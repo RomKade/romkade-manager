@@ -183,6 +183,7 @@ async def test_onion_launch():
 
     await launcher.launch(run, None, "GBA", "/mnt/SDCARD/Roms/GBA/Golden Sun (USA, Europe).zip", None, onion)
     assert "> /tmp/agm-onion-launch.sh" in sent[0] and "pkill -TERM MainUI" in sent[0]
+    assert ".keepServicesAlive_" in sent[0]  # SSH gardé pendant les jeux
     assert sent[0].endswith("sh /tmp/agm-onion-launch.sh '/mnt/SDCARD/Roms/GBA/Golden Sun (USA, Europe).zip'")
 
     async def no_emu(client, command, timeout=20):

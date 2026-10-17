@@ -3,8 +3,10 @@
 #
 #   $1 = chemin complet de la ROM (/mnt/SDCARD/Roms/GBA/jeu.zip)    $2 = « run » : étape détachée (interne)
 #
-# Copié dans /tmp/agm-onion-launch.sh (mémoire vive) par Game Manager, qui le lance avec sh : rien n'est écrit sur
-# la carte.
+# Copié dans /tmp/agm-onion-launch.sh (mémoire vive) par Game Manager, qui le lance avec sh. Seule écriture sur la
+# carte : le réglage « Keep services alive » d'Onion (Tweaks > Network), activé s'il ne l'est pas. Sans lui,
+# Onion arrête SSH au lancement de chaque jeu (runtime.sh, « Kill services for maximum performance ») et Game
+# Manager perd la console pendant la partie (jeu en cours, Quitter, volume).
 # Onion tourne en boucle (/mnt/SDCARD/.tmp_update/runtime.sh) : le menu (MainUI) écrit la commande du jeu choisi
 # dans /tmp/cmd_to_run.sh puis se ferme ; la boucle la range dans .tmp_update/cmd_to_run.sh et lance le jeu.
 # On fait pareil : commande au format de MainUI (émulateur de Emu/<console>/config.json), puis fermeture du
@@ -27,6 +29,13 @@ if [ "$2" != "run" ]; then
     [ -n "$emu" ] || { echo "no-emu $dir"; exit 5; }
     launch=$(sed -n 's/.*"launch":[[:space:]]*"\([^"]*\)".*/\1/p' "$emu/config.json" | head -1)
     [ -n "$launch" ] || { echo "no-emu $dir"; exit 5; }
+    # Garder SSH pendant les jeux : réglage d'Onion, « .keepServicesAlive_ » (désactivé) -> « .keepServicesAlive ».
+    cfg="$SD/.tmp_update/config"
+    if [ ! -f "$cfg/.keepServicesAlive" ]; then
+        mv -f "$cfg/.keepServicesAlive_" "$cfg/.keepServicesAlive" 2>/dev/null || touch "$cfg/.keepServicesAlive"
+        sync
+        echo keepalive-on
+    fi
     printf 'LD_PRELOAD=%s/miyoo/app/../lib/libpadsp.so "%s/%s" "%s/../../Roms/%s"' "$SD" "$emu" "$launch" "$emu" "$rel" \
         > /tmp/agm-onion-cmd
     # Suite détachée : Onion coupe SSH au lancement d'un jeu (sauf « Keep services alive »).

@@ -112,8 +112,9 @@ PROFILES: dict[str, SystemProfile] = {p.id: p for p in [
         (("Saves/CurrentProfile/saves", "retroarch", 3), ("Saves/CurrentProfile/states", "retroarch", 3)),
         ra_config="/mnt/SDCARD/RetroArch/.retroarch/retroarch.cfg",
         ra_history="/mnt/SDCARD/Saves/CurrentProfile/lists/content_history.lpl",
-        notes="Miyoo Mini / Mini Plus. Activer SSH dans les réglages d'Onion. Pendant un jeu, Onion coupe SSH : "
-              "activer « Keep services alive » (Tweaks > Network) pour suivre et quitter le jeu depuis le Mac.",
+        notes="Miyoo Mini / Mini Plus. Activer SSH dans les réglages d'Onion. Au premier jeu lancé depuis le Mac, "
+              "Game Manager active « Keep services alive » (Tweaks > Network) : sans lui, Onion coupe SSH pendant "
+              "les jeux.",
         makers=("Miyoo",)),
     SystemProfile(
         "spruce", "spruce", "experimental", ("/mnt/SDCARD/Roms",), None, "generic",
