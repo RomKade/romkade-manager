@@ -1,0 +1,148 @@
+/*
+ * Chiffres : Atkinson Hyperlegible barre le zéro (0 lu « Ø » dans « 0 modifiés »).
+ * On emprunte donc les chiffres à Archivo, le reste du texte reste en Atkinson.
+ */
+@font-face {
+  font-family: "AGM Digits";
+  src: url("@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  unicode-range: U+0030-0039;
+  font-display: swap;
+}
+
+/*
+ * Jetons de design — thème « Cyber Neon Arcade » : bleu nuit, cyan et rose néon, vert lime pour la console active.
+ * Les noms sont sémantiques (coque, panneau, encre, accent…) : les composants n'utilisent jamais d'hexadécimal.
+ * Thème clair : même vocabulaire (cyan / rose) sur fond bleu très pâle, couleurs assombries pour le contraste.
+ */
+:root {
+  color-scheme: light;
+  --shell: #eef3fa;          /* fond général */
+  --sidebar: #e4ecf7;        /* barre latérale */
+  --panel: #ffffff;          /* cartes, panneaux */
+  --panel-2: #f2f6fc;        /* champs, survols, surfaces surélevées */
+  --line: #cfdbea;           /* bordures normales */
+  --line-strong: #a3b6cd;
+  --ink: #0b1630;            /* titres, texte principal */
+  --ink-2: #33486a;          /* métadonnées */
+  --ink-3: #566b8a;          /* texte discret (≥ 4.5:1 sur --panel) */
+  --screen: #0b1c35;         /* dalle sombre : grille des jaquettes */
+  --screen-2: #102642;
+  --screen-ink: #f5f8ff;
+  --screen-ink-2: #a9bdd3;
+  --bezel: #071327;
+  --accent: #007a96;         /* cyan assombri : liens, navigation active, focus */
+  --accent-hover: #006880;
+  --accent-soft: #d6f3f9;
+  --accent-ink: #ffffff;
+  --accent-2: #c81f84;       /* rose : accent secondaire */
+  --live: #4f7f0c;           /* console active (texte) */
+  --ok: #0f7a4f;
+  --ok-dot: #6aa514;
+  --warn: #8a5a00;
+  --err: #c0294b;
+  --err-soft: #fbe3e9;
+  --err-ink: #ffffff;        /* texte sur fond --err */
+  --danger: #c0294b;         /* fond des boutons destructifs */
+  --danger-ink: #ffffff;
+  --focus: #007a96;
+
+  /* Halos et dégradés */
+  --neon-gradient: linear-gradient(90deg, #0aa6c2, #d23b97);
+  --glow-cyan: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent);
+  --glow-pink: 0 6px 18px color-mix(in srgb, var(--accent-2) 18%, transparent);
+  --surface: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 92%, var(--shell)));
+  --grid-line: rgb(0 122 150 / 0.06);
+  --ambient: radial-gradient(900px 420px at 85% -10%, rgb(0 160 200 / 0.10), transparent 70%),
+             radial-gradient(700px 380px at 40% -20%, rgb(210 40 140 / 0.06), transparent 70%);
+
+  /* Séries de données (palette validée daltonisme, ordre fixe) */
+  --series-1: #0a8fb0;
+  --series-2: #c81f84;
+  --series-3: #5d8f12;
+  --series-4: #c9790f;
+  --series-5: #6b5bd6;
+  --series-6: #139c6b;
+  --series-other: #8b97a8;
+
+  --font-display: "Archivo Variable", "Archivo", system-ui, sans-serif;
+  --font-text: "AGM Digits", "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible", system-ui, sans-serif;
+
+  /* Échelle typographique (rapport ~1.2) */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2.25rem;
+  --fs-hero: clamp(1.75rem, 1rem + 2.6vw, 3.25rem);
+
+  /* Rayons : cartes 12–16 px, contrôles 8–12 px */
+  --r-shell: 16px;
+  --r-panel: 14px;
+  --r-control: 10px;
+  --r-cover: 8px;
+  --r-pill: 999px;
+
+  --shadow-raised: 0 1px 2px rgb(11 22 48 / 0.06), 0 4px 14px rgb(11 22 48 / 0.06);
+  --shadow-inset: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --shadow-pop: 0 18px 48px rgb(11 22 48 / 0.22);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 180ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --shell: #050c1c;
+    --sidebar: #071327;
+    --panel: #0b1c35;
+    --panel-2: #102642;
+    --line: #234362;
+    --line-strong: #31597f;
+    --ink: #f5f8ff;
+    --ink-2: #a9bdd3;
+    --ink-3: #8aa1bb;
+    --screen: #081730;
+    --screen-2: #102642;
+    --screen-ink: #f5f8ff;
+    --screen-ink-2: #a9bdd3;
+    --bezel: #050c1c;
+    --accent: #11d9f5;
+    --accent-hover: #63e7f9;
+    --accent-soft: #0c3550;
+    --accent-ink: #03141f;
+    --accent-2: #ff43b5;
+    --live: #b7ec4b;
+    --ok: #34de95;
+    --ok-dot: #b7ec4b;
+    --warn: #f5b84a;
+    --err: #f56a84;
+    --err-soft: #3a1529;
+    --err-ink: #22050f;
+    --danger: #d8365c;
+    --danger-ink: #ffffff;
+    --focus: #11d9f5;
+
+    --neon-gradient: linear-gradient(90deg, #11d9f5, #ff43b5);
+    --glow-cyan: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 22%, transparent);
+    --glow-pink: 0 0 22px color-mix(in srgb, var(--accent-2) 22%, transparent);
+    --surface: linear-gradient(180deg, #0c1f3b, #0a1830);
+    --grid-line: rgb(17 217 245 / 0.045);
+    --ambient: radial-gradient(1000px 480px at 85% -10%, rgb(17 217 245 / 0.10), transparent 70%),
+               radial-gradient(800px 420px at 35% -25%, rgb(255 67 181 / 0.08), transparent 70%);
+
+    --series-1: #11d9f5;
+    --series-2: #ff43b5;
+    --series-3: #b7ec4b;
+    --series-4: #f5a83a;
+    --series-5: #9d8cff;
+    --series-6: #34de95;
+    --series-other: #5d7390;
+
+    --shadow-raised: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px rgb(0 0 0 / 0.35);
+    --shadow-inset: inset 0 2px 8px rgb(0 0 0 / 0.45);
+    --shadow-pop: 0 24px 60px rgb(0 0 0 / 0.55);
+  }
+}
