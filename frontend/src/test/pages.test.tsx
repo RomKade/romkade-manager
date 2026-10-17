@@ -112,7 +112,7 @@ function mockFetch() {
     if (url.startsWith("/api/players")) {
       const players = init?.method === "PUT" ? (JSON.parse(String(init.body)) as { players: number[] }).players : [2, 1, 0, 3];
       return json({ controllers: [{ index: 0, name: "ANBERNIC-keys", builtin: true }, { index: 1, name: "8BitDo Pro 2", builtin: false }],
-        players, applied: true, game_running: false });
+        players, applied: !(playingId && init?.method === "PUT"), game_running: playingId != null });
     }
     if (url.startsWith("/api/saves/howto")) return json([{ action: "save_state", combo: ["Menu", "R1"] }, { action: "quit", combo: ["Menu", "Start"] }]);
     if (url.startsWith("/api/saves/backups")) return json([]);
@@ -374,6 +374,17 @@ describe("Paramètres", () => {
   });
 });
 
+describe("Sources et crédits", () => {
+  it("cite chaque source avec un lien, et le dépôt GitHub", async () => {
+    renderAt("/parametres/credits");
+    const panel = (await screen.findByRole("heading", { name: "Sources et crédits" })).closest("section")!;
+    expect(within(panel).getByRole("link", { name: /libretro-thumbnails/ })).toHaveAttribute("href", "https://github.com/libretro-thumbnails/libretro-thumbnails");
+    expect(within(panel).getByRole("link", { name: /OpenVGDB/ })).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    expect(within(panel).getByText("CC BY 4.0")).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: /sur GitHub/ })).toHaveAttribute("href", "https://github.com/arnoweb/romkade-manager");
+  });
+});
+
 describe("Date et heure", () => {
   it("montre le retard de la console et la met à l'heure du Mac", async () => {
     renderAt("/parametres/systeme");
@@ -386,13 +397,25 @@ describe("Date et heure", () => {
 });
 
 describe("Manettes", () => {
-  it("rend la main à la console : le joueur 1 prend les boutons, l'ancien joueur l'échange", async () => {
+  it("sans jeu en cours, rend la main à la console (l'ancien joueur 1 l'échange) puis ouvre la bibliothèque", async () => {
     renderAt("/manettes");
     expect(await screen.findByText(/les boutons de la console ne contrôlent pas le jeu/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Jouer avec la console/ }));
     await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [0, 1, 2, 3] }));
-    expect(await screen.findByLabelText("Joueur 1")).toHaveValue("0");
-    expect(screen.queryByText(/ne contrôlent pas le jeu/)).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bibliothèque", level: 1 })).toBeInTheDocument();
+  });
+
+  it("pendant un jeu, relance le jeu pour appliquer la manette", async () => {
+    playingId = 1;
+    renderAt("/manettes");
+    await userEvent.click(await screen.findByRole("button", { name: /Jouer avec la console et relancer le jeu/ }));
+    await waitFor(() => expect(bodies.at(-1)).toMatchObject({ url: "/api/games/1/launch" }));
+    expect(bodies.at(-2)).toEqual({ url: "/api/players", players: [0, 1, 2, 3] });
+
+    await userEvent.selectOptions(screen.getByLabelText("Joueur 1"), "1");
+    expect(await screen.findByText(/relance-le pour appliquer le changement/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Relancer le jeu pour appliquer/ }));
+    await waitFor(() => expect(bodies.filter((b) => b.url === "/api/games/1/launch")).toHaveLength(2));
   });
 
   it("est une page à part, absente de la page Bluetooth", async () => {

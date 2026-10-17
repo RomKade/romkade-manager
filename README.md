@@ -266,6 +266,12 @@ de contrôler le jeu (« Jouer avec la console » la remet sur le joueur 1). Le 
 par `launch.sh` au prochain jeu lancé depuis Game Manager (une fois RetroArch fermé). Choisir une manette pour un
 joueur l'échange avec le joueur qui l'avait.
 
+Le bouton de l'en-tête dépend du jeu en cours : sans jeu, « Jouer avec la console » ouvre ensuite la bibliothèque ;
+pendant un jeu RetroArch connu de la bibliothèque, il devient « Jouer avec la console et relancer le jeu », et
+« Relancer le jeu pour appliquer » quand un changement attend. La relance repasse par `launch.sh` (le jeu est
+quitté proprement avec sa sauvegarde automatique, les manettes sont écrites, puis le jeu reprend en `auto` si le
+système sait reprendre).
+
 ## Volume
 
 Dans le bloc « En cours » du tableau de bord et dans la barre du haut quand un jeu tourne : couper / remettre le
@@ -384,3 +390,25 @@ genres, jaquettes, bandes-annonces et illustrations. Les dossiers de médias ran
 `videos`, `manuals`…) sont ignorés. Quitter un jeu ailleurs que sur Anbernic : commande réseau `QUIT` de RetroArch
 (bash ou `nc`), puis `SIGTERM` si RetroArch ne l'écoute pas. Seul le profil Anbernic + Stock OS Mod a été essayé
 sur une vraie console ; les autres suivent la documentation de leur firmware.
+
+## Sources et crédits
+
+ROMKADE Manager ne fournit aucun jeu. Ce qu'il reprend d'ailleurs est cité dans l'interface
+(Paramètres > Sources et crédits, liste dans `frontend/src/lib/credits.ts`, et sous chaque fiche de jeu) :
+
+| Source | Usage | Licence |
+|---|---|---|
+| [libretro-thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails) | Jaquettes (images © leurs éditeurs) | — |
+| [retroarch-assets](https://github.com/libretro/retroarch-assets) | Illustrations des consoles | CC BY 4.0 |
+| [libretro-database](https://github.com/libretro/libretro-database) | Genres, sortie, développeur, éditeur, franchise, titres arcade | — |
+| [OpenVGDB](https://github.com/OpenVGDB/OpenVGDB) | Résumés, dates, lien GameFAQs, genres | MIT |
+| [catver.ini (progettoSNAPS)](https://www.progettosnaps.net/catver/) | Catégories arcade | — |
+| MAME, FBNeo, HBMAME | Titres complets, année, fabricant (via libretro-database) | — |
+| Wikipédia, GameFAQs, YouTube, Claude (Anthropic) | Liens, bandes-annonces et descriptions IA (clés de l'utilisateur) | — |
+| [Lucide](https://lucide.dev/), Archivo, Atkinson Hyperlegible Next | Pictogrammes, polices | ISC, SIL OFL 1.1 |
+
+Toute nouvelle source (script `backend/scripts/build_*.py`, service en ligne, illustration) s'ajoute à
+`CREDITS` dans `frontend/src/lib/credits.ts`.
+
+Si l'outil vous plaît, une étoile sur [GitHub](https://github.com/arnoweb/romkade-manager) aide le projet.
+

@@ -5,6 +5,7 @@ import { isActive, useCaps, useDeviceStatus, useSettings, useStatus, useSystem, 
 import { getLang, useT } from "../i18n";
 import { has } from "../i18n/core";
 import { gb } from "../lib/format";
+import { GitHubStar } from "./GitHubStar";
 
 const NAV = [
   { to: "/", label: "common.nav.dashboard", icon: Gauge, end: true },
@@ -54,6 +55,7 @@ export function Sidebar() {
         </ul>
       </nav>
       <DeviceCard />
+      <GitHubStar className="sidebar__github" />
     </aside>
   );
 }

@@ -3,8 +3,12 @@ import { useState } from "react";
 
 import type { GameDetail } from "../api/client";
 import { getLang, locale, useT } from "../i18n";
+import { creditUrl } from "../lib/credits";
 import { genreIcon } from "../lib/genreIcons";
 import { regionFlag } from "../lib/regions";
+
+/** Bases d'où viennent ces informations (voir lib/credits.ts), citées sous la fiche. */
+const INFO_SOURCES = [["database", "libretro-database"], ["openvgdb", "OpenVGDB"], ["arcade", "MAME / FBNeo / HBMAME"]] as const;
 
 /**
  * « Informations sur le jeu » de la fiche : genre (pictogramme), régions (drapeaux), sortie, éditeur, développeur,
@@ -73,7 +77,13 @@ export function GameInfo({ game }: { game: GameDetail }) {
           <ExternalLink size={14} aria-hidden /> {t("sheet.info.reference", { site: siteName(game.info_url) })}
         </a>
       )}
-      <p className="muted game-info__sources">{known ? t("sheet.info.sources") : t("sheet.info.none")}</p>
+      <p className="muted game-info__sources">
+        {known ? t("sheet.info.sources") : t("sheet.info.none")}{" "}
+        {INFO_SOURCES.map(([id, name], i) => (
+          <span key={id}>{i > 0 && ", "}<a href={creditUrl(id)} target="_blank" rel="noreferrer noopener">{name}</a></span>
+        ))}
+        {". "}{known && t("sheet.info.wiki")}
+      </p>
     </section>
   );
 }

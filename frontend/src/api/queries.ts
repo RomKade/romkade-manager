@@ -57,6 +57,7 @@ export function useLaunchGame() {
     onSuccess: () => [3000, 7000, 12000].forEach((ms) => setTimeout(() => {
       qc.invalidateQueries({ queryKey: ["now-playing"] });
       qc.invalidateQueries({ queryKey: ["recent-played"] });
+      qc.invalidateQueries({ queryKey: ["players"] });
     }, ms)),
   });
 }

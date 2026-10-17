@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, CalendarClock, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpen, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { NavLink, useParams } from "react-router-dom";
 
@@ -7,7 +7,9 @@ import { api, ApiError, type Capabilities, type DeviceSettings, type HostKey, ty
 import {
   useDetectSystem, useDeviceStatus, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
+import { GitHubStar } from "../components/GitHubStar";
 import { ErrorNotice, hintFor, Meter, PageHeader, Spinner } from "../components/ui";
+import { CREDITS } from "../lib/credits";
 import { dateTime } from "../lib/format";
 import { getLang, locale, t, useT } from "../i18n";
 import { has } from "../i18n/core";
@@ -20,6 +22,7 @@ const TABS = [
   { slug: "temps-de-jeu", label: "settings.tab.playtime", icon: Hourglass },
   { slug: "videos", label: "settings.tab.videos", icon: Video },
   { slug: "descriptions", label: "settings.tab.descriptions", icon: Languages },
+  { slug: "credits", label: "settings.tab.credits", icon: BookOpen },
 ] as const;
 
 export function SettingsPage() {
@@ -60,6 +63,7 @@ export function SettingsPage() {
       {current === "temps-de-jeu" && <PlaytimePanel />}
       {current === "videos" && <YouTubePanel />}
       {current === "descriptions" && <DescriptionsPanel />}
+      {current === "credits" && <CreditsPanel />}
     </div>
   );
 }
@@ -615,5 +619,36 @@ function PlaytimePanel() {
       {save.isError && <ErrorNotice error={save.error} />}
       <p className="muted">{t("settings.playtime.note")}</p>
     </form>
+  );
+}
+
+/** Sources et crédits : tout ce que l'application reprend d'ailleurs (données, images, services), avec un lien. */
+function CreditsPanel() {
+  const t = useT();
+  return (
+    <section className="block credits" aria-labelledby="credits-h">
+      <h2 id="credits-h"><BookOpen size={18} aria-hidden /> {t("settings.credits.title")}</h2>
+      <p className="muted">{t("settings.credits.lead")}</p>
+      {CREDITS.map(({ group, items }) => (
+        <div key={group} className="credits__group">
+          <h3>{t(`settings.credits.group.${group}`)}</h3>
+          <ul className="credits__list">
+            {items.map((c) => (
+              <li key={c.id}>
+                <a href={c.url} target="_blank" rel="noreferrer noopener" className="link">
+                  {c.name} <ExternalLink size={12} aria-hidden />
+                </a>
+                {c.license && <span className="credits__license">{c.license}</span>}
+                <p className="muted">{t(`settings.credits.${c.id}`)}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <div className="credits__support">
+        <p>{t("settings.credits.support")}</p>
+        <GitHubStar />
+      </div>
+    </section>
   );
 }

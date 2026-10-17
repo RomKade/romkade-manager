@@ -20,6 +20,10 @@ const messages: Messages = {
     "useConsole": "Jouer avec la console",
     "p1Missing": "Le joueur 1 utilise « {name} » : les boutons de la console ne contrôlent pas le jeu.",
     "pending": "Un jeu tourne : le changement s'appliquera au prochain jeu lancé depuis Game Manager.",
+    "useConsoleRelaunch": "Jouer avec la console et relancer le jeu",
+    "relaunch": "Relancer le jeu pour appliquer",
+    "relaunching": "Relance du jeu…",
+    "pendingRelaunch": "Un jeu tourne : relance-le pour appliquer le changement (il est quitté proprement, avec sa sauvegarde automatique).",
   },
   en: {
     "title": "Controllers",
@@ -39,6 +43,10 @@ const messages: Messages = {
     "useConsole": "Play with the console",
     "p1Missing": "Player 1 uses “{name}”: the console buttons do not control the game.",
     "pending": "A game is running: the change applies to the next game launched from Game Manager.",
+    "useConsoleRelaunch": "Play with the console and restart the game",
+    "relaunch": "Restart the game to apply",
+    "relaunching": "Restarting the game…",
+    "pendingRelaunch": "A game is running: restart it to apply the change (it quits cleanly, with its automatic save).",
   },
   es: {
     "title": "Mandos",
@@ -58,6 +66,10 @@ const messages: Messages = {
     "useConsole": "Jugar con la consola",
     "p1Missing": "El jugador 1 usa «{name}»: los botones de la consola no controlan el juego.",
     "pending": "Hay un juego en curso: el cambio se aplicará al próximo juego lanzado desde Game Manager.",
+    "useConsoleRelaunch": "Jugar con la consola y reiniciar el juego",
+    "relaunch": "Reiniciar el juego para aplicar",
+    "relaunching": "Reiniciando el juego…",
+    "pendingRelaunch": "Hay un juego en curso: reinícialo para aplicar el cambio (se cierra correctamente, con su guardado automático).",
   },
 };
 

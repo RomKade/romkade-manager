@@ -660,6 +660,9 @@ button, input, select { font: inherit; color: inherit; }
 .genre-pill svg { color: var(--genre-hue, var(--accent)); }
 .sheet__box { width: 120px; aspect-ratio: 3 / 4; margin: 0 0 6px; box-shadow: 0 6px 16px rgb(0 0 0 / 0.3); }
 .sheet__box.cover--empty { display: none; }
+.sheet__credit { display: block; width: 120px; margin: -2px 0 8px; font-size: var(--fs-xs); color: var(--ink-3); }
+.sheet__credit a { color: inherit; }
+.sheet__box.cover--empty + .sheet__credit { display: none; }
 
 .sheet__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
 .sheet__launch-error { flex-basis: 100%; }
@@ -1040,6 +1043,7 @@ kbd {
 .game-info__summary p.is-clamped { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .game-info__ref { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
 .game-info__sources { font-size: var(--fs-xs); margin: 0; }
+.game-info__sources a { color: var(--ink-2); }
 
 /* ---------- Barre du haut sur téléphone : recherche sur toute la largeur, puis jeu en cours et langues ---------- */
 @media (max-width: 760px) {
@@ -1112,3 +1116,34 @@ kbd {
   .search--top { height: 44px; }
   .button--neon { min-height: 44px; }
 }
+
+/* ---------- Lien GitHub (barre latérale) ---------- */
+.gh-star {
+  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 12px;
+  border-radius: var(--r-control); border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--ink-2); text-decoration: none; font-size: var(--fs-sm); font-weight: 600;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.gh-star:hover, .gh-star:focus-visible { color: var(--ink); border-color: color-mix(in srgb, var(--accent-2) 60%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent-2) 22%, transparent); }
+.gh-star svg { flex: none; }
+.gh-star__count { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; color: var(--warn); }
+.gh-star__count span { color: var(--ink); }
+.sidebar__github { margin-top: -10px; }
+@media (max-width: 760px) {
+  .sidebar__github { margin: 0; flex: none; padding: 6px 10px; }
+  .sidebar__github .gh-star__text { display: none; }
+  .sidebar__github .gh-star__count { margin-left: 0; }
+}
+
+/* ---------- Sources et crédits (Paramètres) ---------- */
+.credits { display: flex; flex-direction: column; gap: 14px; }
+.credits__group h3 { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin: 0 0 8px; }
+.credits__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 20px; }
+.credits__list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.credits__list p { flex-basis: 100%; font-size: var(--fs-sm); margin: 0; }
+.credits__list .link { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.credits__license { padding: 0 6px; border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--line-strong); font-size: var(--fs-xs); color: var(--ink-2); }
+.credits__support { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding-top: 14px; border-top: 1px solid var(--line); }
+.credits__support p { max-width: 60ch; }

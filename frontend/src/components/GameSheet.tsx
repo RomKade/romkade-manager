@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { saveFileUrl, type GameDetail } from "../api/client";
 import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, useQuitGame, useSaveStateNow } from "../api/queries";
 import { useT } from "../i18n";
+import { creditUrl } from "../lib/credits";
 import { bytes, date, dateTime } from "../lib/format";
 import { saveLabel } from "../lib/saves";
 import { ConsoleBadge } from "./ConsoleBadge";
@@ -70,7 +71,15 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
         <Cover game={game} size="full" art="card" className="cover--large" />
       </div>
       <div className="sheet__head">
-        {game.boxart_url && <Cover game={game} size="full" art="box" fallback={false} className="sheet__box" />}
+        {game.boxart_url && (
+          <>
+            <Cover game={game} size="full" art="box" fallback={false} className="sheet__box" />
+            {/* Masqué en CSS quand la jaquette ne se charge pas (.cover--empty + .sheet__credit). */}
+            <small className="sheet__credit">
+              {t("sheet.coverCredit")} <a href={creditUrl("thumbnails")} target="_blank" rel="noreferrer noopener">libretro-thumbnails</a>
+            </small>
+          </>
+        )}
         <p className="sheet__platform"><ConsoleBadge code={game.platform.code} label={game.platform.label} />
           {game.platform.label && <span>{game.platform.label}</span>}</p>
         <Dialog.Title className="sheet__title">{game.title}</Dialog.Title>

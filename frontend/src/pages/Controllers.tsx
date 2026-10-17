@@ -1,8 +1,8 @@
-import { AlertTriangle, Gamepad2, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { AlertTriangle, Gamepad2, RotateCcw, Users } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 import type { Controller, Players } from "../api/client";
-import { useCaps, useDeviceStatus, usePlayers, useSetPlayers } from "../api/queries";
+import { useCaps, useDeviceStatus, useLaunchGame, useNowPlaying, usePlayers, useSetPlayers } from "../api/queries";
 import { ErrorNotice, PageHeader, Spinner } from "../components/ui";
 import { useT } from "../i18n";
 
@@ -16,22 +16,46 @@ export function ControllersPage() {
   const builtin = p?.controllers.find((c) => c.builtin);
   const players = p ? complete(p.players) : [];
   const p1 = players[0] ?? 0;
+  const caps = useCaps();
+  const navigate = useNavigate();
+  const now = useNowPlaying(online).data;
+  const launch = useLaunchGame();
+
+  // Le changement ne vaut qu'au prochain lancement de RetroArch : un jeu RetroArch connu de la bibliothèque peut
+  // être relancé tout de suite (launch.sh le quitte proprement, applique les manettes, puis reprend la partie).
+  const game = now?.playing && now.process === "retroarch" ? now.game : null;
+  const canRelaunch = !!game && caps.launch;
+  const relaunch = () => game && launch.mutate({ id: game.id, slot: caps.resume_slot ? "auto" : null });
+  const busy = save.isPending || launch.isPending;
 
   // Choisir une manette pour un joueur l'échange avec le joueur qui l'avait : deux joueurs n'ont jamais la même.
-  const choose = (player: number, index: number) => {
+  const choose = (player: number, index: number, then?: () => void) => {
     const next = [...players];
     const other = next.indexOf(index);
     if (other >= 0) next[other] = players[player]!;
     next[player] = index;
-    save.mutate(next);
+    save.mutate(next, { onSuccess: then });
   };
+
+  // Un seul bouton d'en-tête : sans jeu, la console prend la main puis on choisit un jeu ; pendant un jeu, on
+  // relance le jeu pour que le changement soit pris en compte.
+  let cta: { label: string; icon: typeof Gamepad2; run: () => void } | null = null;
+  if (canRelaunch && p && !p.applied) {
+    cta = { label: t("players.relaunch"), icon: RotateCcw, run: relaunch };
+  } else if (builtin && p1 !== builtin.index) {
+    cta = !now?.playing
+      ? { label: t("players.useConsole"), icon: Gamepad2, run: () => choose(0, builtin.index, () => navigate("/bibliotheque")) }
+      : canRelaunch
+        ? { label: t("players.useConsoleRelaunch"), icon: RotateCcw, run: () => choose(0, builtin.index, relaunch) }
+        : { label: t("players.useConsole"), icon: Gamepad2, run: () => choose(0, builtin.index) };
+  }
 
   return (
     <div className="page controllers">
       <PageHeader title={t("players.title")} lead={t("players.lead")}>
-        {builtin && p1 !== builtin.index && (
-          <button type="button" className="button button--primary" disabled={save.isPending} onClick={() => choose(0, builtin.index)}>
-            <Gamepad2 size={16} aria-hidden /> {t("players.useConsole")}
+        {cta && (
+          <button type="button" className="button button--primary" disabled={busy} onClick={cta.run}>
+            <cta.icon size={16} aria-hidden /> {launch.isPending ? t("players.relaunching") : cta.label}
           </button>
         )}
       </PageHeader>
@@ -43,14 +67,16 @@ export function ControllersPage() {
       ) : q.isError ? (
         <ErrorNotice error={q.error} />
       ) : p && (
-        <PlayersBlock p={p} players={players} busy={save.isPending} error={save.error} onChoose={choose} />
+        <PlayersBlock p={p} players={players} busy={busy} error={save.error ?? launch.error} canRelaunch={canRelaunch}
+          onChoose={(n, i) => choose(n, i)} />
       )}
     </div>
   );
 }
 
-function PlayersBlock({ p, players, busy, error, onChoose }: {
-  p: Players; players: number[]; busy: boolean; error: unknown; onChoose: (player: number, index: number) => void;
+function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose }: {
+  p: Players; players: number[]; busy: boolean; error: unknown; canRelaunch: boolean;
+  onChoose: (player: number, index: number) => void;
 }) {
   const t = useT();
   const bluetooth = useCaps().bluetooth;
@@ -82,7 +108,7 @@ function PlayersBlock({ p, players, busy, error, onChoose }: {
             </li>
           ))}
         </ol>
-        {error ? <ErrorNotice error={error} /> : !p.applied && <p className="muted">{t("players.pending")}</p>}
+        {error ? <ErrorNotice error={error} /> : !p.applied && <p className="muted">{t(canRelaunch ? "players.pendingRelaunch" : "players.pending")}</p>}
       </section>
 
       <section className="block" aria-labelledby="players-detected">
