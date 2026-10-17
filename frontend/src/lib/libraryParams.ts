@@ -1,5 +1,5 @@
 /** État de la bibliothèque, stocké dans l'URL pour que les filtres survivent au retour arrière et aux liens. */
-export type Sort = "name" | "size" | "date" | "added";
+export type Sort = "name" | "size" | "date" | "added" | "year";
 export type View = "grid" | "table";
 export type Art = "box" | "card";
 
@@ -19,12 +19,14 @@ export type LibraryState = {
   /** Jaquettes (banque libretro) ou images du dossier Imgs de la carte. */
   art: Art;
   removed: boolean;
+  /** Seulement les jeux favoris. */
+  fav: boolean;
 };
 
-const SORTS: Sort[] = ["name", "size", "date", "added"];
+const SORTS: Sort[] = ["name", "size", "date", "added", "year"];
 
-/** Ordre naturel de chaque tri : A→Z, gros fichiers d'abord, récents d'abord. */
-export const DEFAULT_ORDER: Record<Sort, "asc" | "desc"> = { name: "asc", size: "desc", date: "desc", added: "desc" };
+/** Ordre naturel de chaque tri : A→Z, gros fichiers d'abord, récents d'abord, années dans l'ordre chronologique. */
+export const DEFAULT_ORDER: Record<Sort, "asc" | "desc"> = { name: "asc", size: "desc", date: "desc", added: "desc", year: "asc" };
 
 export function parseLibrary(sp: URLSearchParams): LibraryState {
   const sort = (SORTS as string[]).includes(sp.get("sort") ?? "") ? (sp.get("sort") as Sort) : "name";
@@ -42,6 +44,7 @@ export function parseLibrary(sp: URLSearchParams): LibraryState {
     view: sp.get("view") === "table" ? "table" : "grid",
     art: sp.get("art") === "card" ? "card" : "box",
     removed: sp.get("removed") === "1",
+    fav: sp.get("fav") === "1",
   };
 }
 
@@ -59,6 +62,7 @@ export function serializeLibrary(s: LibraryState): URLSearchParams {
   if (s.view !== "grid") sp.set("view", s.view);
   if (s.art !== "box") sp.set("art", s.art);
   if (s.removed) sp.set("removed", "1");
+  if (s.fav) sp.set("fav", "1");
   return sp;
 }
 
@@ -74,23 +78,24 @@ export function toApiQuery(s: LibraryState) {
     sort: s.sort,
     order: s.order,
     include_removed: s.removed || undefined,
+    favorite: s.fav || undefined,
   };
 }
 
 /** La console choisie sur l'accueil n'est pas un filtre : elle délimite la page. */
 export function activeFilterCount(s: LibraryState): number {
   const platforms = s.platform.length === 1 ? 0 : s.platform.length;
-  return platforms + s.extension.length + s.region.length + s.genre.length + s.sub.length + (s.q ? 1 : 0) + (s.removed ? 1 : 0);
+  return platforms + s.extension.length + s.region.length + s.genre.length + s.sub.length + (s.q ? 1 : 0) + (s.removed ? 1 : 0) + (s.fav ? 1 : 0);
 }
 
 /** Sans console, sans recherche ni filtre : l'accueil propose de choisir une console. */
 export function showsConsolePicker(s: LibraryState): boolean {
-  return !s.all && !s.q && s.platform.length + s.extension.length + s.region.length + s.genre.length === 0 && !s.removed;
+  return !s.all && !s.q && s.platform.length + s.extension.length + s.region.length + s.genre.length === 0 && !s.removed && !s.fav;
 }
 
 /** Une console ouverte, sans genre choisi, ni recherche ni filtre : on propose de choisir un genre. */
 export function showsGenrePicker(s: LibraryState): boolean {
-  return s.platform.length === 1 && !s.all && !s.q && s.genre.length + s.extension.length + s.region.length === 0 && !s.removed;
+  return s.platform.length === 1 && !s.all && !s.q && s.genre.length + s.extension.length + s.region.length === 0 && !s.removed && !s.fav;
 }
 
 /** Ce que garde « Effacer les filtres » : la console ouverte et l'affichage ; on reste sur la liste des jeux. */

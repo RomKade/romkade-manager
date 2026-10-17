@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +21,7 @@ const game = (id: number, title: string) => ({
   relative_path: `${title} (USA).smc`, extension: "smc", region: "USA", size: 524288,
   modified_at: "2026-01-01T00:00:00Z", role: "candidate", has_image: false, image_url: null,
   metadata_status: "not_fetched", genre: "plateforme", genre_label: "Plateforme", genre_detail: "Platform", first_seen_at: "2026-10-16T10:00:00Z", last_seen_at: "2026-10-16T10:00:00Z", present: true,
+  youtube_url: `https://www.youtube.com/results?search_query=${title.replaceAll(" ", "+")}+SNES+gameplay`,
 });
 const status = {
   synced: true, sync_running: false, last_run: null, last_successful_sync_at: "2026-10-16T10:00:00Z",
@@ -32,6 +33,7 @@ let calls: string[] = [];
 let bodies: Record<string, unknown>[] = [];
 let deviceOnline = true;
 let playingId: number | null = null;
+let favoriteIds: number[] = [];
 let systemCaps: Record<string, boolean> | null = null; // null : système inconnu (tout reste affiché)
 let volume = { percent: 60, muted: false };
 let playAlerts: { id: number; created_at: string; minutes: number; scope: string; game_title: string }[] = [];
@@ -81,10 +83,11 @@ function mockFetch() {
     if (url.startsWith("/api/play/state")) return json({ playing: false, game: null, title: null, session_started_at: null,
       session_seconds: 0, today_seconds: 3 * 3600, settings: playSettings, alerts: playAlerts });
     if (url.startsWith("/api/play/settings")) return json(playSettings);
+    if (url.startsWith("/api/play/reset")) return new Response(null, { status: 204 });
     if (url.startsWith("/api/play/stats")) return json({
       today_seconds: 3 * 3600, week_seconds: 9 * 3600, total_seconds: 20 * 3600, retroarch_available: true,
       days: Array.from({ length: 14 }, (_, i) => ({ date: `2026-10-${String(3 + i).padStart(2, "0")}`, seconds: i * 600 })),
-      games: [{ title: "Super Mario World", platform: "SFC", game: game(1, "Super Mario World"), seconds: 7200, sessions: 3,
+      games: [{ key: "id:1", ra_seconds: 3600, title: "Super Mario World", platform: "SFC", game: game(1, "Super Mario World"), seconds: 7200, sessions: 3,
         last_played: "2026-10-16T10:00:00Z", last_played_console: null }],
       sessions: [{ id: 1, title: "Super Mario World", platform: "SFC", game: game(1, "Super Mario World"),
         started_at: "2026-10-16T08:00:00Z", ended_at: "2026-10-16T10:00:00Z", seconds: 7200 }],
@@ -127,17 +130,37 @@ function mockFetch() {
         source: "retroarch", kind: "sram", slot: null, platform: "SFC", name: "Super Mario World (USA)", size: 2048,
         modified_at: "2026-10-16T10:00:00Z", game: null },
     ]);
+    if (/^\/api\/games\/\d+\/favorite/.test(url)) {
+      const id = Number(url.split("/")[3]);
+      favoriteIds = init?.method === "PUT" ? [id, ...favoriteIds.filter((f) => f !== id)] : favoriteIds.filter((f) => f !== id);
+      return new Response(null, { status: 204 });
+    }
+    if (url.startsWith("/api/favorites")) return json(favoriteIds.map((id) => game(id, id === 1 ? "Super Mario World" : "Zelda")));
+    if (/^\/api\/games\/\d+\/controls/.test(url)) {
+      if (init?.method === "POST") return json({ status: "found", origin: "written", updated_at: "2026-10-17T10:00:00Z",
+        can_generate: true, notes: { fr: "Haut + B : uppercut.", en: "Up + B: uppercut.", es: "Arriba + B: gancho." },
+        controls: [{ button: "dpad", fr: "Se déplacer", en: "Move", es: "Moverse" },
+          { button: "b", fr: "Coup de poing", en: "Punch", es: "Puñetazo" }] });
+      if (init?.method === "PUT") {
+        const body = JSON.parse(String(init.body)) as { controls: { button: string; text: string }[]; notes: string };
+        return json({ status: "found", origin: "edited", updated_at: "2026-10-17T10:00:00Z", can_generate: true, notes: null,
+          controls: body.controls.map((c) => ({ button: c.button, fr: c.text, en: c.text, es: c.text })) });
+      }
+      return json({ status: "none", origin: null, controls: [], notes: null, updated_at: null, can_generate: true });
+    }
     if (/^\/api\/games\/\d+\/video/.test(url)) return json({
       status: "no_key", query: "Super Mario World SNES gameplay", videos: [],
       search_url: "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay",
     });
-    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), release_year: 1990, release_date: "1990-11-21",
+    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), favorite: favoriteIds.includes(1), release_year: 1990, release_date: "1990-11-21",
       publisher: "Nintendo", developer: "Nintendo EAD", franchise: "Mario", description: "Mario's quest to save the princess.",
       descriptions: { fr: { text: "Mario part sauver la princesse.", origin: "translated" } },
       info_url: "http://www.gamefaqs.com/snes/519824-super-mario-world", remote_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc", image_relpath: null, possible_duplicates: [], history: [{ scan_run_id: 1, change: "added", old_size: null, new_size: 1, old_mtime: null, new_mtime: null, run_started_at: "2026-10-16T10:00:00Z" }] });
     if (url.startsWith("/api/games")) {
       const q = new URL(url, "http://x").searchParams.get("q");
-      const items = [game(1, "Super Mario World"), game(2, "Zelda")].filter((g) => !q || g.title.toLowerCase().includes(q));
+      const fav = new URL(url, "http://x").searchParams.get("favorite") === "true";
+      const items = [game(1, "Super Mario World"), game(2, "Zelda")]
+        .filter((g) => (!q || g.title.toLowerCase().includes(q)) && (!fav || favoriteIds.includes(g.id)));
       return json({ page: { total: items.length, offset: 0, limit: 120 }, items });
     }
     return json({ error: { code: "not_found", message: "?" } }, 404);
@@ -160,11 +183,13 @@ function renderAt(path: string) {
 }
 
 beforeEach(() => {
+  localStorage.removeItem("agm-recent-searches");
   systemCaps = null;
   calls = [];
   bodies = [];
   deviceOnline = true;
   playingId = null;
+  favoriteIds = [];
   volume = { percent: 60, muted: false };
   playAlerts = [];
   vi.stubGlobal("fetch", mockFetch());
@@ -207,13 +232,15 @@ describe("Bibliothèque", () => {
     await waitFor(() => expect(screen.getByTestId("loc").textContent).toBe("?platform=SFC&genre=plateforme&genre=sport"));
   });
 
-  it("ouvre la bande-annonce depuis la liste", async () => {
+  it("sans clé YouTube, la bande-annonce mène directement à la recherche YouTube", async () => {
     renderAt("/bibliotheque?all=1");
-    await userEvent.click(await screen.findByRole("button", { name: "Bande-annonce : Super Mario World" }));
+    const link = await screen.findByRole("link", { name: "Bande-annonce : Super Mario World" });
+    expect(link).toHaveAttribute("href", "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay");
+    expect(link).toHaveAttribute("target", "_blank");
+    await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByRole("link", { name: /Chercher sur YouTube/ }))
+    expect(await within(dialog).findByRole("link", { name: /Bande-annonce/ }))
       .toHaveAttribute("href", "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay");
-    expect(within(dialog).getByRole("link", { name: "Paramètres" })).toBeInTheDocument();
   });
 
   it("affiche tous les jeux et filtre à la frappe", async () => {
@@ -276,6 +303,103 @@ describe("Jeu en cours", () => {
     expect(await within(dialog).findByText("En cours sur la console")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Jouer sur la console/ })).not.toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /Quitter le jeu/ })).toBeInTheDocument();
+  });
+});
+
+describe("Jouer avec une manette branchée", () => {
+  it("demande qui joue, donne le joueur 1 à cette manette puis lance le jeu", async () => {
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Jouer sur la console/ }));
+    const choice = within(dialog).getByRole("group", { name: "Qui joue ?" });
+    await userEvent.click(within(choice).getByRole("button", { name: /8BitDo Pro 2/ }));
+    await waitFor(() => expect(bodies.some((b) => b.url === "/api/games/1/launch")).toBe(true));
+    const put = bodies.findIndex((b) => b.url === "/api/players");
+    expect(bodies[put]).toEqual({ url: "/api/players", players: [1, 2, 0, 3] });
+    expect(put).toBeLessThan(bodies.findIndex((b) => b.url === "/api/games/1/launch"));
+  });
+});
+
+describe("Effacer et filtrer le temps de jeu", () => {
+  it("efface le temps d'un jeu, tout le temps de jeu, et filtre sur une période", async () => {
+    renderAt("/temps-de-jeu");
+    await userEvent.click(await screen.findByRole("button", { name: "Effacer le temps de jeu de Super Mario World" }));
+    const one = screen.getByRole("group", { name: "Effacer le temps de jeu de Super Mario World ?" });
+    await userEvent.click(within(one).getByRole("button", { name: "Effacer" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/play/reset", games: [{ key: "id:1", ra_seconds: 3600 }] }));
+
+    await userEvent.click(screen.getByRole("button", { name: /Tout effacer/ }));
+    const all = screen.getByRole("group", { name: /Effacer tout le temps de jeu/ });
+    await userEvent.click(within(all).getByRole("button", { name: "Effacer" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/play/reset-all", games: [{ key: "id:1", ra_seconds: 3600 }] }));
+
+    fireEvent.change(screen.getByLabelText("Du"), { target: { value: "2026-10-01" } });
+    fireEvent.change(screen.getByLabelText("Au"), { target: { value: "2026-10-10" } });
+    await waitFor(() => expect(calls.some((c) => c.includes("/api/play/stats") && c.includes("start=2026-10-01") && c.includes("end=2026-10-10"))).toBe(true));
+    expect(await screen.findByText(/seules les parties suivies par Game Manager comptent/)).toBeInTheDocument();
+  });
+});
+
+describe("Tri par année de sortie", () => {
+  it("trie du plus ancien au plus récent et montre l'année dans le tableau", async () => {
+    renderAt("/bibliotheque?all=1&sort=year&view=table");
+    await waitFor(() => expect(calls.some((c) => c.startsWith("/api/games?") && c.includes("sort=year") && c.includes("order=asc"))).toBe(true));
+    expect(await screen.findByRole("columnheader", { name: /Année/ })).toHaveAttribute("aria-sort", "ascending");
+    expect(screen.getByRole("button", { name: /Plus anciens d'abord/ })).toBeInTheDocument();
+  });
+});
+
+describe("Favoris", () => {
+  it("met un jeu en favori depuis sa fiche, le montre au tableau de bord et filtre la bibliothèque", async () => {
+    renderAt("/");
+    const section = await screen.findByRole("region", { name: "Mes favoris" });
+    expect(await within(section).findByText(/Aucun favori pour l'instant/)).toBeInTheDocument();
+    const added = screen.getByRole("region", { name: "Derniers ajouts" });
+    await userEvent.click(await within(added).findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Ajouter aux favoris/ }));
+    expect(await within(dialog).findByRole("button", { name: /Dans mes favoris/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await within(section).findByText("Super Mario World")).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(within(section).getByRole("link", { name: /Tous mes favoris/ }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Mes favoris" })).toBeInTheDocument();
+    await waitFor(() => expect(calls.some((c) => c.startsWith("/api/games?") && c.includes("favorite=true"))).toBe(true));
+    expect(await screen.findByText("Super Mario World")).toBeInTheDocument();
+    expect(screen.queryByText("Zelda")).not.toBeInTheDocument();
+  });
+});
+
+describe("Commandes du jeu", () => {
+  it("demande les commandes à Claude puis les corrige à la main", async () => {
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    const section = (await within(dialog).findByRole("heading", { name: "Commandes" })).closest("section")!;
+    await userEvent.click(within(section).getByRole("button", { name: /Demander à Claude/ }));
+    expect(await within(section).findByText("Coup de poing")).toBeInTheDocument();
+    expect(within(section).getByText("Haut + B : uppercut.")).toBeInTheDocument();
+    expect(within(section).getByText(/à vérifier en jeu/)).toBeInTheDocument();
+
+    await userEvent.click(within(section).getByRole("button", { name: /Corriger/ }));
+    const actions = within(section).getAllByRole("textbox", { name: "Action" });
+    await userEvent.clear(actions[1]!);
+    await userEvent.type(actions[1]!, "Tir");
+    await userEvent.click(within(section).getByRole("button", { name: "Enregistrer" }));
+    expect(await within(section).findByText("Tir")).toBeInTheDocument();
+    expect(bodies.at(-1)).toMatchObject({ controls: [{ button: "dpad", text: "Se déplacer" }, { button: "b", text: "Tir" }] });
+    expect(within(section).getByText("Corrigé à la main.")).toBeInTheDocument();
+  });
+});
+
+describe("Jeu en cours : volume dans la fiche", () => {
+  it("règle le son depuis le bandeau de la fiche", async () => {
+    playingId = 1;
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    const banner = (await within(dialog).findByText("En cours sur la console")).closest(".playing-banner") as HTMLElement;
+    expect(await within(banner).findByRole("slider", { name: "Volume des jeux" })).toHaveValue("60");
   });
 });
 
@@ -400,15 +524,24 @@ describe("Manettes", () => {
   it("sans jeu en cours, rend la main à la console (l'ancien joueur 1 l'échange) puis ouvre la bibliothèque", async () => {
     renderAt("/manettes");
     expect(await screen.findByText(/les boutons de la console ne contrôlent pas le jeu/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Jouer avec la console/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Utiliser les boutons de la console/ }));
     await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [0, 1, 2, 3] }));
+    expect(await screen.findByRole("heading", { name: "Bibliothèque", level: 1 })).toBeInTheDocument();
+  });
+
+  it("joueur 1 sur une manette branchée, sans jeu en cours : propose de choisir un jeu", async () => {
+    renderAt("/manettes");
+    await userEvent.selectOptions(await screen.findByLabelText("Joueur 1"), "1");
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [1, 2, 0, 3] }));
+    expect(screen.queryByRole("button", { name: /boutons de la console/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Choisir un jeu/ }));
     expect(await screen.findByRole("heading", { name: "Bibliothèque", level: 1 })).toBeInTheDocument();
   });
 
   it("pendant un jeu, relance le jeu pour appliquer la manette", async () => {
     playingId = 1;
     renderAt("/manettes");
-    await userEvent.click(await screen.findByRole("button", { name: /Jouer avec la console et relancer le jeu/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Utiliser les boutons de la console et relancer le jeu/ }));
     await waitFor(() => expect(bodies.at(-1)).toMatchObject({ url: "/api/games/1/launch" }));
     expect(bodies.at(-2)).toEqual({ url: "/api/players", players: [0, 1, 2, 3] });
 
@@ -473,6 +606,26 @@ describe("Tableau de bord", () => {
     expect(calls.some((c) => c.startsWith("/api/search?q=maro"))).toBe(true);
     await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByTestId("loc").textContent).toBe("?q=maro&all=1"));
+  });
+
+  it("garde les dernières recherches et les propose quand le champ est vide", async () => {
+    renderAt("/");
+    const box = await screen.findByRole("combobox", { name: "Rechercher un jeu" });
+    await userEvent.type(box, "maro");
+    await screen.findByRole("option", { name: /Super Mario World/ });
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(screen.getByTestId("loc").textContent).toBe("?q=maro&all=1"));
+
+    await userEvent.clear(box);
+    await userEvent.click(box);
+    const recent = await screen.findByRole("listbox", { name: "Recherches récentes" });
+    await userEvent.click(within(recent).getByRole("option", { name: /maro/ }));
+    expect(box).toHaveValue("maro");
+
+    await userEvent.clear(box);
+    await userEvent.click(screen.getByRole("button", { name: "Retirer « maro » des recherches récentes" }));
+    expect(screen.queryByRole("listbox", { name: "Recherches récentes" })).not.toBeInTheDocument();
+    expect(localStorage.getItem("agm-recent-searches")).toBeNull();
   });
 
   it("montre d'abord les jeux joués récemment et permet de les relancer", async () => {

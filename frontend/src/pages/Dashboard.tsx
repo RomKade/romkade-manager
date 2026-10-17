@@ -1,9 +1,9 @@
-import { ArrowRight, Box, CheckCircle2, Gamepad2, HardDriveUpload, Play, RefreshCw } from "lucide-react";
+import { ArrowRight, Box, CheckCircle2, Gamepad2, HardDriveUpload, Play, RefreshCw, Star } from "lucide-react";
 import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
-  isActive, useCaps, useDeviceStatus, useLaunchGame, useNowPlaying, usePlatforms, usePlayState, useRecentGames, useRecentPlayed, useStartSync,
+  isActive, useCaps, useDeviceStatus, useFavorites, useLaunchGame, useNowPlaying, usePlatforms, usePlayState, useRecentGames, useRecentPlayed, useStartSync,
   useStatus, useTransfers,
 } from "../api/queries";
 import { ConsoleBadge } from "../components/ConsoleBadge";
@@ -54,6 +54,7 @@ export function DashboardPage() {
   const [openId, setOpenId] = useState<number | null>(null);
   const activeTransfers = (useTransfers().data ?? []).filter(isActive);
   const played = useRecentPlayed();
+  const favorites = useFavorites(20);
   const play = usePlayState();
   const dur = useDuration();
   // Même requête que la carte « jeu en cours » (cache partagé) : sert à entourer ce jeu dans « Joués récemment ».
@@ -134,6 +135,31 @@ export function DashboardPage() {
                   </span>
                 </button>
                 {p.game?.present && <ReplayButton id={p.game.id} title={p.title} />}
+              </div>
+            ))}
+          </Shelf>
+        )}
+      </section>
+
+      <section className="block" aria-labelledby="fav-h">
+        <div className="block__head">
+          <h2 id="fav-h"><Star size={22} aria-hidden />{t("dashboard.favorites")}</h2>
+          {(favorites.data ?? []).length > 0 && (
+            <Link to="/bibliotheque?fav=1" className="link link--arrow">{t("dashboard.favoritesAll")} <ArrowRight size={15} aria-hidden /></Link>
+          )}
+        </div>
+        {favorites.isPending ? <Spinner label={t("common.loading")} /> : favorites.isError ? <ErrorNotice error={favorites.error} /> : (favorites.data ?? []).length === 0 ? (
+          <p className="muted">{t("dashboard.favoritesEmpty")}</p>
+        ) : (
+          <Shelf label={t("dashboard.favorites")}>
+            {favorites.data!.map((g) => (
+              <div key={g.id} className={`shelf__item shelf__item--played ${g.id === nowId ? "is-current" : ""}`}>
+                <button type="button" className="shelf__open" onClick={() => setOpenId(g.id)}>
+                  <Cover game={g} />
+                  <span className="tile__title">{g.title}</span>
+                  <span className="tile__meta"><ConsoleBadge code={g.platform.code} label={g.platform.label} />{g.platform.label}</span>
+                </button>
+                {g.present && <ReplayButton id={g.id} title={g.title} />}
               </div>
             ))}
           </Shelf>

@@ -1,20 +1,24 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, Gamepad2, Loader2, Play, Save, Square, X } from "lucide-react";
+import { Copy, Download, Gamepad2, Loader2, Save, Square, Star, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { saveFileUrl, type GameDetail } from "../api/client";
-import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, useQuitGame, useSaveStateNow } from "../api/queries";
+import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetFavorite, useSetPlayers } from "../api/queries";
 import { useT } from "../i18n";
 import { creditUrl } from "../lib/credits";
 import { bytes, date, dateTime } from "../lib/format";
+import { assignPlayer, completePlayers } from "../lib/players";
 import { saveLabel } from "../lib/saves";
 import { ConsoleBadge } from "./ConsoleBadge";
+import { GameControlsSection } from "./GameControls";
 import { GameInfo } from "./GameInfo";
 import { Cover } from "./Cover";
 import { PlaySaveButton } from "./PlaySaveButton";
+import { TrailerButton, YoutubeIcon } from "./Trailer";
 import { ErrorNotice, Spinner } from "./ui";
+import { VolumeControl } from "./VolumeControl";
 
 const CHANGE_LABEL = {
   added: "sheet.change.added",
@@ -87,15 +91,16 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
         <PlayingBanner gameId={game.id} />
         <div className="sheet__actions">
           {game.role === "candidate" && game.present && <LaunchButton id={game.id} />}
-          {onVideo && (
-            <button type="button" className="button" onClick={() => onVideo(game)}>
-              <Play size={16} fill="currentColor" aria-hidden /> {t("sheet.trailer")}
-            </button>
-          )}
+          {game.role === "candidate" && <FavoriteButton id={game.id} on={game.favorite ?? false} />}
+          <TrailerButton game={game} onVideo={onVideo} className="button">
+            <YoutubeIcon size={18} className="yt-icon--brand" /> {t("sheet.trailer")}
+          </TrailerButton>
         </div>
       </div>
 
       <GameInfo game={game} />
+
+      {game.role === "candidate" && <GameControlsSection id={game.id} />}
 
       <dl className="facts">
         {game.full_title && <div className="facts__wide"><dt>{t("sheet.fullTitle")}</dt><dd>{game.full_title}</dd></div>}
@@ -151,7 +156,11 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
   );
 }
 
-/** Disparaît quand ce jeu tourne (le bandeau « En cours » prend le relais) ; bloqué pendant son démarrage. */
+/**
+ * Disparaît quand ce jeu tourne (le bandeau « En cours » prend le relais) ; bloqué pendant son démarrage.
+ * Une manette branchée en plus des boutons de la console : « Jouer » demande d'abord qui joue (joueur 1), écrit
+ * ce choix, puis lance le jeu, qui le prend en compte au démarrage de RetroArch.
+ */
 function LaunchButton({ id }: { id: number }) {
   const t = useT();
   const launch = useLaunchGame();
@@ -160,6 +169,16 @@ function LaunchButton({ id }: { id: number }) {
   const caps = useCaps();
   const qc = useQueryClient();
   const [starting, setStarting] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const pq = usePlayers(online && caps.players);
+  const savePlayers = useSetPlayers();
+  const controllers = pq.data?.controllers ?? [];
+  const players = pq.data ? completePlayers(pq.data.players) : [];
+  const play = (index?: number) => {
+    setChoosing(false);
+    if (index == null || players[0] === index) launch.mutate(id);
+    else savePlayers.mutate(assignPlayer(players, 0, index), { onSuccess: () => launch.mutate(id) });
+  };
   // « Démarrage… » reste affiché jusqu'à ce que la console annonce ce jeu (le bandeau « En cours » prend alors
   // le relais), en relisant l'état toutes les 2 s ; au plus 60 s si le jeu ne démarre pas.
   useEffect(() => {
@@ -172,16 +191,43 @@ function LaunchButton({ id }: { id: number }) {
   if (now?.playing && now.game?.id === id) return null;
   if (!caps.launch) return <p className="muted">{t("sheet.launchUnavailable")}</p>;
   // Un seul état visible de l'envoi au démarrage du jeu (jusqu'à ce que le bandeau « En cours » prenne le relais).
-  const busy = launch.isPending || starting;
+  const busy = launch.isPending || savePlayers.isPending || starting;
+  if (choosing) return (
+    <div className="launch-choice" role="group" aria-labelledby="launch-choice-h">
+      <p id="launch-choice-h" className="launch-choice__title">{t("sheet.whoPlays")}</p>
+      <div className="launch-choice__options">
+        {controllers.map((c) => (
+          <button key={c.index} type="button" className={`button ${players[0] === c.index ? "button--primary" : ""}`}
+            onClick={() => play(c.index)}>
+            <Gamepad2 size={16} aria-hidden /> {c.builtin ? t("players.builtin") : c.name}
+          </button>
+        ))}
+        <button type="button" className="button button--small" onClick={() => setChoosing(false)}>{t("sheet.controls.cancel")}</button>
+      </div>
+    </div>
+  );
   return (
     <>
-      <button type="button" className={`button button--primary ${busy ? "is-busy" : ""}`} onClick={() => launch.mutate(id)}
-        disabled={busy} aria-busy={busy}>
+      <button type="button" className={`button button--primary ${busy ? "is-busy" : ""}`}
+        onClick={() => (controllers.length > 1 ? setChoosing(true) : play())} disabled={busy} aria-busy={busy}>
         {busy ? <Loader2 size={16} aria-hidden className="spin" /> : <Gamepad2 size={16} aria-hidden />}{" "}
         <span role="status">{busy ? t("sheet.starting") : t("sheet.play")}</span>
       </button>
-      {launch.isError && <div className="sheet__launch-error"><ErrorNotice error={launch.error} title={t("sheet.launchFailed")} /></div>}
+      {(launch.isError || savePlayers.isError) && <div className="sheet__launch-error">
+        <ErrorNotice error={launch.error ?? savePlayers.error} title={t("sheet.launchFailed")} /></div>}
     </>
+  );
+}
+
+/** Étoile de la fiche : met le jeu en favori ou l'en retire. */
+function FavoriteButton({ id, on }: { id: number; on: boolean }) {
+  const t = useT();
+  const set = useSetFavorite(id);
+  return (
+    <button type="button" className={`button favorite-button ${on ? "is-on" : ""}`} aria-pressed={on}
+      disabled={set.isPending} onClick={() => set.mutate(!on)}>
+      <Star size={16} fill={on ? "currentColor" : "none"} aria-hidden /> {t(on ? "sheet.favorite.on" : "sheet.favorite.add")}
+    </button>
   );
 }
 
@@ -212,7 +258,7 @@ function GameSaves({ id }: { id: number }) {
   );
 }
 
-/** Bandeau « En cours sur la console » quand ce jeu tourne, avec Sauvegarder et Quitter. */
+/** Bandeau « En cours sur la console » quand ce jeu tourne, avec Sauvegarder, Quitter et le volume. */
 function PlayingBanner({ gameId }: { gameId: number }) {
   const t = useT();
   const online = useDeviceStatus().data?.connected === true;
@@ -236,6 +282,7 @@ function PlayingBanner({ gameId }: { gameId: number }) {
           </button>
         </span>
       )}
+      <div className="playing-banner__volume"><VolumeControl online={online} /></div>
     </div>
   );
 }

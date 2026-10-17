@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { api, type Capabilities, type Query, type Transfer } from "./client";
+import { api, type Capabilities, type GameControls, type GameDetail, type GameControlsIn, type Query, type Transfer } from "./client";
 
 export const PAGE_SIZE = 120;
 
@@ -34,6 +34,22 @@ export const useGamesInfinite = (params: Query, enabled = true) =>
     placeholderData: keepPreviousData,
   });
 
+/** Jeux favoris, le dernier ajouté en tête. */
+export const useFavorites = (limit?: number) =>
+  useQuery({ queryKey: ["favorites", limit], queryFn: () => api.favorites(limit) });
+
+export function useSetFavorite(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => api.setFavorite(id, on),
+    onSuccess: (_, on) => {
+      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, favorite: on } : g));
+      qc.invalidateQueries({ queryKey: ["favorites"] });
+      qc.invalidateQueries({ queryKey: ["games"] });
+    },
+  });
+}
+
 export const useRecentGames = (limit = 14) =>
   useQuery({ queryKey: ["games", "recent", limit], queryFn: () => api.games({ sort: "added", order: "desc", limit }) });
 
@@ -43,6 +59,19 @@ export const useGame = (id: number | null) =>
 /** Bandes-annonces : la première demande lance une recherche YouTube (quota), la réponse est en cache côté serveur. */
 export const useGameVideo = (id: number | null) =>
   useQuery({ queryKey: ["game-video", id], queryFn: () => api.gameVideo(id!), enabled: id != null, staleTime: Infinity, retry: false });
+
+/** Commandes du jeu (quelle touche fait quoi) : rédigées par Claude à la demande ou corrigées à la main. */
+export const useGameControls = (id: number) =>
+  useQuery({ queryKey: ["game-controls", id], queryFn: () => api.gameControls(id), staleTime: Infinity, retry: false });
+
+export function useControlsMutations(id: number) {
+  const qc = useQueryClient();
+  const onSuccess = (d: GameControls) => qc.setQueryData(["game-controls", id], d);
+  return {
+    generate: useMutation({ mutationFn: () => api.generateControls(id), onSuccess }),
+    edit: useMutation({ mutationFn: (body: GameControlsIn) => api.editControls(id, body), onSuccess }),
+  };
+}
 
 /** Jeu en cours sur la console (une connexion SSH courte, sans écriture), seulement si elle est joignable. */
 export const useNowPlaying = (enabled: boolean) =>
@@ -97,8 +126,18 @@ export function useSaveMutations() {
 /** Temps de jeu : état léger (lu sur le serveur, sans contacter la console), relu toutes les 30 s. */
 export const usePlayState = () =>
   useQuery({ queryKey: ["play-state"], queryFn: api.playState, refetchInterval: 30_000, retry: false });
-export const usePlayStats = (days = 14) =>
-  useQuery({ queryKey: ["play-stats", days], queryFn: () => api.playStats(days), refetchInterval: 60_000, retry: false });
+export const usePlayStats = (days = 14, period: { start: string; end: string } | null = null) =>
+  useQuery({ queryKey: ["play-stats", days, period], queryFn: () => api.playStats(days, period), refetchInterval: 60_000, retry: false });
+
+/** Remet à zéro le temps de jeu de jeux (clé + total RetroArch des statistiques), ou tout. */
+export function useResetPlaytime() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ games, everything = false }: { games: { key: string; ra_seconds: number }[]; everything?: boolean }) =>
+      api.resetPlaytime(games, everything),
+    onSuccess: () => ["play-stats", "play-state", "recent-played"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })),
+  });
+}
 /** Recherche rapide (Typesense quand il est prêt), pour le tableau de bord. */
 export const useQuickSearch = (q: string) =>
   useQuery({ queryKey: ["search", q], queryFn: () => api.search(q), enabled: q.trim().length > 0,

@@ -218,3 +218,39 @@ def test_interrupted_run_recovered_on_restart(tmp_path):
 async def test_games_param_validation(client, bad):
     r = await client.get("/api/games", params=bad)
     assert r.status_code == 422 and r.json()["error"]["code"] == "validation_error"
+
+
+async def test_favorites(app_factory):
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        items = (await c.get("/api/games", params={"limit": 3})).json()["items"]
+        a, b = items[0]["id"], items[1]["id"]
+        assert (await c.get(f"/api/games/{a}")).json()["favorite"] is False
+        assert (await c.put(f"/api/games/{a}/favorite")).status_code == 204
+        assert (await c.put(f"/api/games/{b}/favorite")).status_code == 204
+        assert (await c.put(f"/api/games/{b}/favorite")).status_code == 204  # déjà favori : sans effet
+        assert (await c.get(f"/api/games/{a}")).json()["favorite"] is True
+        assert [g["id"] for g in (await c.get("/api/favorites")).json()] == [b, a]
+        page = (await c.get("/api/games", params={"favorite": True})).json()
+        assert page["page"]["total"] == 2 and {g["id"] for g in page["items"]} == {a, b}
+        assert (await c.delete(f"/api/games/{a}/favorite")).status_code == 204
+        assert [g["id"] for g in (await c.get("/api/favorites")).json()] == [b]
+        assert (await c.put("/api/games/999999/favorite")).status_code == 404
+
+
+async def test_sort_by_release_year(app_factory):
+    from app.db.models import RemoteFile
+
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        with app.state.sessions.begin() as s:
+            files = s.query(RemoteFile).filter(RemoteFile.role == "candidate").order_by(RemoteFile.id).all()
+            years = {files[0].id: 1994, files[1].id: 1987}
+            for f in files:
+                f.release_year = years.get(f.id)
+        asc = [g["id"] for g in (await games(c, sort="year", order="asc", limit=500))["items"]]
+        assert asc[:2] == [files[1].id, files[0].id]  # 1987 puis 1994, les jeux sans année ensuite
+        desc = [(g["id"], g["release_year"]) for g in (await games(c, sort="year", order="desc", limit=500))["items"]]
+        assert [i for i, _ in desc[:2]] == [files[0].id, files[1].id] and desc[-1][1] is None

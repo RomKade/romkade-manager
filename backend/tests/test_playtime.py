@@ -127,3 +127,52 @@ async def test_recent_games_merge_console_history_and_sessions(app_factory):
         assert [r["title"] for r in recent] == ["Sonic The Hedgehog", "Jeu disparu", "Super Mario World"]
         assert recent[0]["game"]["platform"]["directory"] == "MD" and recent[1]["game"] is None
         assert recent[2]["seconds"] == 300 and recent[2]["last_played"]
+
+
+async def _two_games(app, tr):
+    for i in range(0, 61):  # Mario : 1 h le 16 octobre
+        await tr.observe(playing(MARIO), T0 + timedelta(minutes=i))
+    await tr.observe(IDLE, T0 + timedelta(minutes=61))
+    for i in range(0, 21):  # Sonic : 20 min le 18 octobre
+        await tr.observe(playing(SONIC), T0 + timedelta(days=2, minutes=i))
+    await tr.observe(IDLE, T0 + timedelta(days=2, minutes=21))
+
+
+async def test_period_filter(app_factory):
+    app = app_factory()
+    app.state.device_runner = FakeConsole()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        await _two_games(app, app.state.tracker)
+        day = pt.local_day(T0)
+        stats = (await c.get("/api/play/stats", params={"start": str(day), "end": str(day)})).json()
+        assert stats["period"] == {"start": str(day), "end": str(day)}
+        assert [g["title"] for g in stats["games"]] == ["Super Mario World"]  # journaux RetroArch exclus
+        assert stats["games"][0]["seconds"] == 60 * 60 and stats["total_seconds"] == 60 * 60
+        assert [s["title"] for s in stats["sessions"]] == ["Super Mario World"] and len(stats["days"]) == 1
+        stats = (await c.get("/api/play/stats", params={"start": str(day), "end": str(day + timedelta(days=2))})).json()
+        assert {g["title"] for g in stats["games"]} == {"Super Mario World", "Sonic The Hedgehog"} and len(stats["days"]) == 3
+        assert (await c.get("/api/play/stats", params={"start": str(day)})).status_code == 422
+        assert (await c.get("/api/play/stats", params={"start": str(day), "end": str(day - timedelta(days=1))})).status_code == 422
+
+
+async def test_reset_one_game_and_everything(app_factory):
+    app = app_factory()
+    app.state.device_runner = FakeConsole()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        await _two_games(app, app.state.tracker)
+        games = {g["title"]: g for g in (await c.get("/api/play/stats")).json()["games"]}
+        mario = games["Super Mario World"]
+        assert mario["seconds"] == 9000 and mario["ra_seconds"] == 9000 and mario["key"].startswith("id:")
+
+        r = await c.post("/api/play/reset", json={"games": [{"key": mario["key"], "ra_seconds": mario["ra_seconds"]}]})
+        assert r.status_code == 204
+        games = {g["title"]: g for g in (await c.get("/api/play/stats")).json()["games"]}
+        assert "Super Mario World" not in games  # parties effacées, journaux RetroArch ramenés à zéro
+        assert games["Sonic The Hedgehog"]["seconds"] == 20 * 60
+
+        everything = [{"key": g["key"], "ra_seconds": g["ra_seconds"]} for g in games.values()]
+        assert (await c.post("/api/play/reset-all", json={"games": everything})).status_code == 204
+        stats = (await c.get("/api/play/stats")).json()
+        assert stats["games"] == [] and stats["sessions"] == [] and stats["total_seconds"] == 0

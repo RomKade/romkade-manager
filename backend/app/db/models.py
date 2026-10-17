@@ -227,6 +227,48 @@ class GameText(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class GameControls(Base):
+    """Commandes d'un jeu sur la console (quelle touche fait quoi), rédigées par Claude à la demande
+    (services/controls.py) ou corrigées à la main.
+
+    Clé : plateforme + titre normalisé, comme GameText. `controls` : liste ordonnée {button, fr, en, es} ;
+    `notes` : {fr, en, es} ou None. `origin` : « written » (jeu connu du modèle), « cautious » (jeu mal connu :
+    commandes génériques de la console), « edited » (corrigé à la main).
+    """
+
+    __tablename__ = "game_controls"
+    __table_args__ = (UniqueConstraint("platform_id", "normalized_title"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    platform_id: Mapped[int] = mapped_column(ForeignKey("platform.id", ondelete="CASCADE"))
+    normalized_title: Mapped[str] = mapped_column(String(512))
+    controls: Mapped[list] = mapped_column(JSON, default=list)
+    notes: Mapped[dict | None] = mapped_column(JSON)
+    origin: Mapped[str] = mapped_column(String(16))
+    model: Mapped[str | None] = mapped_column(String(40))
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class Favorite(Base):
+    """Jeu mis en favori depuis sa fiche (l'édition choisie, pas toutes celles du même titre)."""
+
+    __tablename__ = "favorite"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("remote_file.id", ondelete="CASCADE"), unique=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class PlayReset(Base):
+    """Temps de jeu remis à zéro pour un jeu. Les parties de Game Manager sont effacées ; les journaux de RetroArch
+    restent sur la console (on n'y touche pas) : `ra_baseline` est leur total au moment de la remise à zéro, retiré
+    ensuite de ce qu'ils comptent. Clé : celle des statistiques (« id:12 », « path:/mnt/… », « ra:nom »)."""
+
+    __tablename__ = "play_reset"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(1100), unique=True)
+    ra_baseline: Mapped[int] = mapped_column(Integer, default=0)
+    reset_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class PlaySession(Base):
     """Une partie observée par Game Manager (jeu en cours sur la console), datée avec l'horloge du Mac."""
 

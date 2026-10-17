@@ -64,6 +64,7 @@ class GameOut(ORM):
     first_seen_at: datetime
     last_seen_at: datetime
     present: bool
+    youtube_url: str | None = None  # recherche YouTube de la bande-annonce (même requête que GET /games/{id}/video)
 
 
 class ChangeOut(ORM):
@@ -81,6 +82,7 @@ class GameDetailOut(GameOut):
     franchise: str | None = None
     description: str | None = None  # résumé, en anglais (OpenVGDB)
     descriptions: dict[str, dict] = {}  # {fr|en|es: {text, origin}} : par Claude (services/descriptions.py)
+    favorite: bool = False
     info_url: str | None = None  # fiche de référence (GameFAQs)
     remote_path: str
     image_relpath: str | None

@@ -104,7 +104,7 @@ GENRE_NAMES: dict[str, list[str]] = {
     "educatif": ["Éducatif", "Educational", "Educativo"], "compilation": ["Compilation", "Recopilación"],
     "autre": ["Autre", "Other", "Otros"],
 }
-SORT_FIELDS = {"name": "sort_title", "size": "size", "date": "mtime", "added": "first_seen"}
+SORT_FIELDS = {"name": "sort_title", "size": "size", "date": "mtime", "added": "first_seen", "year": "year"}
 
 
 def _quote(value: str) -> str:
@@ -133,6 +133,8 @@ def build_sort(sort: str, order: str, has_query: bool) -> str:
     # Avec une recherche et le tri par défaut (titre A→Z), la pertinence passe d'abord.
     if has_query and sort == "name" and order == "asc":
         return "_text_match:desc,sort_title:asc"
+    if sort == "year":  # jeux sans année connue à la fin, puis A→Z dans une même année
+        return f"year(missing_values: last):{order},sort_title:asc"
     return f"{SORT_FIELDS.get(sort, 'sort_title')}:{order}"
 
 

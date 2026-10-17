@@ -12,11 +12,12 @@ from app.catalog_schemas import (
     FacetsOut, FacetValue,
     GameDetailOut, GameOut, GamesPageOut, PlatformRef, ScanRunOut, UnmatchedImagesOut,
 )
-from app.db.models import Device, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
+from app.db.models import Device, Favorite, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
 from app.device.paths import safe_join
 from app.schemas import Page
 from app.services.classify import display_title, search_key
 from app.services.boxart import has_source as has_boxart_source
+from app.services import videos
 from app.services.genres import GENRES, UNCLASSIFIED
 from app.services.subgenres import LABELS as SUB_LABELS
 from app.services.subgenres import ORDER as SUB_ORDER
@@ -38,6 +39,7 @@ def to_game(f: RemoteFile) -> GameOut:
         release_year=f.release_year, developer=f.developer, publisher=f.publisher,
         first_seen_at=f.first_seen_at, last_seen_at=f.last_seen_at,
         present=f.deleted_at is None,
+        youtube_url=videos.youtube_search_url(videos.build_query(f)),
     )
 
 
@@ -70,12 +72,12 @@ def list_platforms(s: Session, include_absent: bool = False) -> list[CatalogPlat
     return out
 
 
-SortKey = Literal["name", "size", "date", "added"]
+SortKey = Literal["name", "size", "date", "added", "year"]
 
 
 def search_games(s: Session, *, q: str | None, platforms: list[str] | None, extensions: list[str] | None,
                  regions: list[str] | None, role: str, genres: list[str] | None = None, subgenres: list[str] | None = None,
-                 has_image: bool | None, include_removed: bool,
+                 has_image: bool | None, include_removed: bool, favorite: bool = False,
                  sort: SortKey, order: Literal["asc", "desc"], offset: int, limit: int) -> GamesPageOut:
     conds = []
     if role != "all":
@@ -100,6 +102,8 @@ def search_games(s: Session, *, q: str | None, platforms: list[str] | None, exte
         conds.append(RemoteFile.subgenre.in_(subgenres))
     if has_image is not None:
         conds.append(RemoteFile.image_relpath.is_not(None) if has_image else RemoteFile.image_relpath.is_(None))
+    if favorite:
+        conds.append(RemoteFile.id.in_(select(Favorite.file_id)))
     if q:
         for word in search_key(q).split():
             conds.append(RemoteFile.search_key.like(f"%{word}%", escape="\\"))
@@ -107,8 +111,10 @@ def search_games(s: Session, *, q: str | None, platforms: list[str] | None, exte
     base = select(RemoteFile).join(Platform).where(and_(*conds))
     total = s.scalar(select(func.count()).select_from(base.subquery()))
     col = {"name": RemoteFile.normalized_title, "size": RemoteFile.size, "date": RemoteFile.mtime,
-           "added": RemoteFile.first_seen_at}[sort]
+           "added": RemoteFile.first_seen_at, "year": RemoteFile.release_year}[sort]
     ordering = [col.desc() if order == "desc" else col.asc(), RemoteFile.filename.asc()]
+    if sort == "year":  # jeux sans année connue à la fin, puis A→Z dans une même année
+        ordering = [col.is_(None), ordering[0], RemoteFile.normalized_title.asc(), RemoteFile.filename.asc()]
     rows = s.scalars(base.options(joinedload(RemoteFile.platform)).order_by(*ordering).offset(offset).limit(limit))
     return GamesPageOut(page=Page(total=total, offset=offset, limit=limit), items=[to_game(r) for r in rows])
 
@@ -119,6 +125,22 @@ def games_by_ids(s: Session, ids: list[int], total: int, offset: int, limit: int
                                          .where(RemoteFile.id.in_(ids)))}
     return GamesPageOut(page=Page(total=total, offset=offset, limit=limit),
                         items=[to_game(rows[i]) for i in ids if i in rows])
+
+
+def favorites(s: Session, limit: int | None = None) -> list[GameOut]:
+    """Jeux favoris, le dernier ajouté en tête (y compris ceux disparus de la carte, signalés par `present`)."""
+    q = (select(RemoteFile).join(Favorite, Favorite.file_id == RemoteFile.id).options(joinedload(RemoteFile.platform))
+         .order_by(Favorite.created_at.desc(), Favorite.id.desc()))
+    return [to_game(f) for f in s.scalars(q.limit(limit) if limit else q)]
+
+
+def set_favorite(s: Session, file_id: int, on: bool) -> None:
+    get_file(s, file_id)
+    row = s.scalar(select(Favorite).where(Favorite.file_id == file_id))
+    if on and row is None:
+        s.add(Favorite(file_id=file_id))
+    elif not on and row is not None:
+        s.delete(row)
 
 
 def get_file(s: Session, file_id: int) -> RemoteFile:
@@ -140,6 +162,7 @@ def game_detail(s: Session, file_id: int, roms_root: str) -> GameDetailOut:
         release_date=f.release_date, franchise=f.franchise, description=f.description, info_url=f.info_url,
         descriptions={t.lang: {"text": t.text, "origin": t.origin} for t in s.scalars(select(GameText).where(
             GameText.platform_id == f.platform_id, GameText.normalized_title == f.normalized_title))},
+        favorite=s.scalar(select(Favorite.id).where(Favorite.file_id == f.id)) is not None,
         remote_path=safe_join(roms_root, f.platform.directory, f.relative_path),
         image_relpath=f.image_relpath,
         possible_duplicates=[to_game(d) for d in dups] if f.role == "candidate" else [],

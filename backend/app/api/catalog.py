@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app import errors
 from app.catalog_schemas import (
-    CatalogPlatformOut, CatalogStatusOut, ChangesPageOut, DuplicateGroupOut, GameDetailOut, GamesPageOut, SearchOut,
+    CatalogPlatformOut, CatalogStatusOut, ChangesPageOut, DuplicateGroupOut, GameDetailOut, GameOut, GamesPageOut, SearchOut,
     FacetsOut, ScanRunOut, UnmatchedImagesOut,
 )
 from app.db.models import PlatformImage
@@ -101,13 +101,15 @@ async def games(
     role: Literal["candidate", "component", "auxiliary", "program", "all"] = "candidate",
     has_image: bool | None = None,
     include_removed: bool = Query(False, description="Inclure les fichiers disparus de la carte"),
-    sort: Literal["name", "size", "date", "added"] = "name",
+    favorite: bool = Query(False, description="Seulement les jeux favoris"),
+    sort: Literal["name", "size", "date", "added", "year"] = "name",
     order: Literal["asc", "desc"] = "asc",
     offset: int = Query(0, ge=0),
     limit: int = Query(60, ge=1, le=500),
 ) -> GamesPageOut:
     search = request.app.state.search
-    if q and q.strip() and search.ready and role == "candidate" and has_image is None:
+    # Favoris : peu de jeux, filtrés par SQLite (l'index Typesense ne les connaît pas).
+    if q and q.strip() and search.ready and role == "candidate" and has_image is None and not favorite:
         try:
             ids, total = await search.search(q.strip(), platforms=platform, extensions=extension, regions=region,
                                              genres=genre, subgenres=subgenre, include_removed=include_removed,
@@ -118,7 +120,7 @@ async def games(
             search.ready = False
     return await asyncio.to_thread(_with_session, request, lambda s: cq.search_games(
         s, q=q, platforms=platform, extensions=extension, regions=region, role=role, genres=genre, subgenres=subgenre,
-        has_image=has_image,
+        has_image=has_image, favorite=favorite,
         include_removed=include_removed, sort=sort, order=order, offset=offset, limit=limit))
 
 
@@ -127,7 +129,8 @@ async def quick_search(request: Request, q: str = Query(..., min_length=1, max_l
                        limit: int = Query(8, ge=1, le=30)) -> SearchOut:
     """Recherche rapide (tableau de bord) : les jeux les plus pertinents et le nombre total de résultats."""
     page = await games(request, q=q, platform=None, extension=None, region=None, genre=None, subgenre=None, role="candidate",
-                       has_image=None, include_removed=False, sort="name", order="asc", offset=0, limit=limit)
+                       has_image=None, include_removed=False, favorite=False, sort="name", order="asc", offset=0,
+                       limit=limit)
     return SearchOut(items=page.items, total=page.page.total, engine="typesense" if request.app.state.search.ready else "sqlite")
 
 
@@ -135,6 +138,22 @@ async def quick_search(request: Request, q: str = Query(..., min_length=1, max_l
 def search_status(request: Request) -> dict:
     s = request.app.state.search
     return {"engine": "typesense" if s.ready else "sqlite", "status": s.status}
+
+
+@router.get("/favorites", response_model=list[GameOut], tags=["catalog"])
+async def favorites(request: Request, limit: int | None = Query(None, ge=1, le=500)) -> list[GameOut]:
+    """Jeux favoris, le dernier ajouté en tête."""
+    return await asyncio.to_thread(_with_session, request, cq.favorites, limit)
+
+
+@router.put("/games/{game_id}/favorite", status_code=204, tags=["catalog"])
+async def add_favorite(game_id: int, request: Request) -> None:
+    await asyncio.to_thread(_with_write, request, cq.set_favorite, game_id, True)
+
+
+@router.delete("/games/{game_id}/favorite", status_code=204, tags=["catalog"])
+async def remove_favorite(game_id: int, request: Request) -> None:
+    await asyncio.to_thread(_with_write, request, cq.set_favorite, game_id, False)
 
 
 @router.get("/games/{game_id}", response_model=GameDetailOut, tags=["catalog"])
@@ -204,4 +223,9 @@ def catalog_facets(request: Request, platform: list[str] | None = Query(None)) -
 
 def _with_session(request: Request, fn, *args):
     with _sessions(request)() as s:
+        return fn(s, *args)
+
+
+def _with_write(request: Request, fn, *args):
+    with _sessions(request).begin() as s:
         return fn(s, *args)

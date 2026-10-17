@@ -1,12 +1,13 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, LayoutGrid, LibraryBig, Play, Plus, Rows3, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, LayoutGrid, LibraryBig, Plus, Rows3, Star, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import type { CatalogPlatform, Facets, Game } from "../api/client";
 import { useFacets, useGamesInfinite, usePlatforms, useStatus } from "../api/queries";
 import { ConsoleBadge } from "../components/ConsoleBadge";
+import { TrailerButton, YoutubeIcon } from "../components/Trailer";
 import { ConsoleIcon } from "../components/ConsoleIcon";
 import { Cover } from "../components/Cover";
 import { MultiFilter, SelectField } from "../components/Filters";
@@ -26,6 +27,7 @@ import {
 
 const SORT_OPTIONS = [
   { value: "name", label: "library.sort.name" },
+  { value: "year", label: "library.sort.year" },
   { value: "added", label: "library.sort.added" },
   { value: "date", label: "library.sort.date" },
   { value: "size", label: "library.sort.size" },
@@ -90,7 +92,7 @@ export function LibraryPage() {
                 )}
               </nav>
               {single && <ConsoleIcon code={singleCode} className="library__icon" />}
-              <h1>{singleLabel ?? t("library.allGames")}</h1>
+              <h1>{singleLabel ?? (state.fav ? t("library.favorites") : t("library.allGames"))}</h1>
               {step === "games" && oneGenre && <GenrePill genre={state.genre[0]!} />}
             </>
           )}
@@ -136,14 +138,19 @@ export function LibraryPage() {
           <SelectField label={t("library.sortBy")} value={state.sort} options={SORT_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))}
             onChange={(v) => update({ sort: v as Sort, order: DEFAULT_ORDER[v as Sort] })} />
           <button type="button" className="chip" onClick={() => update({ order: state.order === "asc" ? "desc" : "asc" })}
-            aria-label={state.order === "asc" ? t("library.order.asc") : t("library.order.desc")}>
+            title={t("library.order.reverse")}>
             {state.order === "asc" ? <ArrowUp size={14} aria-hidden /> : <ArrowDown size={14} aria-hidden />}
+            {t(`library.order.${state.sort}.${state.order}`)}
           </button>
           <ToggleGroup.Root type="single" className="segmented segmented--text" value={state.art}
             onValueChange={(v) => v && update({ art: v as LibraryState["art"] })} aria-label={t("library.art")}>
             <ToggleGroup.Item value="box" className="segmented__item">{t("library.art.box")}</ToggleGroup.Item>
             <ToggleGroup.Item value="card" className="segmented__item">{t("library.art.card")}</ToggleGroup.Item>
           </ToggleGroup.Root>
+          <button type="button" className={`chip ${state.fav ? "is-on" : ""}`} aria-pressed={state.fav}
+            onClick={() => update({ fav: !state.fav })}>
+            <Star size={14} fill={state.fav ? "currentColor" : "none"} aria-hidden /> {t("library.favoritesOnly")}
+          </button>
           <label className="toggle-inline">
             <input type="checkbox" checked={state.removed} onChange={(e) => update({ removed: e.target.checked })} />
             {t("library.includeRemoved")}
@@ -375,7 +382,7 @@ function CoverGrid({ items, total, art, showPlatform, onOpen, onVideo, fetchMore
                     <span className="tile__title">{g.title}</span>
                     <span className="tile__meta">
                       {showPlatform && <ConsoleBadge code={g.platform.code} label={g.platform.label} />}
-                      {[g.genre ? t(`common.genre.${g.genre}`) : null, showPlatform ? null : regionLabel(g.region)].filter(Boolean).join(", ")}
+                      {[g.release_year, g.genre ? t(`common.genre.${g.genre}`) : null, showPlatform ? null : regionLabel(g.region)].filter(Boolean).join(", ")}
                     </span>
                   </button>
                   <PlayButton game={g} onVideo={onVideo} className="tile__play" />
@@ -394,6 +401,7 @@ const COLUMNS: { key: string; label: string; sort?: Sort; className?: string }[]
   { key: "title", label: "library.col.title", sort: "name" },
   { key: "platform", label: "library.col.platform" },
   { key: "genre", label: "library.col.genre" },
+  { key: "year", label: "library.col.year", sort: "year", className: "num-col" },
   { key: "ext", label: "library.col.ext" },
   { key: "region", label: "library.col.region" },
   { key: "size", label: "library.col.size", sort: "size", className: "num-col" },
@@ -451,6 +459,7 @@ function GameTable({
                 </td>
                 <td><ConsoleBadge code={g.platform.code} label={g.platform.label} /></td>
                 <td>{g.genre ? t(`common.genre.${g.genre}`) : ""}</td>
+                <td className="num-col num">{g.release_year ?? ""}</td>
                 <td>{g.extension ? `.${g.extension}` : ""}</td>
                 <td>{regionLabel(g.region)}</td>
                 <td className="num-col num">{bytes(g.size)}</td>
@@ -469,9 +478,9 @@ function GameTable({
 function PlayButton({ game, onVideo, className }: { game: Game; onVideo: (g: Game) => void; className: string }) {
   const t = useT();
   return (
-    <button type="button" className={className} aria-label={t("library.trailerFor", { title: game.title })} title={t("library.trailer")}
-      onClick={(e) => { e.stopPropagation(); onVideo(game); }}>
-      <Play size={14} fill="currentColor" aria-hidden />
-    </button>
+    <TrailerButton game={game} onVideo={onVideo} className={className} label={t("library.trailerFor", { title: game.title })}
+      title={t("library.trailer")}>
+      <YoutubeIcon size={16} />
+    </TrailerButton>
   );
 }

@@ -1,14 +1,17 @@
-import { Clock, Hourglass, Settings as SettingsIcon } from "lucide-react";
+import { CalendarRange, Clock, Hourglass, Settings as SettingsIcon, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { PlayStats } from "../api/client";
-import { usePlayState, usePlayStats } from "../api/queries";
+import { usePlayState, usePlayStats, useResetPlaytime } from "../api/queries";
 import { ConsoleBadge } from "../components/ConsoleBadge";
 import { Cover } from "../components/Cover";
 import { Empty, ErrorNotice, PageHeader, Spinner } from "../components/ui";
 import { locale, useT } from "../i18n";
 import { dateTime } from "../lib/format";
+
+/** « 12 oct. 2026 » pour une date « AAAA-MM-JJ » (jour local). */
+const fmtDate = (d: string) => new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${d}T12:00:00`));
 
 /** « 2 h 05 », « 45 min », « < 1 min ». */
 export function useDuration() {
@@ -25,7 +28,18 @@ export function useDuration() {
 export function PlaytimePage() {
   const t = useT();
   const dur = useDuration();
-  const stats = usePlayStats(14);
+  // Période « du … au … » : appliquée quand les deux dates sont choisies, dans le bon ordre.
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const period = from && to && from <= to ? { start: from, end: to } : null;
+  const stats = usePlayStats(14, period);
+  const base = usePlayStats(14);  // sans période : totaux RetroArch de chaque jeu, pour la remise à zéro
+  const reset = useResetPlaytime();
+  const [confirmAll, setConfirmAll] = useState(false);
+  const raByKey = new Map((base.data?.games ?? []).map((g) => [g.key, g.ra_seconds]));
+  const resetGame = (key: string) => reset.mutate({ games: [{ key, ra_seconds: raByKey.get(key) ?? 0 }] });
+  const resetAll = () => reset.mutate({ games: (base.data?.games ?? []).map((g) => ({ key: g.key, ra_seconds: g.ra_seconds })), everything: true },
+    { onSuccess: () => setConfirmAll(false) });
   const state = usePlayState();
   const s = stats.data;
   const st = state.data;
@@ -37,6 +51,27 @@ export function PlaytimePage() {
         <Link to="/parametres/temps-de-jeu" className="button"><SettingsIcon size={16} aria-hidden /> {t("playtime.setLimit")}</Link>
       </PageHeader>
 
+      <section className="block playtime__period" aria-labelledby="period-h">
+        <h2 id="period-h"><CalendarRange size={18} aria-hidden /> {t("playtime.period.title")}</h2>
+        <div className="playtime__period-fields">
+          <label className="field">
+            <span className="field__label">{t("playtime.period.from")}</span>
+            <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="field__label">{t("playtime.period.to")}</span>
+            <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+          </label>
+          {(from || to) && (
+            <button type="button" className="link-button" onClick={() => { setFrom(""); setTo(""); }}>
+              <X size={14} aria-hidden /> {t("playtime.period.clear")}
+            </button>
+          )}
+        </div>
+        {period ? <p className="muted">{t("playtime.period.note")}</p>
+          : (from || to) && <p className="muted">{t("playtime.period.incomplete")}</p>}
+      </section>
+
       {stats.isPending ? <Spinner label={t("common.loading")} /> : stats.isError ? <ErrorNotice error={stats.error} /> : s && (
         <>
           <div className="stat-tiles">
@@ -46,7 +81,7 @@ export function PlaytimePage() {
               <p className="stat-tile__value num">{dur(s.week_seconds)}</p>
             </div>
             <div className="stat-tile">
-              <p className="stat-tile__label">{t("playtime.total")}</p>
+              <p className="stat-tile__label">{period ? t("playtime.periodTotal") : t("playtime.total")}</p>
               <p className="stat-tile__value num">{dur(s.total_seconds)}</p>
               <p className="stat-tile__sub muted">{t("playtime.gamesCount", { count: s.games.length })}</p>
             </div>
@@ -63,14 +98,16 @@ export function PlaytimePage() {
           )}
 
           <section className="block" aria-labelledby="days-h">
-            <h2 id="days-h">{t("playtime.daysTitle")}</h2>
+            <h2 id="days-h">{period
+              ? t("playtime.period.days", { from: fmtDate(period.start), to: fmtDate(period.end) })
+              : t("playtime.daysTitle")}</h2>
             <DaysChart days={s.days} limit={st?.settings.alert_scope === "day" ? limit : null} />
           </section>
 
           <section className="block" aria-labelledby="games-h">
             <h2 id="games-h">{t("playtime.gamesTitle")}</h2>
             {s.games.length === 0 ? <Empty title={t("playtime.noGames")}><p>{t("playtime.noGamesBody")}</p></Empty> : (
-              <GamesChart games={s.games.slice(0, 12)} />
+              <GamesChart games={s.games.slice(0, 12)} onReset={resetGame} busy={reset.isPending} />
             )}
             {!s.retroarch_available && <p className="muted">{t("playtime.raUnavailable")}</p>}
           </section>
@@ -90,6 +127,26 @@ export function PlaytimePage() {
               </ul>
             )}
             <p className="muted playtime__note">{t("playtime.sourcesNote")}</p>
+          </section>
+
+          <section className="block playtime__danger" aria-labelledby="erase-h">
+            <h2 id="erase-h"><Trash2 size={18} aria-hidden /> {t("playtime.erase.title")}</h2>
+            <p className="muted">{t("playtime.erase.lead")}</p>
+            {confirmAll ? (
+              <div className="playtime__confirm" role="group" aria-label={t("playtime.erase.confirm")}>
+                <strong>{t("playtime.erase.confirm")}</strong>
+                <button type="button" className="button button--danger button--small" disabled={reset.isPending} onClick={resetAll}>
+                  {t("playtime.erase.yes")}
+                </button>
+                <button type="button" className="button button--small" onClick={() => setConfirmAll(false)}>{t("playtime.erase.no")}</button>
+              </div>
+            ) : (
+              <button type="button" className="button button--danger" disabled={!base.data || base.data.games.length === 0}
+                onClick={() => setConfirmAll(true)}>
+                <Trash2 size={16} aria-hidden /> {t("playtime.erase.all")}
+              </button>
+            )}
+            {reset.isError && <ErrorNotice error={reset.error} />}
           </section>
         </>
       )}
@@ -180,9 +237,10 @@ function DaysChart({ days, limit }: { days: PlayStats["days"]; limit: number | n
   );
 }
 
-function GamesChart({ games }: { games: PlayStats["games"] }) {
+function GamesChart({ games, onReset, busy }: { games: PlayStats["games"]; onReset: (key: string) => void; busy: boolean }) {
   const t = useT();
   const dur = useDuration();
+  const [confirm, setConfirm] = useState<string | null>(null);
   const max = Math.max(1, ...games.map((g) => g.seconds));
   return (
     <ul className="games-chart">
@@ -204,6 +262,18 @@ function GamesChart({ games }: { games: PlayStats["games"] }) {
             </p>
           </div>
           <span className="games-chart__value num">{dur(g.seconds)}</span>
+          {confirm === g.key ? (
+            <span className="games-chart__confirm" role="group" aria-label={t("playtime.erase.gameConfirm", { title: g.title })}>
+              <button type="button" className="button button--danger button--small" disabled={busy}
+                onClick={() => { onReset(g.key); setConfirm(null); }}>{t("playtime.erase.yes")}</button>
+              <button type="button" className="button button--small" onClick={() => setConfirm(null)}>{t("playtime.erase.no")}</button>
+            </span>
+          ) : (
+            <button type="button" className="icon-button" aria-label={t("playtime.erase.game", { title: g.title })}
+              title={t("playtime.erase.game", { title: g.title })} onClick={() => setConfirm(g.key)}>
+              <Trash2 size={15} aria-hidden />
+            </button>
+          )}
         </li>
       ))}
     </ul>

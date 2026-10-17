@@ -18,6 +18,7 @@ from app.device.ssh_client import DeviceClient
 
 LAUNCH_SCRIPT = (Path(__file__).parent / "launch.sh").read_text()
 VOLUME_KEYS_SCRIPT = (Path(__file__).parent / "volume_keys.py").read_text()
+PLAYERS_SCRIPT = (Path(__file__).parent / "players_apply.sh").read_text()
 LOG = "/tmp/agm-launch.log"
 REQUIRED = "/mnt/mod/ctrl/RA_launch.sh"
 GAME_PROCESSES = ("retroarch", "PPSSPPSDL", "drastic", "OpenBOR.dge", "PPSSPP", "mupen64plus", "flycast",
@@ -53,9 +54,10 @@ def launch_command(platform_dir: str, rom_path: str, slot: str | None = None) ->
           f"then printf %s {shlex.quote(asoundrc('agm_bt'))} > {ASOUNDRC}; "
           f"else printf %s {shlex.quote(asoundrc())} > {ASOUNDRC}; fi; }}; ")
     # setsid + nohup : le jeu continue après la fermeture de la session SSH. AGM_VOLKEYS : touches de volume
-    # pendant le jeu (volume_keys.py, lancé par launch.sh).
+    # pendant le jeu (volume_keys.py, lancé par launch.sh). AGM_PLAYERS : manette de chaque joueur
+    # (players_apply.sh, lancé par launch.sh une fois RetroArch fermé).
     return (f"test -x {REQUIRED} || {{ echo no-mod; exit 7; }}; {rc}"
-            f"AGM_VOLKEYS={shlex.quote(VOLUME_KEYS_SCRIPT)} "
+            f"AGM_VOLKEYS={shlex.quote(VOLUME_KEYS_SCRIPT)} AGM_PLAYERS={shlex.quote(PLAYERS_SCRIPT)} "
             f"setsid nohup bash -c {shlex.quote(LAUNCH_SCRIPT)} agm-launch {shlex.quote(platform_dir)} "
             f"{shlex.quote(rom_path)} {shlex.quote(slot or '')} > {LOG} 2>&1 < /dev/null & echo started")
 

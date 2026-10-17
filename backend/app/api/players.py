@@ -14,6 +14,7 @@ class ControllerOut(BaseModel):
     index: int
     name: str
     builtin: bool
+    usb_id: str | None = None  # « vvvv:pppp »
 
 
 class PlayersOut(BaseModel):

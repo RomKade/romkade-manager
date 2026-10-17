@@ -416,6 +416,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Favorites
+         * @description Jeux favoris, le dernier ajouté en tête.
+         */
+        get: operations["favorites_api_favorites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}/favorite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add Favorite */
+        put: operations["add_favorite_api_games__game_id__favorite_put"];
+        post?: never;
+        /** Remove Favorite */
+        delete: operations["remove_favorite_api_games__game_id__favorite_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/games/{game_id}": {
         parameters: {
             query?: never;
@@ -1161,6 +1199,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/controls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Controls */
+        get: operations["game_controls_api_games__game_id__controls_get"];
+        /** Edit Controls */
+        put: operations["edit_controls_api_games__game_id__controls_put"];
+        /**
+         * Generate Controls
+         * @description Fait rédiger les commandes par Claude (un appel, facturé sur le compte Anthropic) et les garde.
+         */
+        post: operations["generate_controls_api_games__game_id__controls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/play/settings": {
         parameters: {
             query?: never;
@@ -1228,10 +1288,53 @@ export interface paths {
          * Play Stats
          * @description Temps de jeu par jour et par jeu, historique des parties. Les journaux de RetroArch sont lus sur la
          *     console quand elle répond (lecture seule) ; sans elle, seules les parties suivies par Game Manager comptent.
+         *     Avec une période (start, end) : jours, jeux et parties de cette période ; les journaux de RetroArch, qui ne
+         *     donnent qu'un total par jeu sans dates, n'y entrent pas.
          */
         get: operations["play_stats_api_play_stats_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/play/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Games
+         * @description Remet à zéro le temps de jeu de ces jeux (clés et totaux RetroArch de GET /api/play/stats).
+         */
+        post: operations["reset_games_api_play_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/play/reset-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset All
+         * @description Efface tout le temps de jeu : toutes les parties de Game Manager, et les journaux RetroArch des jeux
+         *     listés (tous ceux de GET /api/play/stats) ne comptent plus qu'à partir de maintenant.
+         */
+        post: operations["reset_all_api_play_reset_all_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1684,6 +1787,30 @@ export interface components {
             /** Latency Ms */
             latency_ms: number;
         };
+        /** ControlIn */
+        ControlIn: {
+            /**
+             * Button
+             * @enum {string}
+             */
+            button: "dpad" | "left_stick" | "right_stick" | "a" | "b" | "x" | "y" | "l1" | "r1" | "l2" | "r2" | "l3" | "r3" | "start" | "select";
+            /** Text */
+            text: string;
+        };
+        /** ControlOut */
+        ControlOut: {
+            /**
+             * Button
+             * @enum {string}
+             */
+            button: "dpad" | "left_stick" | "right_stick" | "a" | "b" | "x" | "y" | "l1" | "r1" | "l2" | "r2" | "l3" | "r3" | "start" | "select";
+            /** Fr */
+            fr: string;
+            /** En */
+            en: string;
+            /** Es */
+            es: string;
+        };
         /** ControllerOut */
         ControllerOut: {
             /** Index */
@@ -1692,6 +1819,8 @@ export interface components {
             name: string;
             /** Builtin */
             builtin: boolean;
+            /** Usb Id */
+            usb_id?: string | null;
         };
         /** DayOut */
         DayOut: {
@@ -1860,6 +1989,39 @@ export interface components {
             /** Files */
             files: components["schemas"]["RemoteFileOut"][];
         };
+        /**
+         * GameControlsIn
+         * @description Correction à la main, dans la langue de l'utilisateur : le texte vaut pour les trois langues.
+         */
+        GameControlsIn: {
+            /** Controls */
+            controls: components["schemas"]["ControlIn"][];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
+        /** GameControlsOut */
+        GameControlsOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "found" | "none";
+            /** Origin */
+            origin: ("written" | "cautious" | "edited") | null;
+            /** Controls */
+            controls: components["schemas"]["ControlOut"][];
+            /** Notes */
+            notes: {
+                [key: string]: string;
+            } | null;
+            /** Updated At */
+            updated_at: string | null;
+            /** Can Generate */
+            can_generate: boolean;
+        };
         /** GameDetailOut */
         GameDetailOut: {
             /** Id */
@@ -1927,6 +2089,8 @@ export interface components {
             last_seen_at: string;
             /** Present */
             present: boolean;
+            /** Youtube Url */
+            youtube_url?: string | null;
             /** Release Date */
             release_date?: string | null;
             /** Franchise */
@@ -1942,6 +2106,11 @@ export interface components {
                     [key: string]: unknown;
                 };
             };
+            /**
+             * Favorite
+             * @default false
+             */
+            favorite: boolean;
             /** Info Url */
             info_url?: string | null;
             /** Remote Path */
@@ -2020,9 +2189,18 @@ export interface components {
             last_seen_at: string;
             /** Present */
             present: boolean;
+            /** Youtube Url */
+            youtube_url?: string | null;
         };
         /** GameTimeOut */
         GameTimeOut: {
+            /** Key */
+            key: string;
+            /**
+             * Ra Seconds
+             * @default 0
+             */
+            ra_seconds: number;
             /** Title */
             title: string;
             /** Platform */
@@ -2126,6 +2304,19 @@ export interface components {
              * Format: password
              */
             password: string;
+        };
+        /** PeriodOut */
+        PeriodOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
         };
         /** PlanItemOut */
         PlanItemOut: {
@@ -2310,6 +2501,7 @@ export interface components {
             week_seconds: number;
             /** Total Seconds */
             total_seconds: number;
+            period?: components["schemas"]["PeriodOut"] | null;
             /** Days */
             days: components["schemas"]["DayOut"][];
             /** Games */
@@ -2388,6 +2580,21 @@ export interface components {
             size: number | null;
             /** Modified At */
             modified_at: string | null;
+        };
+        /** ResetGameIn */
+        ResetGameIn: {
+            /** Key */
+            key: string;
+            /**
+             * Ra Seconds
+             * @default 0
+             */
+            ra_seconds: number;
+        };
+        /** ResetIn */
+        ResetIn: {
+            /** Games */
+            games: components["schemas"]["ResetGameIn"][];
         };
         /** RestoreIn */
         RestoreIn: {
@@ -3364,7 +3571,9 @@ export interface operations {
                 has_image?: boolean | null;
                 /** @description Inclure les fichiers disparus de la carte */
                 include_removed?: boolean;
-                sort?: "name" | "size" | "date" | "added";
+                /** @description Seulement les jeux favoris */
+                favorite?: boolean;
+                sort?: "name" | "size" | "date" | "added" | "year";
                 order?: "asc" | "desc";
                 offset?: number;
                 limit?: number;
@@ -3445,6 +3654,95 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    favorites_api_favorites_get: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_favorite_api_games__game_id__favorite_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_favorite_api_games__game_id__favorite_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4730,6 +5028,103 @@ export interface operations {
             };
         };
     };
+    game_controls_api_games__game_id__controls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameControlsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_controls_api_games__game_id__controls_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GameControlsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameControlsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_controls_api_games__game_id__controls_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameControlsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_settings_api_play_settings_get: {
         parameters: {
             query?: never;
@@ -4836,6 +5231,10 @@ export interface operations {
         parameters: {
             query?: {
                 days?: number;
+                /** @description Début de la période (jour local, inclus) */
+                start?: string | null;
+                /** @description Fin de la période (jour local, incluse) */
+                end?: string | null;
             };
             header?: never;
             path?: never;
@@ -4851,6 +5250,68 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PlayStatsOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_games_api_play_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_all_api_play_reset_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

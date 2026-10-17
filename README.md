@@ -261,20 +261,34 @@ appairer / connecter / déconnecter / oublier, et « Son des jeux ici » pour un
 Page « Manettes » : qui contrôle le jeu. Manette de chaque joueur dans RetroArch (`input_playerN_joypad_index`,
 numéros du pilote sdl2 : 0 = boutons de la console, puis manettes USB / Bluetooth dans l'ordre de branchement).
 RetroArch enregistre sa config en quittant : un joueur 1 resté sur une ancienne manette absente empêche la console
-de contrôler le jeu (« Jouer avec la console » la remet sur le joueur 1). Le choix est rangé dans
+de contrôler le jeu (« Utiliser les boutons de la console » la remet sur le joueur 1). Le choix est rangé dans
 `/.config/agm-players`, écrit tout de suite dans `/.config/retroarch/retroarch.cfg` si aucun jeu ne tourne, sinon
 par `launch.sh` au prochain jeu lancé depuis Game Manager (une fois RetroArch fermé). Choisir une manette pour un
 joueur l'échange avec le joueur qui l'avait.
 
-Le bouton de l'en-tête dépend du jeu en cours : sans jeu, « Jouer avec la console » ouvre ensuite la bibliothèque ;
-pendant un jeu RetroArch connu de la bibliothèque, il devient « Jouer avec la console et relancer le jeu », et
-« Relancer le jeu pour appliquer » quand un changement attend. La relance repasse par `launch.sh` (le jeu est
-quitté proprement avec sa sauvegarde automatique, les manettes sont écrites, puis le jeu reprend en `auto` si le
-système sait reprendre).
+RetroArch (pilote sdl2 avec udev) ne numérote pas les manettes dans l'ordre de `/proc/bus/input/devices` mais
+par chemin sysfs : avec une manette Xbox USB, `…/soc/5101000.ohci0…` passe avant les boutons
+`…/soc/soc@03000000:gpio_keys` (Xbox = 0, console = 1), et « joueur 1 = manette n°1 » donnait la main à la
+console. `/.config/agm-players` garde les numéros de Game Manager ; `players_apply.sh` (lancé par Game Manager
+sans jeu en cours, et par `launch.sh` avant chaque jeu, avec les manettes branchées à ce moment) les traduit dans
+l'ordre de RetroArch et réserve en plus la manette au joueur (`input_playerN_reserved_device = "045e:0b12 Generic
+X-Box pad"`, type 1 = préférée). Ce qui a été appliqué est copié dans `/.config/agm-players.applied` ; le
+résultat est noté dans `/tmp/agm-launch.log` (« joueurs pour RetroArch : 0 045e:0b12 Generic X-Box pad 1 … »).
+
+Avec une manette branchée en plus des boutons de la console, « Jouer sur la console » (fiche du jeu) demande
+d'abord « Qui joue ? » : le choix devient le joueur 1, puis le jeu est lancé.
+
+Le bouton de l'en-tête suit la situation : un changement en attente pendant un jeu RetroArch connu de la
+bibliothèque donne « Relancer le jeu pour appliquer » ; un joueur 1 sur une manette absente donne « Utiliser les
+boutons de la console » (puis la bibliothèque sans jeu en cours, ou la relance du jeu en cours) ; sinon, sans jeu
+en cours, « Choisir un jeu » ouvre la bibliothèque. La relance repasse par `launch.sh` : le jeu est quitté
+proprement avec sa sauvegarde automatique, les manettes sont écrites, puis il reprend en `auto` si le système sait
+reprendre.
 
 ## Volume
 
-Dans le bloc « En cours » du tableau de bord et dans la barre du haut quand un jeu tourne : couper / remettre le
+Dans le bloc « En cours » du tableau de bord, dans le bandeau « En cours » de la fiche du jeu et dans la barre du
+haut quand un jeu tourne : couper / remettre le
 son et curseur de volume (1 à 100 % = -40 à 0 dB), valable pour les haut-parleurs comme pour une enceinte
 Bluetooth.
 
@@ -312,6 +326,23 @@ listes arcade MAME / FBNeo / HBMAME), rapprochée par nom de fichier comme les g
 l'année, l'éditeur, le développeur, la franchise, et les régions et genres en français, anglais et espagnol
 (« Japon », « Japan », « Japón »).
 
+## Commandes des jeux
+
+Section « Commandes » de la fiche : quelle touche de la console fait quoi dans ce jeu (« B : coup de poing »,
+« A : tir »), avec quelques astuces. « Demander à Claude » fait un appel (Opus 5.5, effort moyen, quelques
+centimes) avec la correspondance par défaut des cœurs RetroArch entre la manette d'origine et les touches de la
+console (Mega Drive : A = Y, B = B, C = A ; PlayStation : Croix = B, Rond = A… ; arcade : bouton 1 = B, 2 = A…,
+pièce = Select). Réponse en français, anglais et espagnol, gardée en base (table `game_controls`, partagée par
+les éditions d'un même jeu). Jeu mal connu du modèle : commandes habituelles de la console, signalé comme tel.
+« Corriger » / « Saisir à la main » remplace la liste par la sienne (même texte dans les trois langues). Même clé
+d'API Anthropic que les descriptions (Paramètres > Descriptions).
+
+## Favoris
+
+« Ajouter aux favoris » sur la fiche d'un jeu (l'édition ouverte). Les favoris apparaissent dans « Mes favoris » du
+tableau de bord (le dernier ajouté en premier, avec « Rejouer ») et dans la bibliothèque : bouton « Favoris » des
+filtres, ou `/bibliotheque?fav=1` (lien « Tous mes favoris »). Rangés dans la base du Mac (table `favorite`).
+
 ## Temps de jeu
 
 Page « Temps de jeu » : temps du jour, des 7 derniers jours et total, histogramme sur 14 jours, temps par jeu,
@@ -326,6 +357,14 @@ dernières parties ; carte « Aujourd'hui » sur le tableau de bord.
   rappel facultatif. Elle s'affiche en pop-in dans Game Manager et, si coché, sur l'écran de la console pendant
   le jeu (commande réseau `SHOW_MSG` de RetroArch). Réglages dans `play_settings.json` du dossier de données.
 
+
+Filtre « Du … au … » : jours, jeux et parties de cette période. Seules les parties suivies par Game Manager y
+comptent : les journaux de RetroArch (`.lrtl`) ne donnent qu'un total par jeu, sans dates.
+
+Effacer : la corbeille d'un jeu (dans « Par jeu ») ou « Tout effacer », avec confirmation. Les parties de Game
+Manager sont supprimées ; rien n'est modifié sur la console : le total des journaux RetroArch du jeu au moment de
+l'effacement est retenu (table `play_reset`) et retiré ensuite, si bien que seul le temps joué depuis compte. La
+partie en cours, si elle est concernée, repart de zéro.
 ## Tableau de bord
 
 Dans l'ordre : le jeu en cours, les jeux joués récemment (bouton ▶ pour les relancer sur la console ;
@@ -337,9 +376,15 @@ l'activité (dernière partie, temps de jeu du jour, synchronisation, jeux en co
 
 La barre de recherche du haut, sur toutes les pages, propose consoles, genres et jeux pendant la frappe (flèches +
 Entrée ouvrent la fiche, « Voir les N résultats » ouvre la bibliothèque). Dans la bibliothèque, elle filtre en plus
-la liste affichée, combinée aux filtres (console, genre, format, région) et aux tris. Fautes de frappe tolérées
+la liste affichée, combinée aux filtres (console, genre, format, région) et aux tris (dont « Année de sortie » :
+du plus ancien au plus récent par défaut, jeux sans année connue à la fin ; le bouton à côté du tri dit l'ordre
+en clair, « Plus anciens d'abord », « A → Z »…, et l'inverse d'un clic). Fautes de frappe tolérées
 (« castlvania », « zelad », « stret fihgter »), recherche par début de mot (« final fant »), pertinence d'abord
 (titre complet, puis nom de fichier, console et genre).
+
+Champ vide : les 6 dernières recherches (Entrée, choix d'une suggestion, « Voir les N résultats », ou saisie qui a
+filtré la bibliothèque), à reprendre d'un clic, à retirer une par une ou toutes. Gardées dans le navigateur
+(`localStorage`) : le Mac et le téléphone ont chacun leur liste.
 
 Le moteur est [Typesense](https://typesense.org) : Game Manager démarre son propre conteneur Docker
 `agm-typesense` (image `typesense/typesense:27.1`), joignable seulement depuis ce Mac sur `127.0.0.1:8118`,

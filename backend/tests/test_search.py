@@ -18,6 +18,7 @@ def test_filter_and_sort_building():
     assert se.build_sort("name", "asc", True) == "_text_match:desc,sort_title:asc"
     assert se.build_sort("name", "asc", False) == "sort_title:asc"
     assert se.build_sort("size", "desc", True) == "size:desc"
+    assert se.build_sort("year", "asc", False) == "year(missing_values: last):asc,sort_title:asc"
 
 
 async def test_library_falls_back_to_sqlite_without_typesense(client):

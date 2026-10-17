@@ -89,13 +89,11 @@ for _ in $(seq 1 50); do
 done
 if pidof retroarch >/dev/null; then log "RetroArch ne se ferme pas"; exit 3; fi
 
-# Manette de chaque joueur choisie dans Game Manager (voir app/device/players.py). RetroArch est fermé : sa
-# config ne sera plus écrasée, on y remplace les lignes input_playerN_joypad_index.
-PLAYERS=/.config/agm-players RACFG=/.config/retroarch/retroarch.cfg
-if [ -s "$PLAYERS" ] && [ -f "$RACFG" ]; then
-    sed -i '/^input_player[1-4]_joypad_index = /d' "$RACFG" && cat "$PLAYERS" >> "$RACFG"
-    log "joueurs : $(grep -o '[0-9]"$' "$PLAYERS" | tr -d '"' | tr '\n' ' ')"
-fi
+# Manette de chaque joueur choisie dans Game Manager (app/device/players_apply.sh, passé dans AGM_PLAYERS).
+# RetroArch est fermé : sa config ne sera plus écrasée. Recalculé à chaque jeu, avec les manettes branchées
+# maintenant (numéro dans l'ordre de RetroArch + réservation de la manette).
+RACFG=/.config/retroarch/retroarch.cfg
+[ -n "$AGM_PLAYERS" ] && log "$(bash -c "$AGM_PLAYERS")"
 
 # Volume des jeux (voir app/device/volume.py) : notre réglage « Game Manager » (/.asoundrc) fait le volume,
 # celui de RetroArch reste à 0 dB. Premier jeu depuis le démarrage : le réglage naît au maximum (+12 dB), on le

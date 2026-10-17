@@ -35,6 +35,8 @@ export type Diagnose = S["DiagnoseOut"];
 export type Clock = S["ClockOut"];
 export type DescriptionsStatus = S["DescriptionsStatusOut"];
 export type PlayState = S["PlayStateOut"];
+export type GameControls = S["GameControlsOut"];
+export type GameControlsIn = S["GameControlsIn"];
 export type PlayStats = S["PlayStatsOut"];
 export type PlaySettings = S["PlaySettings"];
 export type RecentPlayed = S["RecentGameOut"];
@@ -93,6 +95,8 @@ export const api = {
   platforms: () => request<CatalogPlatform[]>("GET", "/platforms"),
   games: (params: Query) => request<GamesPage>("GET", `/games${qs(params)}`),
   game: (id: number) => request<GameDetail>("GET", `/games/${id}`),
+  favorites: (limit?: number) => request<Game[]>("GET", `/favorites${qs({ limit })}`),
+  setFavorite: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/favorite`),
   facets: (platform: string[]) => request<Facets>("GET", `/catalog/facets${qs({ platform })}`),
   startSync: () => request<ScanRun>("POST", "/catalog/sync"),
   sync: (id: number) => request<ScanRun>("GET", `/catalog/sync/${id}`),
@@ -117,6 +121,9 @@ export const api = {
   transfers: () => request<Transfer[]>("GET", "/transfers?limit=60"),
   cancelTransfer: (id: number) => request<Transfer>("POST", `/transfers/${id}/cancel`),
   retryTransfer: (id: number) => request<Transfer[]>("POST", `/transfers/${id}/retry`),
+  gameControls: (id: number) => request<GameControls>("GET", `/games/${id}/controls`),
+  generateControls: (id: number) => request<GameControls>("POST", `/games/${id}/controls`),
+  editControls: (id: number, body: GameControlsIn) => request<GameControls>("PUT", `/games/${id}/controls`, body),
   gameVideo: (id: number, refresh = false) => request<VideoLookup>("GET", `/games/${id}/video${qs({ refresh: refresh || undefined })}`),
   youtubeSettings: () => request<{ configured: boolean }>("GET", "/settings/youtube"),
   saveYoutubeKey: (api_key: string) => request<void>("PUT", "/settings/youtube", { api_key }),
@@ -130,7 +137,10 @@ export const api = {
   playState: () => request<PlayState>("GET", "/play/state"),
   search: (q: string, limit = 8) => request<SearchResult>("GET", `/search${qs({ q, limit })}`),
   recentPlayed: (limit = 12) => request<RecentPlayed[]>("GET", `/play/recent?limit=${limit}`),
-  playStats: (days = 14) => request<PlayStats>("GET", `/play/stats?days=${days}`),
+  playStats: (days = 14, period?: { start: string; end: string } | null) =>
+    request<PlayStats>("GET", `/play/stats${qs({ days, start: period?.start, end: period?.end })}`),
+  resetPlaytime: (games: { key: string; ra_seconds: number }[], everything = false) =>
+    request<void>("POST", everything ? "/play/reset-all" : "/play/reset", { games }),
   playSettings: () => request<PlaySettings>("GET", "/play/settings"),
   savePlaySettings: (s: PlaySettings) => request<PlaySettings>("PUT", "/play/settings", s),
   ackAlert: (id: number) => request<void>("POST", `/play/alerts/${id}/ack`),

@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import bluetooth, catalog, descriptions, play, players, playtime, saves, system, transfers, videos, volume
+from app.api import bluetooth, catalog, controls, descriptions, play, players, playtime, saves, system, transfers, videos, volume
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
 from app.credentials import CredentialStore, KeyringStore
@@ -130,6 +130,7 @@ def create_app(
     app.include_router(players.router)
     app.include_router(volume.router)
     app.include_router(descriptions.router)
+    app.include_router(controls.router)
     app.include_router(playtime.router)
     app.include_router(system.router)
     _mount_frontend(app, frontend_dist)

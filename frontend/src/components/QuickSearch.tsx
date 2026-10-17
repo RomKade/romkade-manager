@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { History, Search, X } from "lucide-react";
 import { useEffect, useId, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -7,6 +7,7 @@ import { regionLabel, useT } from "../i18n";
 import { consoleShortName } from "../lib/consoleGroups";
 import { genreIcon } from "../lib/genreIcons";
 import { useDebounced } from "../lib/hooks";
+import { useRecentSearches } from "../lib/recentSearches";
 import { ConsoleBadge } from "./ConsoleBadge";
 import { ConsoleIcon } from "./ConsoleIcon";
 import { Cover } from "./Cover";
@@ -28,6 +29,7 @@ type Suggestion =
  * La recherche de l'application, dans la barre du haut de toutes les pages : genres et consoles proposés en tête
  * (« sport », « gba »), puis les jeux (Typesense : fautes de frappe tolérées). Flèches pour choisir, Entrée pour
  * ouvrir le choix ou tous les résultats dans la bibliothèque.
+ * Champ vide : les dernières recherches (gardées dans ce navigateur), à reprendre d'un clic.
  * Les suggestions sont les mêmes sur toutes les pages. Dans la bibliothèque, la saisie filtre en plus la liste
  * affichée (paramètre « q » de l'adresse, console et filtres gardés) ; Entrée ferme alors les suggestions.
  */
@@ -47,6 +49,8 @@ export function QuickSearch({ onOpen }: { onOpen: (id: number) => void }) {
   const platforms = usePlatforms();
   const items = debounced.trim() ? res.data?.items ?? [] : [];
   const total = onLibrary ? 0 : res.data?.total ?? 0;
+  const recent = useRecentSearches();
+  const showRecent = !q.trim() && recent.list.length > 0;
 
   // Bibliothèque : l'adresse a changé sans la saisie (retour arrière, filtres effacés, autre page) -> le champ suit.
   useEffect(() => { if (onLibrary) setQ(urlQ); }, [onLibrary, urlQ]);
@@ -60,7 +64,7 @@ export function QuickSearch({ onOpen }: { onOpen: (id: number) => void }) {
     }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);
-  const showAll = () => navigate(`/bibliotheque?q=${encodeURIComponent(q.trim())}&all=1`);
+  const showAll = () => { recent.add(q); navigate(`/bibliotheque?q=${encodeURIComponent(q.trim())}&all=1`); };
 
   const needle = fold(debounced.trim());
   const suggestions: Suggestion[] = needle.length < 2 ? [] : [
@@ -74,8 +78,10 @@ export function QuickSearch({ onOpen }: { onOpen: (id: number) => void }) {
       .map((p) => ({ kind: "console" as const, value: p.directory, code: p.code, label: p.label ?? p.directory, count: p.game_count })),
   ];
 
-  const count = suggestions.length + items.length;
+  const count = showRecent ? recent.list.length : suggestions.length + items.length;
   const pick = (i: number) => {
+    if (showRecent) { setQ(recent.list[i]!); setActive(-1); return; }
+    recent.add(q);
     const s = suggestions[i];
     if (s) navigate(s.kind === "genre" ? `/bibliotheque?genre=${encodeURIComponent(s.value)}&all=1`
       : `/bibliotheque?platform=${encodeURIComponent(s.value)}`);
@@ -89,7 +95,7 @@ export function QuickSearch({ onOpen }: { onOpen: (id: number) => void }) {
     else if (e.key === "Escape") { setOpen(false); setActive(-1); }
     else if (e.key === "Enter" && q.trim()) {
       e.preventDefault();
-      if (active >= 0 && active < count) pick(active); else if (onLibrary) setOpen(false); else showAll();
+      if (active >= 0 && active < count) pick(active); else if (onLibrary) { recent.add(q); setOpen(false); } else showAll();
     }
   };
 
@@ -100,7 +106,11 @@ export function QuickSearch({ onOpen }: { onOpen: (id: number) => void }) {
   });
 
   return (
-    <div className="quick-search" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
+    <div className="quick-search" onBlur={(e) => {
+      if (e.currentTarget.contains(e.relatedTarget)) return;
+      setOpen(false);
+      if (onLibrary) recent.add(q);  // la saisie a filtré la bibliothèque : c'est une recherche faite
+    }}>
       <label className="search search--top">
         <Search size={18} aria-hidden />
         <span className="visually-hidden">{t("dashboard.searchLabel")}</span>
@@ -110,7 +120,27 @@ export function QuickSearch({ onOpen }: { onOpen: (id: number) => void }) {
           onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(-1); }}
           onFocus={() => setOpen(true)} onKeyDown={onKey} />
       </label>
-      {open && debounced.trim() && (
+      {open && showRecent && (
+        <div className="quick-search__panel">
+          <p className="quick-search__heading muted">{t("dashboard.searchRecent")}</p>
+          <ul id={listId} role="listbox" aria-label={t("dashboard.searchRecent")} className="quick-search__list">
+            {recent.list.map((term, i) => (
+              <li key={term} {...option(i)}>
+                <History size={16} aria-hidden className="quick-search__history" />
+                <span className="quick-search__title quick-search__term">{term}</span>
+                <button type="button" className="quick-search__remove" aria-label={t("dashboard.searchRecentRemove", { term })}
+                  onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); recent.remove(term); }}>
+                  <X size={14} aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="quick-search__all" onMouseDown={(e) => e.preventDefault()} onClick={recent.clear}>
+            {t("dashboard.searchRecentClear")}
+          </button>
+        </div>
+      )}
+      {open && !showRecent && debounced.trim() && (
         <div className="quick-search__panel">
           {count === 0 ? (
             <p className="muted quick-search__empty">{res.isFetching ? t("common.loading") : t("dashboard.searchNone")}</p>

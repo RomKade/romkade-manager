@@ -31,8 +31,8 @@ input_player4_joypad_index = "3"
 
 def test_parse_status():
     st = pl.parse_status(SAMPLE)
-    assert st["controllers"] == [{"index": 0, "name": "ANBERNIC-keys", "builtin": True},
-                                 {"index": 1, "name": "Xbox Wireless Controller", "builtin": False}]
+    assert st["controllers"] == [{"index": 0, "name": "ANBERNIC-keys", "builtin": True, "usb_id": "0001:0001"},
+                                 {"index": 1, "name": "Xbox Wireless Controller", "builtin": False, "usb_id": "045e:0b13"}]
     assert st["players"] == [2, 1, 0, 3] and st["applied"] and not st["game_running"]
 
 
@@ -62,4 +62,23 @@ async def test_players_api(app_factory):
         assert (await c.put("/api/players", json={"players": [0, 1, 2, 3]})).status_code == 200
         sent = console.commands[-2]
         assert 'input_player1_joypad_index = "0"' in sent and "> /.config/agm-players" in sent
-        assert "pidof retroarch >/dev/null ||" in sent and "cat /.config/agm-players >> /.config/retroarch/retroarch.cfg" in sent
+        # Sans jeu en cours : players_apply.sh traduit les numéros pour RetroArch et réserve les manettes
+        assert "pidof retroarch >/dev/null ||" in sent and "reserved_device" in sent and "sort -n" in sent
+
+
+
+def test_applied_copy_decides_pending():
+    """La config de RetroArch porte des numéros traduits : « appliqué » se lit dans la copie de players_apply.sh."""
+    want = pl.file_text([1, 0, 2, 3])
+    out = SAMPLE.replace("@@WANT\n", "@@WANT\n" + want).replace("@@RA\n", "@@APPLIED\n" + want + "@@RA\n")
+    st = pl.parse_status(out)
+    assert st["players"] == [1, 0, 2, 3] and st["applied"]  # CFG dit 2 1 0 3, mais c'est la traduction
+    st = pl.parse_status(out.replace("@@APPLIED\n" + want, "@@APPLIED\n" + pl.file_text([0, 1, 2, 3])))
+    assert not st["applied"]
+
+
+def test_launch_command_carries_players_script():
+    from app.device import launcher
+
+    cmd = launcher.launch_command("SMS", "/mnt/mmc/Roms/SMS/California Games.sms")
+    assert "AGM_PLAYERS=" in cmd and "reservation_type" in cmd
