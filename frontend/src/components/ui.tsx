@@ -1,5 +1,6 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { ApiError } from "../api/client";
 import { getLang, t, useLang } from "../i18n";
@@ -44,6 +45,9 @@ export function ErrorNotice({ error, title }: { error: unknown; title?: string }
         <p className="notice__title">{title ?? message}</p>
         {title && <p>{message}</p>}
         {hint && <p className="notice__hint">{hint}</p>}
+        {e && (e.code === "host_key_unknown" || e.code === "host_key_mismatch") && (
+          <p><Link to="/parametres#hk" className="link">{t("common.hostKeyCheck")}</Link></p>
+        )}
       </div>
     </div>
   );

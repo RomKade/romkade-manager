@@ -34,7 +34,8 @@ def credentials_missing() -> AppError:
 def host_key_unknown(fingerprint: str | None = None) -> AppError:
     return AppError(
         "host_key_unknown",
-        "Clé d'hôte inconnue : confirme l'empreinte via POST /api/device/host-key/trust",
+        "La clé de cette console n'est pas encore approuvée : vérifie son empreinte et approuve-la dans "
+        "Paramètres > Connexion.",
         409,
         {"fingerprint": fingerprint},
     )

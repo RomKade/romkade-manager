@@ -1194,3 +1194,6 @@ kbd {
 .credits__support { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
   padding-top: 14px; border-top: 1px solid var(--line); }
 .credits__support p { max-width: 60ch; }
+
+/* Bloc qui attend une action (clé de la console à approuver) */
+.block--attention { border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); }

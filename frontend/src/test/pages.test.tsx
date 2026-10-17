@@ -34,6 +34,7 @@ let bodies: Record<string, unknown>[] = [];
 let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
+let hostKeyTrusted = true;
 let systemCaps: Record<string, boolean> | null = null; // null : système inconnu (tout reste affiché)
 let volume = { percent: 60, muted: false };
 let playAlerts: { id: number; created_at: string; minutes: number; scope: string; game_title: string }[] = [];
@@ -53,7 +54,9 @@ function mockFetch() {
     }
     if (url.startsWith("/api/device/status"))
       return json(deviceOnline ? { connected: true, error: null } : { connected: false, error: { code: "device_unreachable", message: "Console injoignable sur 192.168.86.242:22" } });
-    if (url.startsWith("/api/settings")) return json({ host: "192.168.86.242", port: 22, username: "root", auth_method: "password", key_path: null, roms_root: "/mnt/mmc/Roms", connect_timeout: 8, has_password: true, host_key_trusted: true });
+    if (url === "/api/device/host-key/trust") { hostKeyTrusted = true; return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: true }); }
+    if (url === "/api/device/host-key") return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: false });
+    if (url.startsWith("/api/settings")) return json({ host: "192.168.86.242", port: 22, username: "root", auth_method: "password", key_path: null, roms_root: "/mnt/mmc/Roms", connect_timeout: 8, has_password: true, host_key_trusted: hostKeyTrusted });
     if (url.startsWith("/api/platforms")) return json([{ ...platform, label_status: "confirmed", kind: "emulated", present: true, image_dir_present: true, last_scanned_at: null, game_count: 2, file_count: 2, total_bytes: 1048576, image_count: 0, images_matched: 0 }]);
     if (url.startsWith("/api/catalog/facets")) return json({
       extensions: [{ value: "smc", count: 2 }], regions: [{ value: "USA", count: 2 }],
@@ -190,6 +193,7 @@ beforeEach(() => {
   deviceOnline = true;
   playingId = null;
   favoriteIds = [];
+  hostKeyTrusted = true;
   volume = { percent: 60, muted: false };
   playAlerts = [];
   vi.stubGlobal("fetch", mockFetch());
@@ -338,6 +342,25 @@ describe("Effacer et filtrer le temps de jeu", () => {
     fireEvent.change(screen.getByLabelText("Au"), { target: { value: "2026-10-10" } });
     await waitFor(() => expect(calls.some((c) => c.includes("/api/play/stats") && c.includes("start=2026-10-01") && c.includes("end=2026-10-10"))).toBe(true));
     expect(await screen.findByText(/seules les parties suivies par Game Manager comptent/)).toBeInTheDocument();
+  });
+});
+
+describe("Nouvelle console : clé à approuver", () => {
+  it("lit l'empreinte tout de suite et l'approuve d'un clic", async () => {
+    hostKeyTrusted = false;
+    renderAt("/parametres");
+    const panel = (await screen.findByRole("heading", { name: /Identité de la console/ })).closest("section")!;
+    expect(await within(panel).findByText("SHA256:abc")).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Approuver cette clé" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/device/host-key/trust", fingerprint: "SHA256:abc" }));
+    expect(await within(panel).findByText("Approuvée")).toBeInTheDocument();
+  });
+
+  it("l'erreur de clé inconnue mène à l'approbation", async () => {
+    const { ApiError } = await import("../api/client");
+    const { ErrorNotice } = await import("../components/ui");
+    render(<MemoryRouter><ErrorNotice error={new ApiError(409, "host_key_unknown", "La clé de cette console n'est pas encore approuvée")} /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: "Vérifier et approuver la clé de la console" })).toHaveAttribute("href", "/parametres#hk");
   });
 });
 

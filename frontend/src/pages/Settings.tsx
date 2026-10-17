@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, BookOpen, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { NavLink, useParams } from "react-router-dom";
 
 import { api, ApiError, type Capabilities, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
@@ -49,7 +49,7 @@ export function SettingsPage() {
           <ConnectionForm initial={settings.data} />
           <div className="settings__cols">
             <PasswordForm hasPassword={settings.data.has_password} />
-            <HostKeyPanel trusted={settings.data.host_key_trusted} />
+            <HostKeyPanel trusted={settings.data.host_key_trusted} host={settings.data.host} />
           </div>
         </>
       )}
@@ -258,11 +258,21 @@ function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
   );
 }
 
-function HostKeyPanel({ trusted }: { trusted: boolean }) {
+/** Identité de la console (clé SSH). Pas encore approuvée (nouvelle console, nouvelle adresse) : l'empreinte est lue
+ * tout de suite, il ne reste qu'à la comparer et à l'approuver ; « Paramètres#hk » (lien des erreurs) y amène. */
+function HostKeyPanel({ trusted, host }: { trusted: boolean; host: string }) {
   const t = useT();
   const qc = useQueryClient();
   const [key, setKey] = useState<HostKey | null>(null);
   const read = useMutation({ mutationFn: api.hostKey, onSuccess: setKey });
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!trusted && host) { setKey(null); read.mutate(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trusted, host]);
+  useEffect(() => {
+    if (window.location.hash === "#hk") ref.current?.scrollIntoView({ block: "center" });
+  }, []);
   const trust = useMutation({
     mutationFn: (fp: string) => api.trustHostKey(fp),
     onSuccess: (k) => {
@@ -272,7 +282,7 @@ function HostKeyPanel({ trusted }: { trusted: boolean }) {
     },
   });
   return (
-    <section className="block" aria-labelledby="hk-h">
+    <section id="hk" ref={ref} className={`block ${trusted ? "" : "block--attention"}`} aria-labelledby="hk-h">
       <h2 id="hk-h"><ShieldCheck size={18} aria-hidden /> {t("settings.hk.title")}</h2>
       <p className="muted">
         {trusted

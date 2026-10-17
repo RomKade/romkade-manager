@@ -3,6 +3,7 @@ import type { Messages } from "../core";
 /** Textes partagés : navigation, encart de la console, genres, unités, erreurs du serveur. */
 const messages: Messages = {
   fr: {
+    "hostKeyCheck": "Vérifier et approuver la clé de la console",
     "nav.dashboard": "Tableau de bord",
     "nav.library": "Bibliothèque",
     "nav.transfers": "Ajouter des jeux",
@@ -125,6 +126,7 @@ const messages: Messages = {
     "hint.sync_already_running": "Une synchronisation tourne déjà. Attends qu'elle se termine.",
   },
   en: {
+    "hostKeyCheck": "Check and approve the console's key",
     "nav.dashboard": "Dashboard",
     "nav.library": "Library",
     "nav.transfers": "Add games",
@@ -305,6 +307,7 @@ const messages: Messages = {
     "hint.sync_already_running": "A sync is already running. Wait for it to finish.",
   },
   es: {
+    "hostKeyCheck": "Comprobar y aprobar la clave de la consola",
     "nav.dashboard": "Panel",
     "nav.library": "Biblioteca",
     "nav.transfers": "Añadir juegos",
