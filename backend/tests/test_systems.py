@@ -166,3 +166,30 @@ async def test_systems_list_and_settings(app_factory):
         s["system"] = "windows"
         r = await c.put("/api/settings", json={k: v for k, v in s.items() if k not in ("has_password", "host_key_trusted")})
         assert r.status_code == 422
+
+
+async def test_onion_launch():
+    from app import errors
+    from app.device import launcher
+    from app.device.systems import PROFILES
+
+    onion = PROFILES["onion"]
+    assert onion.capabilities()["launch"] and not onion.capabilities()["resume_slot"]
+    sent = []
+
+    async def run(client, command, timeout=20):
+        sent.append(command)
+        return 0, "started\n"
+
+    await launcher.launch(run, None, "GBA", "/mnt/SDCARD/Roms/GBA/Golden Sun (USA, Europe).zip", None, onion)
+    assert "> /tmp/agm-onion-launch.sh" in sent[0] and "pkill -2 MainUI" in sent[0]
+    assert sent[0].endswith("sh /tmp/agm-onion-launch.sh '/mnt/SDCARD/Roms/GBA/Golden Sun (USA, Europe).zip'")
+
+    async def no_emu(client, command, timeout=20):
+        return 5, "no-emu VECTREX\n"
+
+    with pytest.raises(errors.AppError) as e:
+        await launcher.launch(no_emu, None, "VECTREX", "/mnt/SDCARD/Roms/VECTREX/x.vec", None, onion)
+    assert "VECTREX" in e.value.message
+    with pytest.raises(errors.AppError):
+        await launcher.launch(run, None, "GBA", "/mnt/SDCARD/Roms/GBA/x.zip", "auto", onion)

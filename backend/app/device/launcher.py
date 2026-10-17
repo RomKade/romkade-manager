@@ -19,6 +19,7 @@ from app.device.ssh_client import DeviceClient
 LAUNCH_SCRIPT = (Path(__file__).parent / "launch.sh").read_text()
 VOLUME_KEYS_SCRIPT = (Path(__file__).parent / "volume_keys.py").read_text()
 PLAYERS_SCRIPT = (Path(__file__).parent / "players_apply.sh").read_text()
+ONION_SCRIPT = (Path(__file__).parent / "onion_launch.sh").read_text()
 LOG = "/tmp/agm-launch.log"
 REQUIRED = "/mnt/mod/ctrl/RA_launch.sh"
 GAME_PROCESSES = ("retroarch", "PPSSPPSDL", "drastic", "OpenBOR.dge", "PPSSPP", "mupen64plus", "flycast",
@@ -98,6 +99,12 @@ def es_launch_command(rom_path: str) -> str:
             f"wget -q -T 10 -O - --post-data={body} {ES_HTTP}/launch; }} >/dev/null 2>&1 && echo started || echo no-es")
 
 
+def onion_launch_command(rom_path: str) -> str:
+    """Onion OS : le script est copié dans /tmp (mémoire vive) puis lancé avec sh (voir onion_launch.sh)."""
+    return (f"printf %s {shlex.quote(ONION_SCRIPT)} > /tmp/agm-onion-launch.sh && "
+            f"sh /tmp/agm-onion-launch.sh {shlex.quote(rom_path)}")
+
+
 SLOT_RE = re.compile(r"^(auto|\d{1,3})$")
 
 
@@ -110,6 +117,18 @@ async def launch(run: Runner, client: DeviceClient, platform_dir: str, rom_path:
     if method is None:
         raise errors.AppError("launch_unsupported", f"Lancement à distance impossible sur {profile.label} : "
                               "lance le jeu depuis la console.", 409, {"system": profile.id})
+    if method == "onion":
+        if slot is not None:
+            raise errors.AppError("launch_unsupported", "Reprendre sur une sauvegarde depuis Game Manager n'est "
+                                  "pas encore possible sur Onion OS : lance le jeu puis charge la sauvegarde.", 409,
+                                  {"system": profile.id})
+        code, out = await run(client, onion_launch_command(rom_path))
+        if "started" in out:
+            return
+        if "no-emu" in out:
+            raise errors.AppError("launch_failed", "Onion n'a pas d'émulateur pour ce dossier de jeux "
+                                  f"({out.split('no-emu', 1)[1].strip()}).", 409, {"output": out[-300:]})
+        raise errors.AppError("launch_failed", "La console n'a pas lancé le jeu", 502, {"exit": code, "output": out[-500:]})
     if method == "es-http":
         if slot is not None:
             raise errors.AppError("launch_unsupported", "Reprendre sur une sauvegarde depuis Game Manager n'est "

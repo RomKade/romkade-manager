@@ -425,7 +425,8 @@ les ROMs et les sauvegardes, comment lancer et quitter un jeu, et ce qui est dis
 | ROCKNIX / JELOS | Anbernic, Powkiddy, Retroid, AYN | `/storage/roms` | quitter ; lancer si le serveur web d'ES répond | expérimental |
 | muOS | Anbernic, TrimUI | `/mnt/mmc/ROMS` | quitter | expérimental |
 | ArkOS / dArkOS | R36S et clones, RG351, RG353 | `/roms` | quitter | expérimental |
-| Onion OS, spruce | Miyoo Mini, A30, Flip | `/mnt/SDCARD/Roms` | quitter | expérimental |
+| Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | oui (comme le menu d'Onion), quitter | expérimental |
+| spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | quitter | expérimental |
 | MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | non | expérimental |
 | Autre (Linux + SSH) | — | à régler | quitter (RetroArch) | expérimental |
 
@@ -435,6 +436,13 @@ genres, jaquettes, bandes-annonces et illustrations. Les dossiers de médias ran
 `videos`, `manuals`…) sont ignorés. Quitter un jeu ailleurs que sur Anbernic : commande réseau `QUIT` de RetroArch
 (bash ou `nc`), puis `SIGTERM` si RetroArch ne l'écoute pas. Seul le profil Anbernic + Stock OS Mod a été essayé
 sur une vraie console ; les autres suivent la documentation de leur firmware.
+
+Onion OS : le menu (MainUI) écrit la commande du jeu dans `/tmp/cmd_to_run.sh` puis se ferme, et la boucle
+`.tmp_update/runtime.sh` lance le jeu. `onion_launch.sh` (copié dans `/tmp`) fait pareil : commande au format
+de MainUI (émulateur de `Emu/<console>/config.json`), puis `pkill -2 MainUI` ; un jeu ouvert est d'abord quitté
+(`QUIT` de RetroArch), une appli fermée, le temps que le menu revienne (journal `/tmp/agm-launch.log`). Onion
+coupe SSH pendant les jeux : activer « Keep services alive » (Tweaks > Network) pour voir le jeu en cours et le
+quitter depuis le Mac.
 
 ## Sources et crédits
 

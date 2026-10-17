@@ -33,7 +33,7 @@ class SystemProfile:
     label: str
     status: str                       # tested | experimental
     roms_roots: tuple[str, ...]       # emplacements habituels du dossier des ROMs, dans l'ordre
-    launcher: str | None              # stock-mod | es-http | None (lancement à distance impossible)
+    launcher: str | None              # stock-mod | es-http | onion | None (lancement à distance impossible)
     quit: str                         # ra-udp (Anbernic) | es-http (repli : generic) | generic (QUIT puis SIGTERM) | none
     save_sources: tuple[SaveSource, ...] = ()
     states_in_rom_folder: bool = False  # sauvegardes instantanées rangées à côté des jeux
@@ -46,7 +46,7 @@ class SystemProfile:
     ra_network: bool = False          # commandes réseau de RetroArch actives (SAVE_STATE, SHOW_MSG)
 
     def capabilities(self, es_http: bool = False) -> dict[str, bool]:
-        launch = self.launcher == "stock-mod" or (self.launcher == "es-http" and es_http)
+        launch = self.launcher in ("stock-mod", "onion") or (self.launcher == "es-http" and es_http)
         return {
             "launch": launch,
             "resume_slot": self.launcher == "stock-mod",
@@ -108,10 +108,13 @@ PROFILES: dict[str, SystemProfile] = {p.id: p for p in [
         ra_history="/home/ark/.config/retroarch/content_history.lpl",
         notes="R36S et clones, RG351, RG353 (sous ArkOS).", makers=("Anbernic", "R36S", "Powkiddy")),
     SystemProfile(
-        "onion", "Onion OS", "experimental", ("/mnt/SDCARD/Roms",), None, "generic",
+        "onion", "Onion OS", "experimental", ("/mnt/SDCARD/Roms",), "onion", "generic",
         (("Saves/CurrentProfile/saves", "retroarch", 3), ("Saves/CurrentProfile/states", "retroarch", 3)),
         ra_config="/mnt/SDCARD/RetroArch/.retroarch/retroarch.cfg",
-        notes="Miyoo Mini / Mini Plus. Activer SSH dans les réglages d'Onion.", makers=("Miyoo",)),
+        ra_history="/mnt/SDCARD/Saves/CurrentProfile/lists/content_history.lpl",
+        notes="Miyoo Mini / Mini Plus. Activer SSH dans les réglages d'Onion. Pendant un jeu, Onion coupe SSH : "
+              "activer « Keep services alive » (Tweaks > Network) pour suivre et quitter le jeu depuis le Mac.",
+        makers=("Miyoo",)),
     SystemProfile(
         "spruce", "spruce", "experimental", ("/mnt/SDCARD/Roms",), None, "generic",
         (("Saves/saves", "retroarch", 3), ("Saves/states", "retroarch", 3)),
