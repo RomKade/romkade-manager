@@ -439,7 +439,7 @@ sur une vraie console ; les autres suivent la documentation de leur firmware.
 
 Onion OS : le menu (MainUI) écrit la commande du jeu dans `/tmp/cmd_to_run.sh` puis se ferme, et la boucle
 `.tmp_update/runtime.sh` lance le jeu. `onion_launch.sh` (copié dans `/tmp`) fait pareil : commande au format
-de MainUI (émulateur de `Emu/<console>/config.json`), puis `pkill -2 MainUI` ; un jeu ouvert est d'abord quitté
+de MainUI (émulateur de `Emu/<console>/config.json`), puis fermeture du menu (`SIGTERM`, `SIGKILL` en secours) ; un jeu ouvert est d'abord quitté
 (`QUIT` de RetroArch), une appli fermée, le temps que le menu revienne (journal `/tmp/agm-launch.log`). Onion
 coupe SSH pendant les jeux : activer « Keep services alive » (Tweaks > Network) pour voir le jeu en cours et le
 quitter depuis le Mac.

@@ -8,7 +8,8 @@
 # Onion tourne en boucle (/mnt/SDCARD/.tmp_update/runtime.sh) : le menu (MainUI) écrit la commande du jeu choisi
 # dans /tmp/cmd_to_run.sh puis se ferme ; la boucle la range dans .tmp_update/cmd_to_run.sh et lance le jeu.
 # On fait pareil : commande au format de MainUI (émulateur de Emu/<console>/config.json), puis fermeture du
-# menu comme le fait Onion (pkill -2 MainUI). Un jeu ou une appli ouverte est d'abord quitté (RetroArch : QUIT,
+# menu par SIGTERM (essayé sur Miyoo Mini Plus, Onion 4.3.1 : MainUI ignore SIGINT juste après son démarrage),
+# SIGKILL en dernier recours. Un jeu ou une appli ouverte est d'abord quitté (RetroArch : QUIT,
 # sauvegarde automatique comprise), le temps que le menu revienne.
 SD=/mnt/SDCARD
 LOG=/tmp/agm-launch.log
@@ -66,13 +67,17 @@ if ! pidof MainUI > /dev/null; then
     n=0
     while [ $n -lt 30 ] && ! pidof MainUI > /dev/null; do sleep 0.5; n=$((n + 1)); done
     pidof MainUI > /dev/null || { log "le menu n'est pas revenu"; exit 3; }
-    sleep 1
+    sleep 2
 fi
 
 # 2. Commande du jeu, puis fermeture du menu : la boucle d'Onion lance le jeu.
 cp /tmp/agm-onion-cmd /tmp/cmd_to_run.sh && sync
 log "commande : $(cat /tmp/cmd_to_run.sh)"
-pkill -2 MainUI
+pkill -TERM MainUI
 n=0
-while [ $n -lt 20 ] && pidof MainUI > /dev/null; do sleep 0.5; n=$((n + 1)); done
+while [ $n -lt 10 ] && pidof MainUI > /dev/null; do sleep 0.5; n=$((n + 1)); done
+if pidof MainUI > /dev/null; then
+    log "le menu ignore SIGTERM : SIGKILL"
+    pkill -9 MainUI
+fi
 log "menu fermé, lancement par Onion"
