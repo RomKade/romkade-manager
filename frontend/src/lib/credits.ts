@@ -1,8 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { getLang } from "../i18n";
+
 /** Dépôt du projet : lien « GitHub » de la barre latérale et de Paramètres > Sources et crédits. */
 export const REPO = { owner: "arnoweb", name: "romkade-manager" } as const;
 export const REPO_URL = `https://github.com/${REPO.owner}/${REPO.name}`;
+/** Documentation : le README du dépôt dans la langue de l'interface (en attendant un site de documentation). */
+export const docsUrl = () => `${REPO_URL}/blob/main/README${getLang() === "en" ? "" : `.${getLang()}`}.md`;
 
 /**
  * Nombre d'étoiles du dépôt, lu sur l'API publique de GitHub (sans clé, une fois toutes les 6 h au plus).

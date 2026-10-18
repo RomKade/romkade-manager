@@ -16,7 +16,9 @@ export const usePlatforms = () => useQuery({ queryKey: ["platforms"], queryFn: a
 
 /** Interroge la console toutes les 30 s (une connexion SSH courte, sans écriture). */
 export const useDeviceStatus = () =>
-  useQuery({ queryKey: ["device-status"], queryFn: api.deviceStatus, refetchInterval: 30_000, retry: false });
+  // Console absente : on la recherche plus souvent, pour la voir arriver vite (elle répond, ou échoue en ~8 s).
+  useQuery({ queryKey: ["device-status"], queryFn: api.deviceStatus, retry: false,
+    refetchInterval: (q) => (q.state.data?.connected ? 30_000 : 12_000) });
 
 export const useFacets = (platform: string[]) =>
   useQuery({ queryKey: ["facets", platform], queryFn: () => api.facets(platform), staleTime: 60_000 });

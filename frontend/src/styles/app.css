@@ -1294,3 +1294,12 @@ kbd {
 .caps__yes svg { color: var(--ok); flex: none; }
 .caps__no svg { color: var(--ink-3); flex: none; }
 .caps__no span:not(.visually-hidden) { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+
+/* ---------- Encart de la console : recherche en cours, réessayer ; lien Documentation ---------- */
+.device-card__state.is-checking { color: var(--warn); }
+.device-card__spinner { flex: none; color: var(--warn); }
+.device-card__retry { margin-left: auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--line); background: none; color: var(--ink-2); cursor: pointer; }
+.device-card__retry:hover, .device-card__retry:focus-visible { color: var(--ink); border-color: var(--line-strong); }
+.nav__external { margin-left: auto; opacity: 0.6; }
+@media (max-width: 760px) { .nav__external { display: none; } }

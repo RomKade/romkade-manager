@@ -633,6 +633,21 @@ describe("Conditions d'utilisation et version", () => {
   });
 });
 
+describe("Barre latérale", () => {
+  it("montre la recherche de la console, puis hors ligne avec Réessayer ; lien vers la documentation", async () => {
+    deviceOnline = false;
+    renderAt("/");
+    const card = await screen.findByRole("region", { name: /État de la console/ });
+    expect(within(card).getByText("Recherche de la console…")).toBeInTheDocument();
+    const retry = await within(card).findByRole("button", { name: "Réessayer maintenant" });
+    expect(within(card).getByText("Hors ligne")).toBeInTheDocument();
+    await userEvent.click(retry);
+    expect(calls.filter((c) => c.startsWith("/api/device/status")).length).toBeGreaterThan(1);
+    expect(screen.getByRole("link", { name: /Documentation/ }))
+      .toHaveAttribute("href", "https://github.com/arnoweb/romkade-manager/blob/main/README.fr.md");
+  });
+});
+
 describe("Sources et crédits", () => {
   it("cite chaque source avec un lien, et le dépôt GitHub", async () => {
     renderAt("/parametres/credits");

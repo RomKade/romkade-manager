@@ -1,4 +1,4 @@
-import { Bluetooth, Gamepad2, Gauge, HardDriveUpload, Hourglass, Library, RefreshCw, Save, Settings as SettingsIcon } from "lucide-react";
+import { Bluetooth, BookOpen, ExternalLink, Gamepad2, Gauge, HardDriveUpload, Hourglass, Library, Loader2, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 
 import { isActive, useCaps, useDeviceStatus, useSettings, useStatus, useSystem, useTransfers } from "../api/queries";
@@ -8,6 +8,7 @@ import { gb } from "../lib/format";
 import icon80 from "../assets/brand/romkade-manager-icon-80.webp";
 import logo240 from "../assets/brand/romkade-manager-logo-240.webp";
 import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
+import { docsUrl } from "../lib/credits";
 import { APP_VERSION } from "../version";
 import { GitHubStar } from "./GitHubStar";
 
@@ -50,6 +51,14 @@ export function Sidebar() {
               </NavLink>
             </li>
           ))}
+          <li>
+            <a href={docsUrl()} target="_blank" rel="noreferrer noopener" className="nav__link">
+              <BookOpen aria-hidden size={18} strokeWidth={1.75} />
+              <span>{t("common.nav.docs")}</span>
+              <ExternalLink aria-hidden size={13} className="nav__external" />
+              <span className="visually-hidden"> {t("common.nav.newTab")}</span>
+            </a>
+          </li>
         </ul>
       </nav>
       <DeviceCard />
@@ -70,7 +79,8 @@ function DeviceCard() {
   const settings = useSettings();
   const s = status.data;
   const connected = device.data?.connected;
-  const state = device.isPending ? "checking" : connected ? "online" : "offline";
+  // Une tentative en cours alors que la console n'est pas (encore) connectée : on le montre tout de suite.
+  const state = connected ? "online" : device.isFetching || device.isPending ? "checking" : "offline";
   const label = t(`common.device.${state}`);
   const usedPct =
     s?.storage_total_bytes && s.storage_free_bytes != null
@@ -80,11 +90,17 @@ function DeviceCard() {
   return (
     <section className="device-card" aria-label={t("common.device.state", { state: label })}>
       <p className={`device-card__state is-${state}`}>
-        <span className="led" aria-hidden />
+        {state === "checking" ? <Loader2 size={12} aria-hidden className="spin device-card__spinner" /> : <span className="led" aria-hidden />}
         <span className="device-card__label">{label}</span>
+        {state === "offline" && (
+          <button type="button" className="device-card__retry" onClick={() => device.refetch()}
+            title={t("common.device.retry")} aria-label={t("common.device.retry")}>
+            <RotateCw size={13} aria-hidden />
+          </button>
+        )}
       </p>
       <p className="device-card__host">{settings.data ? settings.data.host : " "}</p>
-      {state === "offline" && device.data?.error && (
+      {!connected && device.data?.error && (
         <p className="device-card__error">
           {getLang() !== "fr" && has(`common.error.${device.data.error.code}`) ? t(`common.error.${device.data.error.code}`) : device.data.error.message}
         </p>
