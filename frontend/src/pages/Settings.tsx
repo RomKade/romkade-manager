@@ -47,11 +47,9 @@ export function SettingsPage() {
       </nav>
       {current === "" && (
         <>
-          <ConnectionForm initial={settings.data} />
-          <div className="settings__cols">
-            <PasswordForm hasPassword={settings.data.has_password} />
-            <HostKeyPanel trusted={settings.data.host_key_trusted} host={settings.data.host} />
-          </div>
+          <ConnectionSteps settings={settings.data} />
+          <ConnectionForm initial={settings.data} hasPassword={settings.data.has_password} />
+          <HostKeyPanel trusted={settings.data.host_key_trusted} host={settings.data.host} />
         </>
       )}
       {current === "test" && <TestPanel />}
@@ -77,14 +75,59 @@ function fieldErrors(err: unknown): Record<string, string> {
   return out;
 }
 
-function ConnectionForm({ initial }: { initial: DeviceSettings }) {
+/**
+ * Mise en route en trois étapes : 1. la console (adresse, utilisateur, mot de passe ou clé SSH) ; 2. son identité
+ * (empreinte de sa clé, approuvée une fois) ; 3. le test de connexion. Chaque étape faite est cochée.
+ */
+function ConnectionSteps({ settings }: { settings: Settings }) {
+  const t = useT();
+  const auth = settings.auth_method === "password" ? settings.has_password : !!settings.key_path;
+  const steps = [
+    { n: 1, label: t("settings.steps.console"), done: !!settings.host && auth, href: "#conn-h" },
+    { n: 2, label: t("settings.steps.identity"), done: settings.host_key_trusted, href: "#hk" },
+    { n: 3, label: t("settings.steps.test"), done: false, to: "/parametres/test" },
+  ];
+  const current = steps.find((s) => !s.done)?.n ?? 3;
+  return (
+    <nav className="steps" aria-label={t("settings.steps.label")}>
+      <ol>
+        {steps.map((s) => {
+          const body = (
+            <>
+              <span className="steps__num" aria-hidden>{s.done ? <CheckCircle2 size={16} /> : s.n}</span>
+              <span>{s.label}</span>
+              <span className="visually-hidden"> — {t(s.done ? "settings.steps.done" : s.n === current ? "settings.steps.current" : "settings.steps.todo")}</span>
+            </>
+          );
+          const cls = `steps__item ${s.done ? "is-done" : ""} ${s.n === current ? "is-current" : ""}`;
+          return (
+            <li key={s.n}>
+              {s.to ? <Link to={s.to} className={cls}>{body}</Link> : <a href={s.href} className={cls}>{body}</a>}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/** Étape 1 : la console. Le choix d'authentification affiche son propre champ (mot de passe ou clé SSH). */
+function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; hasPassword: boolean }) {
   const t = useT();
   const qc = useQueryClient();
   const [form, setForm] = useState<DeviceSettings>(initial);
+  const [pw, setPw] = useState("");
   useEffect(() => setForm(initial), [initial]);
+  const dirty = JSON.stringify(form) !== JSON.stringify(initial);
+  const withPassword = form.auth_method === "password" && !!pw;
   const save = useMutation({
-    mutationFn: (s: DeviceSettings) => api.saveSettings(s),
+    // Les réglages d'abord : le mot de passe est rangé dans le trousseau pour l'utilisateur et l'adresse enregistrés.
+    mutationFn: async () => {
+      if (dirty) await api.saveSettings(form);
+      if (withPassword) await api.savePassword(pw);
+    },
     onSuccess: () => {
+      setPw("");
       qc.invalidateQueries({ queryKey: ["settings"] });
       qc.invalidateQueries({ queryKey: ["device-status"] });
       qc.invalidateQueries({ queryKey: ["system"] });
@@ -94,13 +137,13 @@ function ConnectionForm({ initial }: { initial: DeviceSettings }) {
   const set = <K extends keyof DeviceSettings>(k: K, v: DeviceSettings[K]) => setForm((f) => ({ ...f, [k]: v }));
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    save.mutate(form);
+    save.mutate();
   };
-  const dirty = JSON.stringify(form) !== JSON.stringify(initial);
 
   return (
     <form className="block form" onSubmit={submit} aria-labelledby="conn-h" noValidate>
-      <h2 id="conn-h">{t("settings.conn.title")}</h2>
+      <h2 id="conn-h"><span className="step-badge" aria-hidden>1</span> {t("settings.conn.title")}</h2>
+      <p className="muted block__lead">{t("settings.conn.lead")}</p>
       <div className="form__grid">
         <Field id="host" label={t("settings.conn.host")} error={errs.host} hint={t("settings.conn.hostHint")}>
           <input id="host" value={form.host} onChange={(e) => set("host", e.target.value)} autoComplete="off" spellCheck={false} />
@@ -111,23 +154,42 @@ function ConnectionForm({ initial }: { initial: DeviceSettings }) {
         <Field id="username" label={t("settings.conn.username")} error={errs.username}>
           <input id="username" value={form.username} onChange={(e) => set("username", e.target.value)} autoComplete="off" spellCheck={false} />
         </Field>
-        <Field id="auth" label={t("settings.conn.auth")}>
-          <select id="auth" value={form.auth_method} onChange={(e) => set("auth_method", e.target.value as DeviceSettings["auth_method"])}>
-            <option value="password">{t("settings.conn.authPassword")}</option>
-            <option value="key">{t("settings.conn.authKey")}</option>
-          </select>
-        </Field>
-        {form.auth_method === "key" && (
-          <Field id="key_path" label={t("settings.conn.keyPath")} error={errs.key_path} wide>
-            <input id="key_path" value={form.key_path ?? ""} onChange={(e) => set("key_path", e.target.value || null)} placeholder="/Users/…/.ssh/id_ed25519" spellCheck={false} />
-          </Field>
-        )}
-        <Field id="roms_root" label={t("settings.conn.romsRoot")} error={errs.roms_root} wide hint={t("settings.conn.romsRootHint")}>
+        <Field id="roms_root" label={t("settings.conn.romsRoot")} error={errs.roms_root} hint={t("settings.conn.romsRootHint")}>
           <input id="roms_root" value={form.roms_root} onChange={(e) => set("roms_root", e.target.value)} spellCheck={false} />
         </Field>
       </div>
+
+      <fieldset className="auth-choice">
+        <legend>{t("settings.conn.auth")}</legend>
+        <div className="auth-choice__options" role="radiogroup">
+          {(["password", "key"] as const).map((m) => (
+            <label key={m} className={`auth-choice__option ${form.auth_method === m ? "is-on" : ""}`}>
+              <input type="radio" name="auth_method" value={m} checked={form.auth_method === m} onChange={() => set("auth_method", m)} />
+              {m === "password" ? <KeyRound size={16} aria-hidden /> : <ShieldCheck size={16} aria-hidden />}
+              {t(m === "password" ? "settings.conn.authPassword" : "settings.conn.authKey")}
+            </label>
+          ))}
+        </div>
+        <div className="auth-choice__panel">
+          {form.auth_method === "password" ? (
+            <>
+              <p className="muted">{hasPassword ? t("settings.pw.saved") : t("settings.pw.none")}</p>
+              <div className="field">
+                <label htmlFor="pw">{hasPassword ? t("settings.pw.replace") : t("settings.pw.label")}</label>
+                <input id="pw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+                <p className="field__hint">{t("settings.pw.hint")}</p>
+              </div>
+            </>
+          ) : (
+            <Field id="key_path" label={t("settings.conn.keyPath")} error={errs.key_path} hint={t("settings.conn.keyHint")}>
+              <input id="key_path" value={form.key_path ?? ""} onChange={(e) => set("key_path", e.target.value || null)} placeholder="/Users/…/.ssh/id_ed25519" spellCheck={false} />
+            </Field>
+          )}
+        </div>
+      </fieldset>
+
       <div className="form__actions">
-        <button type="submit" className="button button--primary" disabled={save.isPending || !dirty}>{t("settings.save")}</button>
+        <button type="submit" className="button button--primary" disabled={save.isPending || (!dirty && !withPassword)}>{t("settings.save")}</button>
         {save.isSuccess && !dirty && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.saved")}</span>}
       </div>
       {save.isError && !Object.keys(errs).length && <ErrorNotice error={save.error} />}
@@ -229,37 +291,6 @@ function Field({ id, label, hint, error, wide, children }: { id: string; label: 
   );
 }
 
-function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
-  const t = useT();
-  const qc = useQueryClient();
-  const [pw, setPw] = useState("");
-  const save = useMutation({
-    mutationFn: api.savePassword,
-    onSuccess: () => {
-      setPw("");
-      qc.invalidateQueries({ queryKey: ["settings"] });
-      qc.invalidateQueries({ queryKey: ["device-status"] });
-    },
-  });
-  return (
-    <form className="block form" aria-labelledby="pw-h" onSubmit={(e) => { e.preventDefault(); if (pw) save.mutate(pw); }}>
-      <h2 id="pw-h"><KeyRound size={18} aria-hidden /> {t("settings.pw.title")}</h2>
-      <p className="muted">
-        {hasPassword ? t("settings.pw.saved") : t("settings.pw.none")}
-      </p>
-      <div className="field">
-        <label htmlFor="pw">{hasPassword ? t("settings.pw.replace") : t("settings.pw.label")}</label>
-        <input id="pw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
-      </div>
-      <div className="form__actions">
-        <button type="submit" className="button" disabled={!pw || save.isPending}>{t("settings.saveKeychain")}</button>
-        {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.saved")}</span>}
-      </div>
-      {save.isError && <ErrorNotice error={save.error} />}
-    </form>
-  );
-}
-
 /** Identité de la console (clé SSH). Pas encore approuvée (nouvelle console, nouvelle adresse) : l'empreinte est lue
  * tout de suite, il ne reste qu'à la comparer et à l'approuver ; « Paramètres#hk » (lien des erreurs) y amène. */
 function HostKeyPanel({ trusted, host }: { trusted: boolean; host: string }) {
@@ -285,13 +316,12 @@ function HostKeyPanel({ trusted, host }: { trusted: boolean; host: string }) {
   });
   return (
     <section id="hk" ref={ref} className={`block ${trusted ? "" : "block--attention"}`} aria-labelledby="hk-h">
-      <h2 id="hk-h"><ShieldCheck size={18} aria-hidden /> {t("settings.hk.title")}</h2>
-      <p className="muted">
-        {trusted
-          ? t("settings.hk.trusted")
-          : t("settings.hk.untrusted")}
+      <h2 id="hk-h"><span className="step-badge" aria-hidden>2</span> {t("settings.hk.title")}</h2>
+      <p className="muted block__lead">{t("settings.hk.lead")}</p>
+      <p className={trusted ? "ok-text" : ""}>
+        {trusted && <CheckCircle2 size={16} aria-hidden />} {trusted ? t("settings.hk.trusted") : host ? t("settings.hk.untrusted") : t("settings.hk.needHost")}
       </p>
-      <button type="button" className="button" onClick={() => read.mutate()} disabled={read.isPending}>
+      <button type="button" className="button" onClick={() => read.mutate()} disabled={read.isPending || !host}>
         {read.isPending ? t("settings.hk.reading") : t("settings.hk.read")}
       </button>
       {read.isError && <ErrorNotice error={read.error} />}

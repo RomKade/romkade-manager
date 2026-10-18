@@ -346,6 +346,25 @@ describe("Effacer et filtrer le temps de jeu", () => {
   });
 });
 
+describe("Connexion en étapes", () => {
+  it("montre les étapes, le champ de l'authentification choisie, et enregistre le mot de passe avec la console", async () => {
+    hostKeyTrusted = false;
+    renderAt("/parametres");
+    const steps = await screen.findByRole("navigation", { name: "Mise en route de la connexion" });
+    expect(within(steps).getByRole("link", { name: /La console.*fait/ })).toBeInTheDocument();
+    expect(within(steps).getByRole("link", { name: /Identifier la console.*étape en cours/ })).toBeInTheDocument();
+    const form = (await screen.findByRole("heading", { name: /La console/ })).closest("form")!;
+    expect(within(form).getByLabelText("Remplacer le mot de passe")).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole("radio", { name: /Clé SSH/ }));
+    expect(within(form).queryByLabelText("Remplacer le mot de passe")).not.toBeInTheDocument();
+    expect(within(form).getByLabelText("Chemin de la clé privée")).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole("radio", { name: /Mot de passe/ }));
+    await userEvent.type(within(form).getByLabelText("Remplacer le mot de passe"), "s3cret");
+    await userEvent.click(within(form).getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/password", password: "s3cret" }));
+  });
+});
+
 describe("Nouvelle console : clé à approuver", () => {
   it("lit l'empreinte tout de suite et l'approuve d'un clic", async () => {
     hostKeyTrusted = false;
