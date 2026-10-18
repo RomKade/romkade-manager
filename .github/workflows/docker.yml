@@ -57,6 +57,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tout l'historique et les tags : les nouveautés depuis la version précédente
       # compose.yaml de l'utilisateur : l'image publiée, sans la ligne « build: . » qui sert au développement.
       - name: compose.yaml de la release
         run: |
@@ -68,7 +70,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          cat > out/notes.md <<EOF
+          # Nouveautés = sujets des commits depuis le tag précédent (tout l'historique pour la première version).
+          # Le site romkade.com/notes-de-version affiche cette section (« ## Nouveautés »), lue sur GitHub au build.
+          PREV=$(git describe --tags --abbrev=0 --match 'v*.*.*' "$GITHUB_REF_NAME^" 2>/dev/null || true)
+          {
+            echo "## Nouveautés"
+            echo
+            git log --no-merges --pretty='- %s' ${PREV:+"$PREV.."}"$GITHUB_REF_NAME"
+            echo
+            echo "## Installer ou mettre à jour"
+            echo
+          } > out/notes.md
+          cat >> out/notes.md <<EOF
           Image : \`ghcr.io/romkade/romkade-manager:$VERSION\` (aussi \`latest\`), macOS, Windows et Linux, Intel/AMD et ARM.
 
           Installer : dans un dossier vide,
@@ -83,6 +96,15 @@ jobs:
           EOF
           gh release create "$GITHUB_REF_NAME" out/compose.yaml --title "ROMKADE Manager $VERSION" \
             --notes-file out/notes.md --generate-notes --verify-tag
+      # romkade.com se reconstruit pour afficher la nouvelle version et ses notes (sinon : au plus tard la nuit
+      # suivante). Jeton facultatif SITE_DISPATCH_TOKEN : accès « Contents: read and write » au dépôt du site.
+      - name: Prévenir romkade.com
+        env:
+          GH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "SITE_DISPATCH_TOKEN absent : le site se mettra à jour cette nuit."; exit 0; fi
+          gh api repos/arnoweb/romkade-website/dispatches -f event_type=manager-release \
+            -F "client_payload[tag]=$GITHUB_REF_NAME"
 
   # L'installation telle que la fait un utilisateur, avec le compose.yaml de la release et l'image publiée
   # (une release créée par GITHUB_TOKEN ne déclenche pas d'autre workflow : appel direct).
