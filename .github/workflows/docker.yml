@@ -58,7 +58,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # compose.yaml de l'utilisateur : l'image publiée, sans la ligne « build: . » qui sert au développement.
-      - run: mkdir -p out && sed '/^    build: \.$/d' compose.yaml > out/compose.yaml && ! grep -q 'build:' out/compose.yaml
+      - name: compose.yaml de la release
+        run: |
+          mkdir -p out
+          sed '/^    build: \.$/d' compose.yaml > out/compose.yaml
+          ! grep -q 'build:' out/compose.yaml
       - name: Release GitHub
         env:
           GH_TOKEN: ${{ github.token }}
@@ -77,6 +81,5 @@ jobs:
           puis ouvrir http://localhost:8765. Mettre à jour : \`docker compose pull && docker compose up -d\`.
           Guide complet : https://romkade.com/docs/getting-started/installation/
           EOF
-          sed -i 's/^          //' out/notes.md
           gh release create "$GITHUB_REF_NAME" out/compose.yaml --title "ROMKADE Manager $VERSION" \
             --notes-file out/notes.md --generate-notes --verify-tag
