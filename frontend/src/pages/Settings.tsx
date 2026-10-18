@@ -8,6 +8,7 @@ import {
   useDetectSystem, useDeviceStatus, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
 import { GitHubStar } from "../components/GitHubStar";
+import { KnowledgePanel } from "../components/KnowledgePanel";
 import { LlmPanel } from "../components/LlmPanel";
 import { SecretInput } from "../components/SecretInput";
 import { ErrorNotice, hintFor, Meter, PageHeader, Spinner } from "../components/ui";
@@ -537,6 +538,7 @@ function DescriptionsPanel() {
   const running = st?.batches.find((b) => !b.imported);
   return (
     <>
+      <KnowledgePanel />
       <section className="block" aria-labelledby="desc-h">
         <div className="block__head">
           <h2 id="desc-h"><Languages size={18} aria-hidden /> {t("settings.desc.title")}</h2>

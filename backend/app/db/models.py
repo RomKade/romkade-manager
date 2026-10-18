@@ -263,6 +263,44 @@ class Favorite(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class GameKnowledge(Base):
+    """Recherche de connaissances pour un jeu (services/knowledge.py) : trouvé sur Wikidata ou non, pages retenues.
+
+    Clé : plateforme + titre normalisé, comme GameText. `status` : found | not_found | error. `sources` :
+    {"wikipedia": {"en": "Titre", …}, "strategywiki": "Id"}.
+    """
+
+    __tablename__ = "game_knowledge"
+    __table_args__ = (UniqueConstraint("platform_id", "normalized_title"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    platform_id: Mapped[int] = mapped_column(ForeignKey("platform.id", ondelete="CASCADE"))
+    normalized_title: Mapped[str] = mapped_column(String(512))
+    status: Mapped[str] = mapped_column(String(16))
+    wikidata_id: Mapped[str | None] = mapped_column(String(20))
+    sources: Mapped[dict] = mapped_column(JSON, default=dict)
+    chunks: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(String(300))
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class KnowledgeChunk(Base):
+    """Passage de connaissances (une section d'une page, 400 mots au plus), avec sa source et sa licence."""
+
+    __tablename__ = "knowledge_chunk"
+    __table_args__ = (Index("ix_knowledge_chunk_game", "platform_id", "normalized_title"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    platform_id: Mapped[int] = mapped_column(ForeignKey("platform.id", ondelete="CASCADE"))
+    normalized_title: Mapped[str] = mapped_column(String(512))
+    source: Mapped[str] = mapped_column(String(20))   # wikipedia | strategywiki
+    lang: Mapped[str] = mapped_column(String(2))
+    page: Mapped[str] = mapped_column(String(300))
+    section: Mapped[str] = mapped_column(String(300))
+    url: Mapped[str] = mapped_column(String(600))
+    license: Mapped[str] = mapped_column(String(40))
+    text: Mapped[str] = mapped_column(Text)
+    position: Mapped[int] = mapped_column(Integer)
+
+
 class PlayReset(Base):
     """Temps de jeu remis à zéro pour un jeu. Les parties de Game Manager sont effacées ; les journaux de RetroArch
     restent sur la console (on n'y touche pas) : `ra_baseline` est leur total au moment de la remise à zéro, retiré

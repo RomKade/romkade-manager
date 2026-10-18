@@ -1303,3 +1303,15 @@ kbd {
 .device-card__retry:hover, .device-card__retry:focus-visible { color: var(--ink); border-color: var(--line-strong); }
 .nav__external { margin-left: auto; opacity: 0.6; }
 @media (max-width: 760px) { .nav__external { display: none; } }
+
+/* Paramètres > Contenu IA > Connaissances */
+.knowledge__test { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.knowledge__test h3 { font-size: var(--fs-md); }
+.knowledge__search { max-width: 420px; }
+.knowledge__results, .knowledge__sources, .knowledge__hits { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; }
+.knowledge__results { list-style: none; padding: 0; }
+.knowledge__game { display: flex; flex-direction: column; gap: 10px; }
+.knowledge__ask { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.knowledge__ask .field { flex: 1 1 280px; }
+.knowledge__hits li { display: flex; flex-direction: column; gap: 2px; }
+.knowledge__hit-head { margin: 0; }

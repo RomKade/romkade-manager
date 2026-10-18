@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { api, type Capabilities, type GameControls, type GameDetail, type GameControlsIn, type Query, type Transfer } from "./client";
+import { api, type Capabilities, type GameControls, type GameDetail, type KnowledgeStatus, type GameControlsIn, type Query, type Transfer } from "./client";
 
 export const PAGE_SIZE = 120;
 
@@ -61,6 +61,21 @@ export const useGame = (id: number | null) =>
 /** Bandes-annonces : la première demande lance une recherche YouTube (quota), la réponse est en cache côté serveur. */
 export const useGameVideo = (id: number | null) =>
   useQuery({ queryKey: ["game-video", id], queryFn: () => api.gameVideo(id!), enabled: id != null, staleTime: Infinity, retry: false });
+
+/** Connaissances pour l'assistant (Wikipédia, StrategyWiki) : couverture et récupération en cours. */
+export const useKnowledge = () =>
+  useQuery({ queryKey: ["knowledge"], queryFn: api.knowledge,
+    refetchInterval: (q) => (q.state.data?.job.running ? 2000 : false) });
+
+export function useKnowledgeMutations() {
+  const qc = useQueryClient();
+  const onSuccess = (d: KnowledgeStatus) => qc.setQueryData(["knowledge"], d);
+  return {
+    start: useMutation({ mutationFn: api.startKnowledge, onSuccess }),
+    stop: useMutation({ mutationFn: api.stopKnowledge, onSuccess }),
+    auto: useMutation({ mutationFn: api.knowledgeSettings, onSuccess }),
+  };
+}
 
 /** Commandes du jeu (quelle touche fait quoi) : rédigées par Claude à la demande ou corrigées à la main. */
 export const useGameControls = (id: number) =>

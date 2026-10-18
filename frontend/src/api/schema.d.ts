@@ -1296,6 +1296,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Knowledge Status */
+        get: operations["knowledge_status_api_knowledge_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/knowledge/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Knowledge Settings */
+        put: operations["knowledge_settings_api_knowledge_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/knowledge/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Knowledge Start
+         * @description Récupère les connaissances de tous les jeux jamais recherchés, une requête à la fois (en arrière-plan).
+         */
+        post: operations["knowledge_start_api_knowledge_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/knowledge/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Knowledge Stop */
+        post: operations["knowledge_stop_api_knowledge_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Knowledge */
+        get: operations["game_knowledge_api_games__game_id__knowledge_get"];
+        put?: never;
+        /**
+         * Fetch Game Knowledge
+         * @description Récupère (ou récupère à nouveau) les connaissances de ce jeu tout de suite : sert aussi de test.
+         */
+        post: operations["fetch_game_knowledge_api_games__game_id__knowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}/knowledge/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Game Knowledge
+         * @description Passages que l'assistant recevrait pour cette question (Typesense, sinon classement simple).
+         */
+        get: operations["search_game_knowledge_api_games__game_id__knowledge_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/play/settings": {
         parameters: {
             query?: never;
@@ -2200,6 +2312,21 @@ export interface components {
             /** History */
             history: components["schemas"]["ChangeOut"][];
         };
+        /** GameKnowledgeOut */
+        GameKnowledgeOut: {
+            /** Status */
+            status: string;
+            /** Fetched At */
+            fetched_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Chunks */
+            chunks: number;
+            /** Sources */
+            sources: components["schemas"]["KnowledgeSourceOut"][];
+            /** Sections */
+            sections: string[];
+        };
         /** GameOut */
         GameOut: {
             /** Id */
@@ -2348,6 +2475,78 @@ export interface components {
             total_bytes: number;
             /** Platforms */
             platforms: components["schemas"]["PlatformInventoryOut"][];
+        };
+        /** KnowledgeHitOut */
+        KnowledgeHitOut: {
+            /** Source */
+            source: string;
+            /** Lang */
+            lang: string;
+            /** Page */
+            page: string;
+            /** Section */
+            section: string;
+            /** Url */
+            url: string;
+            /** License */
+            license: string;
+            /** Excerpt */
+            excerpt: string;
+        };
+        /** KnowledgeJobOut */
+        KnowledgeJobOut: {
+            /** Running */
+            running: boolean;
+            /** Total */
+            total: number;
+            /** Done */
+            done: number;
+            /** Found */
+            found: number;
+            /** Current */
+            current: string | null;
+            /** Stopping */
+            stopping: boolean;
+        };
+        /** KnowledgeSettingsIn */
+        KnowledgeSettingsIn: {
+            /** Auto After Sync */
+            auto_after_sync: boolean;
+        };
+        /** KnowledgeSourceOut */
+        KnowledgeSourceOut: {
+            /** Source */
+            source: string;
+            /** Lang */
+            lang: string;
+            /** Page */
+            page: string;
+            /** Url */
+            url: string;
+            /** Chunks */
+            chunks: number;
+            /** License */
+            license: string;
+        };
+        /** KnowledgeStatusOut */
+        KnowledgeStatusOut: {
+            /** Games */
+            games: number;
+            /** Found */
+            found: number;
+            /** Not Found */
+            not_found: number;
+            /** Errors */
+            errors: number;
+            /** Pending */
+            pending: number;
+            /** Chunks */
+            chunks: number;
+            /** Auto After Sync */
+            auto_after_sync: boolean;
+            job: components["schemas"]["KnowledgeJobOut"];
+            /** License */
+            license: string;
         };
         /** LaunchIn */
         LaunchIn: {
@@ -5396,6 +5595,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LlmTestOut"];
+                };
+            };
+        };
+    };
+    knowledge_status_api_knowledge_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeStatusOut"];
+                };
+            };
+        };
+    };
+    knowledge_settings_api_knowledge_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    knowledge_start_api_knowledge_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeStatusOut"];
+                };
+            };
+        };
+    };
+    knowledge_stop_api_knowledge_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeStatusOut"];
+                };
+            };
+        };
+    };
+    game_knowledge_api_games__game_id__knowledge_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameKnowledgeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_game_knowledge_api_games__game_id__knowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameKnowledgeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_game_knowledge_api_games__game_id__knowledge_search_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeHitOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -23,7 +23,7 @@ import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 
-from app.db.models import Platform, RemoteFile, ScanRun
+from app.db.models import KnowledgeChunk, Platform, RemoteFile, ScanRun
 from app.services.classify import display_title
 from app.services.genres import GENRES, UNCLASSIFIED
 from app.services.subgenres import LABELS as SUB_LABELS
@@ -34,6 +34,20 @@ IMAGE = "typesense/typesense:27.1"
 CONTAINER = "agm-typesense"
 PORT = 8118
 COLLECTION = "games"
+KNOWLEDGE = "knowledge"
+KNOWLEDGE_SETTLE = 15  # secondes sans changement avant de reconstruire l'index des connaissances
+KNOWLEDGE_SCHEMA = {
+    "fields": [
+        {"name": "game", "type": "string", "facet": True},   # « plateforme:titre normalisé »
+        {"name": "source", "type": "string", "facet": True},
+        {"name": "lang", "type": "string", "facet": True},
+        {"name": "page", "type": "string"},
+        {"name": "section", "type": "string"},
+        {"name": "text", "type": "string"},
+        {"name": "position", "type": "int32"},
+    ],
+    "default_sorting_field": "position",
+}
 CHECK_SECONDS = 30
 VERSION_SECONDS = 2  # une requête d'agrégats sur le catalogue : quelques millisecondes
 EXCLUDED_KINDS = ("apps", "ports")
@@ -197,6 +211,8 @@ class SearchService:
         self.ready = False
         self.status = "starting"
         self._version: tuple | None = None
+        self._kversion: tuple | None = None
+        self._kseen: tuple | None = None  # (version vue, depuis quand)
         self._task: asyncio.Task | None = None
 
     def _load_key(self) -> str:
@@ -300,6 +316,16 @@ class SearchService:
                     version = await asyncio.to_thread(self._version_now)
                     if version != self._version:
                         await self.reindex()
+                    # Connaissances : reconstruites quand la base n'a plus bougé depuis 15 s (pas à chaque jeu
+                    # d'une récupération en lot).
+                    kversion = await asyncio.to_thread(self._knowledge_version)
+                    if kversion == self._kversion:
+                        self._kseen = None
+                    elif self._kseen is None or self._kseen[0] != kversion:
+                        self._kseen = (kversion, time.monotonic())
+                    elif time.monotonic() - self._kseen[1] >= KNOWLEDGE_SETTLE or self._kversion is None:
+                        await self.reindex_knowledge()
+                        self._kseen = None
             except Exception:  # noqa: BLE001 — la recherche SQLite prend le relais
                 log.exception("Typesense")
                 self.ready, self.status = False, "unavailable"
@@ -318,11 +344,11 @@ class SearchService:
                              .where(RemoteFile.role == "candidate", Platform.kind.not_in(EXCLUDED_KINDS)))
             return [to_document(f) for f in rows], version
 
-    async def reindex(self) -> int:
-        docs, version = await asyncio.to_thread(self._documents)
-        name = f"{COLLECTION}_{time.time_ns()}"
+    async def _publish(self, alias: str, schema: dict, docs: list[dict]) -> None:
+        """Nouvelle collection remplie, puis bascule de l'alias : la recherche n'est jamais coupée."""
+        name = f"{alias}_{time.time_ns()}"
         async with self._http() as http:
-            r = await http.post("/collections", json={**SCHEMA, "name": name})
+            r = await http.post("/collections", json={**schema, "name": name})
             if r.status_code not in (200, 201):
                 raise RuntimeError(f"création de l'index : {r.status_code} {r.text[:200]}")
             try:
@@ -333,10 +359,10 @@ class SearchService:
                     failed = [line for line in r.text.splitlines() if '"success":false' in line]
                     if failed:
                         log.warning("Typesense : %d documents refusés (%s)", len(failed), failed[0][:200])
-                if (await http.get(f"/aliases/{COLLECTION}")).status_code != 200:
-                    # Index d'une version précédente : une vraie collection « games », sans alias.
-                    await http.delete(f"/collections/{COLLECTION}")
-                r = await http.put(f"/aliases/{COLLECTION}", json={"collection_name": name})
+                if (await http.get(f"/aliases/{alias}")).status_code != 200:
+                    # Index d'une version précédente : une vraie collection de ce nom, sans alias.
+                    await http.delete(f"/collections/{alias}")
+                r = await http.put(f"/aliases/{alias}", json={"collection_name": name})
                 if r.status_code != 200:
                     raise RuntimeError(f"bascule de l'index : {r.status_code} {r.text[:200]}")
             except BaseException:
@@ -345,11 +371,47 @@ class SearchService:
             # Anciennes collections (la précédente, ou celles d'une reconstruction interrompue).
             r = await http.get("/collections")
             for c in r.json() if r.status_code == 200 else []:
-                if c["name"].startswith(f"{COLLECTION}_") and c["name"] != name:
+                if c["name"].startswith(f"{alias}_") and c["name"] != name:
                     await http.delete(f"/collections/{c['name']}")
+
+    async def reindex(self) -> int:
+        docs, version = await asyncio.to_thread(self._documents)
+        await self._publish(COLLECTION, SCHEMA, docs)
         self._version, self.ready, self.status = version, True, "ready"
         log.info("Typesense : %d jeux indexés", len(docs))
         return len(docs)
+
+    # ---------- connaissances (assistant) ----------
+
+    def _knowledge_version(self) -> tuple:
+        with self.sessions() as s:
+            return tuple(s.execute(select(func.count(KnowledgeChunk.id), func.max(KnowledgeChunk.id))).one())
+
+    def _knowledge_documents(self) -> tuple[list[dict], tuple]:
+        with self.sessions() as s:
+            version = tuple(s.execute(select(func.count(KnowledgeChunk.id), func.max(KnowledgeChunk.id))).one())
+            docs = [{"id": str(c.id), "game": f"{c.platform_id}:{c.normalized_title}", "source": c.source,
+                     "lang": c.lang, "page": c.page, "section": c.section, "text": c.text, "position": c.position}
+                    for c in s.scalars(select(KnowledgeChunk))]
+        return docs, version
+
+    async def reindex_knowledge(self) -> int:
+        docs, version = await asyncio.to_thread(self._knowledge_documents)
+        await self._publish(KNOWLEDGE, KNOWLEDGE_SCHEMA, docs)
+        self._kversion = version
+        log.info("Typesense : %d passages de connaissances indexés", len(docs))
+        return len(docs)
+
+    async def search_knowledge(self, game: str, q: str, limit: int = 4) -> list[int]:
+        """Passages d'un jeu (« plateforme:titre normalisé ») les plus proches de la question."""
+        params = {"q": q or "*", "query_by": "text,section,page", "query_by_weights": "3,2,1",
+                  "filter_by": f"game:=`{game.replace('`', '')}`", "per_page": str(limit),
+                  "prefix": "false", "num_typos": "1", "drop_tokens_threshold": "10", "include_fields": "id"}
+        async with self._http() as http:
+            r = await http.get(f"/collections/{KNOWLEDGE}/documents/search", params=params)
+        if r.status_code != 200:
+            raise RuntimeError(f"recherche Typesense : {r.status_code} {r.text[:200]}")
+        return [int(h["document"]["id"]) for h in r.json().get("hits", [])]
 
     # ---------- recherche ----------
 

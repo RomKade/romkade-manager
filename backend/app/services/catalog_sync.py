@@ -34,6 +34,7 @@ class SyncManager:
         self.sessions = sessions
         self.lock = asyncio.Lock()
         self.task: asyncio.Task | None = None
+        self.after: list = []  # coroutines appelées après une synchronisation réussie (connaissances des nouveaux jeux)
 
     def running(self) -> bool:
         return self.lock.locked()
@@ -52,7 +53,13 @@ class SyncManager:
 
     async def _run(self, client: DeviceClient, run_id: int) -> None:
         try:
-            await run_sync(self.sessions, client, run_id)
+            status = await run_sync(self.sessions, client, run_id)
+            if status in ("completed", "partial"):
+                for hook in self.after:
+                    try:
+                        await hook()
+                    except Exception:  # noqa: BLE001 — une suite ratée ne fait pas échouer la synchronisation
+                        log.exception("après synchronisation")
         except Exception as exc:  # noqa: BLE001
             msg = exc.message if isinstance(exc, errors.AppError) else f"{type(exc).__name__}: {exc}"
             code = exc.code if isinstance(exc, errors.AppError) else "internal_error"

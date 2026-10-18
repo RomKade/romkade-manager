@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import bluetooth, catalog, controls, descriptions, llm, play, players, playtime, saves, system, transfers, videos, volume
+from app.api import bluetooth, catalog, controls, descriptions, knowledge, llm, play, players, playtime, saves, system, transfers, videos, volume
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
 from app.credentials import CredentialStore, default_store
@@ -26,6 +26,8 @@ from app.services.genres import apply_all as apply_genres
 from app.services.boxart import BoxartStore
 from app.services.images import ImageCache
 from app.services.playtime import PlaySettingsStore, PlayTracker
+from app.services.knowledge import Fetcher, KnowledgeJobs
+from app.services.knowledge import settings_store as knowledge_settings
 from app.services.search import SearchService
 from app.device.systems import SystemService
 from app.services.catalog_watch import CatalogWatcher
@@ -87,6 +89,10 @@ def create_app(
     app.state.system = SystemService(st.settings_store, lambda: st.device_runner,
                                      lambda: DeviceClient(st.settings_store.load(), st.credentials, st.host_keys))
     app.state.search = SearchService(st.sessions, cache_dir.parent if cache_dir else base)
+    # Connaissances pour l'assistant ; récupérées pour les nouveaux jeux après une synchronisation si l'option est active.
+    app.state.knowledge = KnowledgeJobs(st.sessions, Fetcher(getattr(st, "knowledge_transport", None)),
+                                        knowledge_settings(cache_dir.parent if cache_dir else base))
+    app.state.sync.after.append(app.state.knowledge.after_sync)
     app.state.play_settings = PlaySettingsStore((cache_dir.parent if cache_dir else base) / "play_settings.json")
     app.state.llm_config = LlmConfigStore((cache_dir.parent if cache_dir else base) / "llm.json")
     app.state.llm_transport = None  # les tests y branchent un faux fournisseur (httpx.MockTransport)
@@ -135,6 +141,7 @@ def create_app(
     app.include_router(descriptions.router)
     app.include_router(controls.router)
     app.include_router(llm.router)
+    app.include_router(knowledge.router)
     app.include_router(playtime.router)
     app.include_router(system.router)
     _mount_frontend(app, frontend_dist)
