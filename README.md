@@ -1,115 +1,122 @@
-# Anbernic Game Manager
+# ROMKADE Manager
 
-Gestionnaire local des jeux d'une Anbernic RG35XX Pro : bibliothèque, ajout de jeux depuis le Mac, lancement
-sur la console, sauvegardes, temps de jeu, Bluetooth. **La console n'est modifiée que par des actions que tu
-lances : ajout de jeux, restauration ou suppression d'une sauvegarde, réglages Bluetooth et manettes des joueurs.**
+<p align="center"><strong>🌐 <a href="https://romkade.com">romkade.com</a></strong></p>
 
-Architecture, modèle de données et choix techniques : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+<p align="center"><strong>English</strong> · <a href="README.fr.md">Français</a> · <a href="README.es.md">Español</a></p>
 
-## Démarrage rapide
+Manage and control your retro handhelds (Anbernic, Miyoo…) from the Mac's browser: library, adding
+games, launching on the console, saves, play time, controllers, Bluetooth. **The console is only modified
+by actions you start: adding games, restoring or deleting a save, Bluetooth settings and
+player controllers.**
+
+Project website: **[romkade.com](https://romkade.com)**.
+
+Architecture, data model and technical choices: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Quick start
 
 ```bash
 cd romkade-manager
 ./run.sh
 ```
 
-Le script prépare l'environnement Python au premier lancement, démarre le serveur et ouvre
-http://127.0.0.1:8765 dans le navigateur. L'interface est livrée déjà compilée (`frontend/dist`) :
-Node n'est nécessaire que pour la modifier. `Ctrl+C` arrête le serveur.
+The script sets up the Python environment on first run, starts the server and opens
+http://127.0.0.1:8765 in the browser. The interface ships already built (`frontend/dist`):
+Node is only needed to modify it. `Ctrl+C` stops the server.
 
-## Installation manuelle (macOS, Apple Silicon)
+## Manual installation (macOS, Apple Silicon)
 
 ```bash
 cd romkade-manager/backend
-# Python officiel python.org (signé) : le Python Homebrew est bloqué par la permission
-# macOS « Réseau local » et renvoie « No route to host ».
+# Official python.org Python (signed): Homebrew Python is blocked by the macOS
+# "Local Network" permission and returns "No route to host".
 /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest -q               # 114 tests contre un serveur SFTP simulé
+.venv/bin/pytest -q               # 114 tests against a simulated SFTP server
 ```
 
-## 1. Diagnostic de la vraie console (recommandé d'abord)
+## 1. Diagnose the real console (recommended first)
 
 ```bash
 .venv/bin/python scripts/diagnose_device.py --host 192.168.86.242
 ```
 
-Le script affiche l'empreinte de la clé d'hôte, demande le mot de passe (non enregistré), puis vérifie SFTP, l'espace disque et l'arborescence. Il n'écrit rien sur la console.
+The script displays the host key fingerprint, asks for the password (not stored), then checks SFTP, disk space and the directory tree. It writes nothing to the console.
 
-Pour comparer l'empreinte indépendamment :
+To compare the fingerprint independently:
 
 ```bash
 ssh-keyscan -p 22 192.168.86.242 2>/dev/null | ssh-keygen -lf -
 ```
 
-## 2. Synchroniser le catalogue (phase 2)
+## 2. Sync the catalog (phase 2)
 
 ```bash
 .venv/bin/python scripts/catalog_report.py
 ```
 
-Au premier lancement : confirmation de la clé d'hôte, mot de passe rangé dans le trousseau, réglages
-enregistrés. Ensuite, aucune question. Le script scanne la carte en lecture seule, met à jour
-`~/Library/Application Support/AnbernicGameManager/catalog.sqlite3` et affiche un rapport
-(jeux par plateforme, changements, doublons, images non rapprochées).
+On first run: host key confirmation, password stored in the keychain, settings
+saved. After that, no questions. The script scans the card read-only, updates
+`~/Library/Application Support/AnbernicGameManager/catalog.sqlite3` and prints a report
+(games per platform, changes, duplicates, unmatched images).
 
-## 3. Lancer l'application
+## 3. Start the application
 
 ```bash
 .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8765
 ```
 
-Interface : http://127.0.0.1:8765. Documentation de l'API : http://127.0.0.1:8765/docs
+Interface: http://127.0.0.1:8765. API documentation: http://127.0.0.1:8765/docs
 
-## Modifier l'interface (Node 20 ou plus : `brew install node`)
+## Modifying the interface (Node 20 or later: `brew install node`)
 
 ```bash
 cd frontend
 npm install
-npm run dev          # http://127.0.0.1:5173, relaie /api vers le backend lancé sur 8765
-npm test             # tests Vitest
-npm run build        # recompile frontend/dist, servi ensuite par le backend
-npm run gen:api      # régénère les types TypeScript depuis l'OpenAPI (backend lancé)
+npm run dev          # http://127.0.0.1:5173, proxies /api to the backend running on 8765
+npm test             # Vitest tests
+npm run build        # rebuilds frontend/dist, then served by the backend
+npm run gen:api      # regenerates the TypeScript types from the OpenAPI spec (backend running)
 ```
 
-## 4. Premier branchement via l'API (inutile si catalog_report.py a été lancé)
+## 4. First connection through the API (not needed if catalog_report.py was run)
 
 ```bash
 API=http://127.0.0.1:8765/api
 
-# Réglages (non sensibles, stockés dans ~/Library/Application Support/AnbernicGameManager/)
+# Settings (non-sensitive, stored in ~/Library/Application Support/AnbernicGameManager/)
 curl -s -X PUT $API/settings -H 'Content-Type: application/json' \
   -d '{"host":"192.168.86.242","port":22,"username":"root","auth_method":"password","roms_root":"/mnt/mmc/Roms"}'
 
-# Mot de passe -> trousseau macOS (jamais renvoyé par l'API). read -s évite l'historique du shell.
+# Password -> macOS keychain (never returned by the API). read -s keeps it out of the shell history.
 read -s PW && curl -s -X PUT $API/settings/password -H 'Content-Type: application/json' \
   -d "{\"password\":\"$PW\"}"; unset PW
 
-# Clé d'hôte : afficher, vérifier, puis confirmer en recopiant l'empreinte
+# Host key: display, check, then confirm by copying back the fingerprint
 curl -s $API/device/host-key
 curl -s -X POST $API/device/host-key/trust -H 'Content-Type: application/json' \
   -d '{"fingerprint":"SHA256:...."}'
 ```
 
-## 5. Utilisation
+## 5. Usage
 
-Catalogue (servi depuis SQLite, console éteinte comprise) :
+Catalog (served from SQLite, even when the console is off):
 
 ```bash
-curl -s -X POST $API/catalog/sync                       # lance une synchronisation (202 + id)
-curl -s $API/catalog/sync/1                             # avancement : platforms_done / platforms_total
-curl -s $API/catalog/status | python3 -m json.tool      # totaux, dernière synchro, espace carte
+curl -s -X POST $API/catalog/sync                       # starts a sync (202 + id)
+curl -s $API/catalog/sync/1                             # progress: platforms_done / platforms_total
+curl -s $API/catalog/status | python3 -m json.tool      # totals, last sync, card space
 curl -s $API/platforms
 curl -s "$API/games?q=mario&platform=SFC&sort=name&limit=20"
 curl -s "$API/games?region=Europe&extension=chd&has_image=true"
-curl -s $API/games/42                                   # fiche + doublons + historique
-open  http://127.0.0.1:8765/api/games/42/image          # image Imgs (mise en cache locale)
-curl -s $API/catalog/changes                            # ajouts / modifs / disparitions de la dernière synchro
+curl -s $API/games/42                                   # details + duplicates + history
+open  http://127.0.0.1:8765/api/games/42/image          # Imgs image (cached locally)
+curl -s $API/catalog/changes                            # additions / changes / removals from the last sync
 curl -s $API/catalog/duplicates
 curl -s $API/catalog/unmatched-images
 ```
 
-Accès direct à la console (diagnostic) :
+Direct access to the console (diagnostics):
 
 ```bash
 curl -s -X POST $API/device/test-connection | python3 -m json.tool
@@ -117,372 +124,372 @@ curl -s $API/device/storage
 curl -s "$API/device/inventory?include_files=true&platform=PS"
 ```
 
-## Ajouter des jeux
+## Adding games
 
-Page **Ajouter des jeux** (anciennement « Transferts », `/ajouter-des-jeux`) : glisse des fichiers ou clique sur « Choisir des fichiers ».
+**Add games** page (formerly "Transfers", `/ajouter-des-jeux`): drag files in or click "Choose files".
 
-1. Les fichiers sont d'abord copiés dans une zone d'attente sur le Mac (`~/Library/Application Support/AnbernicGameManager/staging`), avec calcul de leur empreinte SHA-256.
-2. Pour chacun, l'application propose la console de destination d'après le format et signale : nom refusé par la carte, format inhabituel, fichier déjà présent (casse comprise), titre déjà présent, espace insuffisant (marge de 256 Mo minimum).
-3. « Copier sur la console » : chaque fichier est écrit sous un nom temporaire caché, vérifié (empreinte SHA-256 calculée sur la console, sinon la taille), puis renommé. Le catalogue des consoles concernées est ensuite relu.
-4. Un fichier déjà présent n'est jamais remplacé sans confirmation. En cas de remplacement, l'ancien est déplacé dans `/mnt/mmc/Roms/.agm-backups/<console>/` (même carte, aucun espace consommé). Tu peux supprimer ce dossier à la main quand tu n'en as plus besoin.
-5. Annulation ou coupure : le fichier temporaire est supprimé, rien n'apparaît sur la carte. Un transfert échoué ou annulé peut être relancé tant que le fichier est en zone d'attente.
+1. Files are first copied to a staging area on the Mac (`~/Library/Application Support/AnbernicGameManager/staging`), and their SHA-256 hash is computed.
+2. For each one, the application suggests the destination console based on the format and flags: name rejected by the card, unusual format, file already present (case-insensitive), title already present, not enough space (minimum 256 MB margin).
+3. "Copy to console": each file is written under a hidden temporary name, verified (SHA-256 hash computed on the console, otherwise the size), then renamed. The catalog of the affected consoles is then re-read.
+4. An existing file is never replaced without confirmation. When replaced, the old one is moved to `/mnt/mmc/Roms/.agm-backups/<console>/` (same card, no space used). You can delete this folder by hand when you no longer need it.
+5. Cancellation or disconnection: the temporary file is deleted, nothing appears on the card. A failed or cancelled transfer can be restarted as long as the file is in the staging area.
 
-## Garanties
+## Guarantees
 
-- Lecture et écriture séparées : `ReadOnlyRemoteFS` pour tout ce qui lit, `RemoteWriter` pour les seules copies. L'écriture est limitée aux dossiers de consoles existants (jamais APPS, PORTS, un lien symbolique ou un fichier système), et la seule suppression possible concerne les fichiers temporaires de l'application.
-- Le serveur refuse les requêtes venues d'autres sites ouverts dans le navigateur (contrôle des en-têtes Origin et Host).
-- Clé d'hôte vérifiée, confirmation explicite au premier contact, blocage si elle change.
-- Mot de passe dans le trousseau macOS uniquement.
-- Chemins validés et confinés sous la racine, liens symboliques signalés et jamais suivis.
-- Dossiers `Imgs` comptés à part, jamais comme des jeux. Un fichier `candidate` n'est pas affirmé jouable.
-- Synchronisation : un fichier disparu est marqué `deleted_at`, jamais effacé ; une plateforme en erreur garde ses fichiers ; racine absente ou vide : synchronisation refusée sans rien modifier.
-- Rôles : `candidate` (jeu potentiel), `component` (piste .bin d'un .cue, disque d'un .m3u), `auxiliary` (texte, sauvegarde), `program` (APPS, PORTS).
-- Serveur lié à 127.0.0.1.
+- Reading and writing are separate: `ReadOnlyRemoteFS` for everything that reads, `RemoteWriter` for copies only. Writing is limited to existing console folders (never APPS, PORTS, a symbolic link or a system file), and the only possible deletion concerns the application's temporary files.
+- The server rejects requests coming from other sites open in the browser (Origin and Host header checks).
+- Host key verified, explicit confirmation on first contact, blocked if it changes.
+- Password stored in the macOS keychain only.
+- Paths validated and confined under the root, symbolic links reported and never followed.
+- `Imgs` folders counted separately, never as games. A `candidate` file is not claimed to be playable.
+- Sync: a missing file is marked `deleted_at`, never erased; a platform with an error keeps its files; missing or empty root: sync refused without changing anything.
+- Roles: `candidate` (potential game), `component` (.bin track of a .cue, disc of a .m3u), `auxiliary` (text, save), `program` (APPS, PORTS).
+- Server bound to 127.0.0.1.
 
 ## Genres
 
-La bibliothèque filtre par genre (Sport, Tir, Plateforme…). Les genres viennent d'une table embarquée,
-`backend/app/data/genres.json.gz`, rapprochée par nom de fichier : libretro-database pour les consoles
-(noms No-Intro), catver.ini (progettoSNAPS) pour l'arcade (noms courts MAME). Aucun accès réseau à l'usage ;
-les genres sont recalculés à chaque démarrage et après chaque synchronisation.
-Seconde source : [OpenVGDB](https://github.com/OpenVGDB/OpenVGDB) (base d'OpenEmu), indispensable pour les
-consoles à CD (PlayStation, Saturn, Mega-CD, PC Engine CD) absentes de libretro. Les noms de fichiers
-approximatifs sont rapprochés par titre compact (« Bomberman2 »), préfixe retiré (« SS-Clockwork Knight »),
-début de titre (nom tronqué), puis par le même jeu sur une autre console ou en arcade. Pour rafraîchir la table :
+The library filters by genre (Sports, Shooter, Platformer…). Genres come from a bundled table,
+`backend/app/data/genres.json.gz`, matched by file name: libretro-database for consoles
+(No-Intro names), catver.ini (progettoSNAPS) for arcade (MAME short names). No network access at runtime;
+genres are recomputed at every startup and after every sync.
+Second source: [OpenVGDB](https://github.com/OpenVGDB/OpenVGDB) (OpenEmu's database), essential for
+CD-based consoles (PlayStation, Saturn, Mega-CD, PC Engine CD) missing from libretro. Approximate file
+names are matched by compact title ("Bomberman2"), stripped prefix ("SS-Clockwork Knight"),
+title start (truncated name), then by the same game on another console or in arcade. To refresh the table:
 
 ```bash
 cd backend && .venv/bin/python scripts/build_genres.py
 ```
 
-Les jeux d'arcade affichent leur titre complet (« sf2.zip » → « Street Fighter II: The World Warrior »),
-tiré des listes MAME, FBNeo et HBMAME de libretro-database, dans la même table.
+Arcade games show their full title ("sf2.zip" → "Street Fighter II: The World Warrior"),
+taken from the MAME, FBNeo and HBMAME lists of libretro-database, in the same table.
 
-## Illustrations des consoles
+## Console illustrations
 
-`frontend/public/consoles/*.webp` : thème XMB « systematic » de
-[retroarch-assets](https://github.com/libretro/retroarch-assets) (CC-BY 4.0). Pour en ajouter :
-`cd backend && .venv/bin/python scripts/build_console_icons.py`, puis recompiler l'interface.
+`frontend/public/consoles/*.webp`: "systematic" XMB theme from
+[retroarch-assets](https://github.com/libretro/retroarch-assets) (CC-BY 4.0). To add more:
+`cd backend && .venv/bin/python scripts/build_console_icons.py`, then rebuild the interface.
 
-## Bandes-annonces
+## Trailers
 
-Le bouton ▶ d'une jaquette cherche une vidéo avec l'API officielle YouTube Data v3. Il faut une clé d'API
-gratuite (Paramètres → Bandes-annonces YouTube), rangée dans le trousseau macOS. Une recherche coûte
-100 unités sur un quota de 10 000 par jour, soit environ 100 jeux par jour : la recherche se fait au premier
-clic, puis le résultat (les 5 vidéos les plus pertinentes) est gardé en cache dans le catalogue. Sans clé,
-le bouton ouvre la recherche sur youtube.com.
+The ▶ button on a cover looks up a video with the official YouTube Data v3 API. It needs a free API key
+(Settings → YouTube trailers), stored in the macOS keychain. A search costs
+100 units out of a quota of 10,000 per day, i.e. about 100 games per day: the search runs on the first
+click, then the result (the 5 most relevant videos) is cached in the catalog. Without a key,
+the button opens the search on youtube.com.
 
-## Jaquettes
+## Box art
 
-Les images du dossier `Imgs` de la carte sont souvent des montages pour le menu de la console. La grille
-affiche plutôt la vraie boîte du jeu, tirée de [libretro-thumbnails](https://thumbnails.libretro.com)
-(la banque d'images de RetroArch), par nom No-Intro ou, pour l'arcade, par titre complet. Si le nom exact
-manque, le titre le plus proche est cherché dans la liste des fichiers de la banque. Chaque jaquette est
-téléchargée au premier affichage puis gardée dans `cache/boxart` sur le Mac ; rien n'est écrit sur la
-carte. Le sélecteur « Jaquettes / Images de la carte » de la bibliothèque permet de revenir aux images
-de la carte.
+The images in the card's `Imgs` folder are often composites made for the console's menu. The grid
+shows the actual game box instead, taken from [libretro-thumbnails](https://thumbnails.libretro.com)
+(RetroArch's image bank), by No-Intro name or, for arcade, by full title. If the exact name
+is missing, the closest title is looked up in the bank's file list. Each cover is
+downloaded the first time it is displayed, then kept in `cache/boxart` on the Mac; nothing is written to the
+card. The library's "Box art / Card images" switch lets you go back to the card's
+images.
 
-## Jouer sur la console depuis l'interface
+## Playing on the console from the interface
 
-Dans la fiche d'un jeu, « Jouer sur la console » ferme le menu (ou le jeu RetroArch en cours, avec sa
-sauvegarde automatique) et lance le jeu sur la console ; le menu revient quand on quitte le jeu.
-L'encart de la console, dans la barre latérale, affiche le jeu en cours et propose « Quitter le jeu ».
+On a game's page, "Play on the console" closes the menu (or the running RetroArch game, with its
+automatic save) and launches the game on the console; the menu comes back when you quit the game.
+The console panel, in the sidebar, shows the running game and offers "Quit game".
 
-Fonctionne avec le firmware Anbernic muni du « Stock OS Mod » (`/mnt/mod/ctrl/RA_launch.sh`, cœurs de
-`/mnt/mod/ctrl/configs/CORES.txt`). Le script `backend/app/device/launch.sh` est envoyé par SSH et exécuté
-détaché : il met en pause la boucle du menu (`/mnt/vendor/ctrl/loadapp.sh`), ferme `dmenu.bin` proprement
-(SIGINT), remet l'écran dans son mode de démarrage (640×480, 32 bits, enregistré par le mod dans
-`configs/fb.cfg` ; sans cela RetroArch ne peut pas s'afficher), lance le jeu comme le fait le mod, puis
-relâche la boucle à la sortie du jeu. « Quitter le jeu » envoie la commande réseau `QUIT` de RetroArch
-(UDP 55355). Aucun fichier n'est écrit sur la carte ;
-le journal est dans `/tmp/agm-launch.log` sur la console.
+Works with the Anbernic firmware fitted with the "Stock OS Mod" (`/mnt/mod/ctrl/RA_launch.sh`, cores from
+`/mnt/mod/ctrl/configs/CORES.txt`). The script `backend/app/device/launch.sh` is sent over SSH and run
+detached: it pauses the menu loop (`/mnt/vendor/ctrl/loadapp.sh`), closes `dmenu.bin` cleanly
+(SIGINT), puts the screen back into its boot mode (640×480, 32-bit, saved by the mod in
+`configs/fb.cfg`; without this RetroArch cannot display), launches the game the way the mod does, then
+releases the loop when the game exits. "Quit game" sends RetroArch's `QUIT` network command
+(UDP 55355). No file is written to the card;
+the log is in `/tmp/agm-launch.log` on the console.
 
-## Langues
+## Languages
 
-L'interface existe en français, anglais et espagnol (sélecteur en bas de la barre latérale, choix gardé
-dans le navigateur). Textes : `frontend/src/i18n/locales/*.ts`, un fichier par zone, les trois langues
-côte à côte. Le serveur répond en français ; l'interface traduit ses erreurs à partir de leur code.
+The interface is available in French, English and Spanish (selector at the bottom of the sidebar, choice kept
+in the browser). Strings: `frontend/src/i18n/locales/*.ts`, one file per area, the three languages
+side by side. The server responds in French; the interface translates its errors from their code.
 
-## Sauvegardes
+## Saves
 
-Page « Sauvegardes » : toutes les sauvegardes de la carte, rattachées à leur jeu, lues en lecture seule
-dans les dossiers du firmware (sous `/mnt/mmc`) :
+"Saves" page: all the saves on the card, linked to their game, read-only
+from the firmware folders (under `/mnt/mmc`):
 
-| Dossier | Contenu |
+| Folder | Contents |
 |---|---|
-| `saves_RA/Roms/<CONSOLE>/<cœur>/` | sauvegardes « en jeu » RetroArch (`.srm`, `.save.zip`, `.nvmem`) |
-| `states_RA/Roms/<CONSOLE>/<cœur>/` | instantanées RetroArch (`.state`, `.stateN`, `.state.auto`) |
-| `save/Roms/<CONSOLE>/` | émulateurs d'origine d'Anbernic (`.stN`, `.mds.gz`, `.srm`) |
+| `saves_RA/Roms/<CONSOLE>/<cœur>/` | RetroArch in-game saves (`.srm`, `.save.zip`, `.nvmem`) |
+| `states_RA/Roms/<CONSOLE>/<cœur>/` | RetroArch save states (`.state`, `.stateN`, `.state.auto`) |
+| `save/Roms/<CONSOLE>/` | Anbernic's stock emulators (`.stN`, `.mds.gz`, `.srm`) |
 | `save_nds/` | DraStic (Nintendo DS) |
-| `.config/ppsspp/PSP/SAVEDATA/` | PPSSPP (PSP), un dossier par identifiant de jeu |
-| `Roms/<CONSOLE>/*.sav` | sauvegardes posées à côté du jeu |
+| `.config/ppsspp/PSP/SAVEDATA/` | PPSSPP (PSP), one folder per game ID |
+| `Roms/<CONSOLE>/*.sav` | saves placed next to the game |
 
-- « Copier toutes les sauvegardes sur le Mac » crée un dossier daté dans
-  `~/Library/Application Support/AnbernicGameManager/save-backups/`, téléchargeable en `.zip`.
-- Restaurer un fichier d'une copie, ou supprimer une sauvegarde de la carte : refusé pendant qu'un jeu tourne,
-  et toujours précédé d'une copie automatique sur le Mac du fichier remplacé ou supprimé. Les écritures passent
-  par `app/device/save_writer.py`, limité aux emplacements de sauvegarde.
-- Le guide « Comment sauvegarder » affiche les raccourcis RetroArch réellement configurés sur la console.
-- Tableau de bord : « Sauvegarder maintenant » envoie la commande réseau `SAVE_STATE` de RetroArch au jeu en cours.
+- "Copy all saves to the Mac" creates a dated folder in
+  `~/Library/Application Support/AnbernicGameManager/save-backups/`, downloadable as a `.zip`.
+- Restoring a file from a copy, or deleting a save from the card: refused while a game is running,
+  and always preceded by an automatic copy, on the Mac, of the file being replaced or deleted. Writes go
+  through `app/device/save_writer.py`, limited to save locations.
+- The "How to save" guide shows the RetroArch shortcuts actually configured on the console.
+- Dashboard: "Save now" sends RetroArch's `SAVE_STATE` network command to the running game.
 
-## Reprendre une partie depuis une sauvegarde
+## Resuming a game from a save
 
-Sur la page Sauvegardes et dans la fiche d'un jeu, chaque sauvegarde a un bouton :
-- « Reprendre ici » (instantanée RetroArch) : lance le jeu sur la console puis charge cet emplacement dès que
-  RetroArch fait tourner le jeu (commandes réseau `GET_STATUS` puis `LOAD_STATE_SLOT n`) ; l'instantanée
-  « auto » passe par l'option `auto` de `RA_launch.sh` ;
-- « Jouer » (sauvegarde en jeu) : lance le jeu, qui charge lui-même sa sauvegarde.
+On the Saves page and on a game's page, each save has a button:
+- "Resume here" (RetroArch save state): launches the game on the console, then loads that slot as soon as
+  RetroArch is running the game (network commands `GET_STATUS` then `LOAD_STATE_SLOT n`); the
+  "auto" state goes through the `auto` option of `RA_launch.sh`;
+- "Play" (in-game save): launches the game, which loads its save itself.
 
 ## Bluetooth
 
-Page « Bluetooth » : état du Bluetooth de la console, appareils appairés et à portée (recherche de 12 s),
-appairer / connecter / déconnecter / oublier, et « Son des jeux ici » pour une enceinte ou un casque.
+"Bluetooth" page: the console's Bluetooth status, paired and nearby devices (12 s scan),
+pair / connect / disconnect / forget, and "Game sound here" for a speaker or headphones.
 
-- La console a BlueZ et BlueALSA, mais rien ne démarre `bluealsa` : sans lui une enceinte s'appaire sans
-  recevoir de son. L'application le lance à la demande (`bluealsa -p a2dp-source`, processus détaché).
-- « Son des jeux ici » : RetroArch est un programme 32 bits, le greffon ALSA de BlueALSA n'existe qu'en 64 bits,
-  et RetroArch ouvre toujours la sortie ALSA « default ». L'application installe donc
-  `/etc/alsa/conf.d/60-agm-bluetooth.conf` (sortie `agm_bt` : le son est passé à `aplay`, 64 bits, vers
-  l'enceinte ; si elle est absente, il est absorbé et le jeu continue sans son) et `/.asoundrc`
-  (`pcm.!default agm_bt`, lu par les jeux lancés depuis Game Manager, qui tournent avec `HOME=/`).
-  Le relais recopie aussi le son vers la sortie HDMI (muette sans câble) : elle donne à RetroArch une horloge
-  temps réel ; sans elle (sortie « null »), le son arrivait haché.
-  « Remettre le son sur la console » supprime ces deux fichiers. Le menu de la console, et les jeux lancés
-  depuis lui, gardent ses haut-parleurs.
-- Manettes récentes (Xbox, 8BitDo…) : elles sont en Bluetooth basse consommation et ne s'appairent que pendant
-  une recherche active. La connexion se fait donc en une seule session `bluetoothctl` (agent, `scan on`, `pair`,
-  `trust`, `connect`), journal dans `/tmp/agm-bt-connect.log` sur la console. Si l'appareil est appairé mais ne
-  répond pas, il faut le réveiller (bouton Xbox / Home) puis cliquer de nouveau sur « Connecter ».
-- Le firmware efface les appairages à chaque démarrage (`/mnt/vendor/ctrl/loadapp.sh` vide
-  `/var/lib/bluetooth`), et `bluealsa` n'est pas relancé : après un redémarrage, reconnecter l'appareil depuis
-  cette page.
+- The console has BlueZ and BlueALSA, but nothing starts `bluealsa`: without it a speaker pairs without
+  receiving any sound. The application starts it on demand (`bluealsa -p a2dp-source`, detached process).
+- "Game sound here": RetroArch is a 32-bit program, BlueALSA's ALSA plugin only exists in 64-bit,
+  and RetroArch always opens the "default" ALSA output. The application therefore installs
+  `/etc/alsa/conf.d/60-agm-bluetooth.conf` (`agm_bt` output: the sound is passed to `aplay`, 64-bit, towards
+  the speaker; if the speaker is absent, the sound is swallowed and the game continues silently) and `/.asoundrc`
+  (`pcm.!default agm_bt`, read by games launched from Game Manager, which run with `HOME=/`).
+  The relay also copies the sound to the HDMI output (silent without a cable): it gives RetroArch a real-time
+  clock; without it ("null" output), the sound came out choppy.
+  "Send sound back to the console" deletes these two files. The console's menu, and games launched
+  from it, keep using its speakers.
+- Recent controllers (Xbox, 8BitDo…): they use Bluetooth Low Energy and only pair during
+  an active scan. Connecting is therefore done in a single `bluetoothctl` session (agent, `scan on`, `pair`,
+  `trust`, `connect`), logged in `/tmp/agm-bt-connect.log` on the console. If the device is paired but does not
+  respond, wake it up (Xbox / Home button) then click "Connect" again.
+- The firmware erases pairings at every startup (`/mnt/vendor/ctrl/loadapp.sh` empties
+  `/var/lib/bluetooth`), and `bluealsa` is not restarted: after a reboot, reconnect the device from
+  this page.
 
-## Manettes
+## Controllers
 
-Page « Manettes » : qui contrôle le jeu. Manette de chaque joueur dans RetroArch (`input_playerN_joypad_index`,
-numéros du pilote sdl2 : 0 = boutons de la console, puis manettes USB / Bluetooth dans l'ordre de branchement).
-RetroArch enregistre sa config en quittant : un joueur 1 resté sur une ancienne manette absente empêche la console
-de contrôler le jeu (« Utiliser les boutons de la console » la remet sur le joueur 1). Le choix est rangé dans
-`/.config/agm-players`, écrit tout de suite dans `/.config/retroarch/retroarch.cfg` si aucun jeu ne tourne, sinon
-par `launch.sh` au prochain jeu lancé depuis Game Manager (une fois RetroArch fermé). Choisir une manette pour un
-joueur l'échange avec le joueur qui l'avait.
+"Controllers" page: who controls the game. Each player's controller in RetroArch (`input_playerN_joypad_index`,
+sdl2 driver numbers: 0 = the console's buttons, then USB / Bluetooth controllers in the order they were plugged in).
+RetroArch saves its config when quitting: a player 1 left on an old, absent controller prevents the console
+from controlling the game ("Use the console buttons" puts it back on player 1). The choice is stored in
+`/.config/agm-players`, written right away to `/.config/retroarch/retroarch.cfg` if no game is running, otherwise
+by `launch.sh` at the next game launched from Game Manager (once RetroArch is closed). Choosing a controller for a
+player swaps it with the player who had it.
 
-RetroArch (pilote sdl2 avec udev) ne numérote pas les manettes dans l'ordre de `/proc/bus/input/devices` mais
-par chemin sysfs : avec une manette Xbox USB, `…/soc/5101000.ohci0…` passe avant les boutons
-`…/soc/soc@03000000:gpio_keys` (Xbox = 0, console = 1), et « joueur 1 = manette n°1 » donnait la main à la
-console. `/.config/agm-players` garde les numéros de Game Manager ; `players_apply.sh` (lancé par Game Manager
-sans jeu en cours, et par `launch.sh` avant chaque jeu, avec les manettes branchées à ce moment) les traduit dans
-l'ordre de RetroArch et réserve en plus la manette au joueur (`input_playerN_reserved_device = "045e:0b12 Generic
-X-Box pad"`, type 1 = préférée). Ce qui a été appliqué est copié dans `/.config/agm-players.applied` ; le
-résultat est noté dans `/tmp/agm-launch.log` (« joueurs pour RetroArch : 0 045e:0b12 Generic X-Box pad 1 … »).
+RetroArch (sdl2 driver with udev) does not number controllers in the order of `/proc/bus/input/devices` but
+by sysfs path: with a USB Xbox controller, `…/soc/5101000.ohci0…` comes before the buttons
+`…/soc/soc@03000000:gpio_keys` (Xbox = 0, console = 1), and "player 1 = controller #1" handed control to the
+console. `/.config/agm-players` keeps Game Manager's numbers; `players_apply.sh` (run by Game Manager
+when no game is running, and by `launch.sh` before each game, with the controllers plugged in at that moment) translates them into
+RetroArch's order and also reserves the controller for the player (`input_playerN_reserved_device = "045e:0b12 Generic
+X-Box pad"`, type 1 = preferred). What was applied is copied to `/.config/agm-players.applied`; the
+result is noted in `/tmp/agm-launch.log` ("joueurs pour RetroArch : 0 045e:0b12 Generic X-Box pad 1 …").
 
-Avec une manette branchée en plus des boutons de la console, « Jouer sur la console » (fiche du jeu) demande
-d'abord « Qui joue ? » : le choix devient le joueur 1, puis le jeu est lancé.
+With a controller plugged in on top of the console's buttons, "Play on the console" (game page) first asks
+"Who is playing?": the choice becomes player 1, then the game is launched.
 
-Le bouton de l'en-tête suit la situation : un changement en attente pendant un jeu RetroArch connu de la
-bibliothèque donne « Relancer le jeu pour appliquer » ; un joueur 1 sur une manette absente donne « Utiliser les
-boutons de la console » (puis la bibliothèque sans jeu en cours, ou la relance du jeu en cours) ; sinon, sans jeu
-en cours, « Choisir un jeu » ouvre la bibliothèque. La relance repasse par `launch.sh` : le jeu est quitté
-proprement avec sa sauvegarde automatique, les manettes sont écrites, puis il reprend en `auto` si le système sait
-reprendre.
+The header button follows the situation: a pending change during a RetroArch game known to the
+library gives "Restart the game to apply"; a player 1 on an absent controller gives "Use the console
+buttons" (then the library when no game is running, or a restart of the running game); otherwise, with no game
+running, "Choose a game" opens the library. The restart goes through `launch.sh` again: the game is quit
+cleanly with its automatic save, the controllers are written, then it resumes with `auto` if the system can
+resume.
 
 ## Volume
 
-Dans le bloc « En cours » du tableau de bord, dans le bandeau « En cours » de la fiche du jeu et dans la barre du
-haut quand un jeu tourne : couper / remettre le
-son et curseur de volume (1 à 100 % = -40 à 0 dB), valable pour les haut-parleurs comme pour une enceinte
-Bluetooth.
+In the dashboard's "Now playing" block, in the "Now playing" banner of the game page and in the top
+bar while a game is running: mute / unmute
+and a volume slider (1 to 100% = -40 to 0 dB), working for the speakers as well as for a Bluetooth
+speaker.
 
-Ce qui ne marche pas sur cette console, d'où ce choix :
-- le mixeur de la puce son : pendant un jeu, ses réglages sont verrouillés (`amixer` ne change rien, sans erreur) ;
-- les commandes réseau `VOLUME_UP` / `VOLUME_DOWN` de RetroArch : ignorées (seule `MUTE` marche).
+What does not work on this console, hence this choice:
+- the sound chip's mixer: during a game, its settings are locked (`amixer` changes nothing, without an error);
+- RetroArch's `VOLUME_UP` / `VOLUME_DOWN` network commands: ignored (only `MUTE` works).
 
-Game Manager ajoute donc son propre volume logiciel ALSA : `/.asoundrc` (lu par les jeux lancés depuis Game
-Manager, `HOME=/`) fait passer la sortie « default » par deux `softvol` (volume « Game Manager », puis coupure),
-avant les haut-parleurs ou la sortie Bluetooth `agm_bt`. Le réglage « Game Manager » apparaît sur la carte 0 au
-premier jeu après un démarrage (mis alors à 60 %) et se règle ensuite avec `amixer`, même en plein jeu. Au
-lancement, `launch.sh` met le volume propre de RetroArch (`audio_volume`, souvent très bas) à 0 dB.
-Un jeu lancé depuis le menu de la console n'utilise pas `/.asoundrc` : seule la coupure marche (`MUTE`).
+Game Manager therefore adds its own ALSA software volume: `/.asoundrc` (read by games launched from Game
+Manager, `HOME=/`) routes the "default" output through two `softvol` (the "Game Manager" volume, then mute),
+before the speakers or the Bluetooth output `agm_bt`. The "Game Manager" control appears on card 0 at the
+first game after a startup (set to 60% at that point) and is then adjusted with `amixer`, even mid-game. At
+launch, `launch.sh` sets RetroArch's own volume (`audio_volume`, often very low) to 0 dB.
+A game launched from the console's menu does not use `/.asoundrc`: only muting works (`MUTE`).
 
-## Depuis le téléphone (ngrok)
+## From your phone (ngrok)
 
 ```bash
 ./run.sh --telephone
 ```
 
-Publie l'interface sur une adresse https ngrok (compte ngrok configuré une fois : `ngrok config add-authtoken …`)
-et affiche l'adresse, l'identifiant, le mot de passe et un QR code. L'application n'a pas de comptes : ngrok
-demande l'identifiant et le mot de passe **avant** que la requête n'arrive sur le Mac (règle `basic-auth`,
-`phone_policy.yml` dans le dossier de données). Le mot de passe est créé au premier lancement
-(`phone_password`, lisible par toi seul) et gardé ensuite. Le serveur n'accepte, en plus de localhost, que
-l'adresse ngrok de ce lancement (`AGM_EXTRA_HOSTS`). `Ctrl+C` arrête le serveur et l'accès. Sans `--telephone`,
-rien n'est publié.
+Publishes the interface on an ngrok https address (ngrok account configured once: `ngrok config add-authtoken …`)
+and displays the address, the username, the password and a QR code. The application has no accounts: ngrok
+asks for the username and password **before** the request reaches the Mac (`basic-auth` rule,
+`phone_policy.yml` in the data folder). The password is created on first run
+(`phone_password`, readable only by you) and kept afterwards. Besides localhost, the server only accepts
+the ngrok address of that run (`AGM_EXTRA_HOSTS`). `Ctrl+C` stops the server and the access. Without `--telephone`,
+nothing is published.
 
-## Informations sur les jeux
+## Game information
 
-Fiche du jeu : genre (pictogramme), régions (drapeaux), sortie, éditeur, développeur, franchise (liens
-Wikipédia dans la langue de l'interface), résumé (en anglais) et fiche GameFAQs. Table embarquée
-`backend/app/data/gameinfo.json.gz`, construite par `scripts/build_gameinfo.py` (libretro-database, OpenVGDB,
-listes arcade MAME / FBNeo / HBMAME), rapprochée par nom de fichier comme les genres. La recherche trouve aussi
-l'année, l'éditeur, le développeur, la franchise, et les régions et genres en français, anglais et espagnol
-(« Japon », « Japan », « Japón »).
+Game page: genre (icon), regions (flags), release, publisher, developer, franchise (Wikipedia
+links in the interface language), summary (in English) and GameFAQs page. Bundled table
+`backend/app/data/gameinfo.json.gz`, built by `scripts/build_gameinfo.py` (libretro-database, OpenVGDB,
+MAME / FBNeo / HBMAME arcade lists), matched by file name like the genres. Search also finds
+the year, publisher, developer, franchise, and the regions and genres in French, English and Spanish
+("Japon", "Japan", "Japón").
 
-## Commandes des jeux
+## Game controls
 
-Section « Commandes » de la fiche : quelle touche de la console fait quoi dans ce jeu (« B : coup de poing »,
-« A : tir »), avec quelques astuces. « Demander à Claude » fait un appel (Opus 5.5, effort moyen, quelques
-centimes) avec la correspondance par défaut des cœurs RetroArch entre la manette d'origine et les touches de la
-console (Mega Drive : A = Y, B = B, C = A ; PlayStation : Croix = B, Rond = A… ; arcade : bouton 1 = B, 2 = A…,
-pièce = Select). Réponse en français, anglais et espagnol, gardée en base (table `game_controls`, partagée par
-les éditions d'un même jeu). Jeu mal connu du modèle : commandes habituelles de la console, signalé comme tel.
-« Corriger » / « Saisir à la main » remplace la liste par la sienne (même texte dans les trois langues). Même clé
-d'API IA que les descriptions (Paramètres > IA).
+"Controls" section of the game page: which console button does what in this game ("B: punch",
+"A: fire"), with a few tips. "Ask Claude" makes a call (Opus 5.5, medium effort, a few
+cents) with the RetroArch cores' default mapping between the original controller and the console's
+buttons (Mega Drive: A = Y, B = B, C = A; PlayStation: Cross = B, Circle = A…; arcade: button 1 = B, 2 = A…,
+coin = Select). Answer in French, English and Spanish, stored in the database (`game_controls` table, shared by
+the editions of the same game). Game the model barely knows: the console's usual controls, flagged as such.
+"Edit" / "Write them myself" replaces the list with your own (same text in all three languages). Same AI
+API key as the descriptions (Settings > AI).
 
-## Connexion à une IA (LLM)
+## Connecting to an AI (LLM)
 
-Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions des jeux, commandes des jeux).
-`backend/app/services/llm.py` :
+Settings > AI: a single AI for everything that uses one (game descriptions, game controls).
+`backend/app/services/llm.py`:
 
-| Fournisseur | Clé | Remarques |
+| Provider | Key | Notes |
 |---|---|---|
-| Claude (Anthropic) | `sk-ant-…` | Claude Opus 5.5 par défaut ; descriptions en lot (moitié prix) |
-| ChatGPT (OpenAI), Mistral, Gemini | clé du fournisseur | protocole OpenAI (chat completions) |
-| Autre service compatible OpenAI | facultative | adresse au choix (`…/v1`) |
-| Modèle local (Ollama, LM Studio) | aucune | poids ouverts sur le Mac, gratuit et hors ligne ; `ollama pull qwen2.5:7b` |
+| Claude (Anthropic) | `sk-ant-…` | Claude Opus 5.5 by default; batch descriptions (half price) |
+| ChatGPT (OpenAI), Mistral, Gemini | provider key | OpenAI protocol (chat completions) |
+| Other OpenAI-compatible service | optional | address of your choice (`…/v1`) |
+| Local model (Ollama, LM Studio) | none | open weights on the Mac, free and offline; `ollama pull qwen2.5:7b` |
 
-- Clés dans le trousseau macOS, une par fournisseur (la clé Anthropic garde son ancienne entrée) ; à défaut la
-  variable d'environnement du fournisseur (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
-- Fournisseur, modèle et adresse dans `llm.json` (dossier de données). Le modèle n'est jamais deviné : la liste
-  vient du fournisseur (`GET /api/settings/llm/models`) ; « Tester » fait une petite demande réelle.
-- Réponses en JSON : sorties structurées (`json_schema`), sinon JSON simple avec le schéma dans la consigne
-  (modèles locaux qui ne les gèrent pas).
-- Descriptions sans Claude : jeu par jeu en arrière-plan (arrêt après 5 échecs d'affilée, reprise possible).
+- Keys in the macOS keychain, one per provider (the Anthropic key keeps its old entry); otherwise the
+  provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
+- Provider, model and address in `llm.json` (data folder). The model is never guessed: the list
+  comes from the provider (`GET /api/settings/llm/models`); "Test" makes a small real request.
+- JSON responses: structured outputs (`json_schema`), otherwise plain JSON with the schema in the prompt
+  (local models that do not support them).
+- Descriptions without Claude: game by game in the background (stops after 5 failures in a row, can be resumed).
 
-## Favoris
+## Favorites
 
-« Ajouter aux favoris » sur la fiche d'un jeu (l'édition ouverte). Les favoris apparaissent dans « Mes favoris » du
-tableau de bord (le dernier ajouté en premier, avec « Rejouer ») et dans la bibliothèque : bouton « Favoris » des
-filtres, ou `/bibliotheque?fav=1` (lien « Tous mes favoris »). Rangés dans la base du Mac (table `favorite`).
+"Add to favorites" on a game's page (the open edition). Favorites appear in the dashboard's "My favorites"
+(most recently added first, with "Play again") and in the library: "Favorites" button among the
+filters, or `/bibliotheque?fav=1` ("All my favorites" link). Stored in the Mac's database (`favorite` table).
 
-## Temps de jeu
+## Play time
 
-Page « Temps de jeu » : temps du jour, des 7 derniers jours et total, histogramme sur 14 jours, temps par jeu,
-dernières parties ; carte « Aujourd'hui » sur le tableau de bord.
+"Play time" page: today's time, the last 7 days and the total, 14-day histogram, time per game,
+latest sessions; "Today" card on the dashboard.
 
-- **Suivi par Game Manager** (`app/services/playtime.py`) : tant que le serveur tourne, il regarde toutes les
-  30 s ce qui tourne sur la console et enregistre des sessions datées avec l'horloge du Mac (table
-  `play_session`). C'est ce qui donne l'historique et le temps par jour. `AGM_NO_TRACKER=1` le désactive.
-- **Journaux de RetroArch** (`/mnt/vendor/deep/retro/playlists/logs/<cœur>/<jeu>.lrtl`) : temps total par jeu,
-  y compris les parties lancées depuis le menu de la console. Les totaux par jeu prennent le plus grand des deux.
-- **Alerte** (Paramètres → Temps de jeu) : au bout de N heures de la partie en cours ou de la journée, avec
-  rappel facultatif. Elle s'affiche en pop-in dans Game Manager et, si coché, sur l'écran de la console pendant
-  le jeu (commande réseau `SHOW_MSG` de RetroArch). Réglages dans `play_settings.json` du dossier de données.
+- **Tracking by Game Manager** (`app/services/playtime.py`): while the server is running, it checks every
+  30 s what is running on the console and records dated sessions using the Mac's clock (`play_session`
+  table). This is what provides the history and the time per day. `AGM_NO_TRACKER=1` disables it.
+- **RetroArch logs** (`/mnt/vendor/deep/retro/playlists/logs/<cœur>/<jeu>.lrtl`): total time per game,
+  including games launched from the console's menu. Per-game totals take the larger of the two.
+- **Alert** (Settings → Play time): after N hours of the current session or of the day, with an
+  optional reminder. It shows as a pop-in in Game Manager and, if checked, on the console's screen during
+  the game (RetroArch's `SHOW_MSG` network command). Settings in `play_settings.json` in the data folder.
 
 
-Filtre « Du … au … » : jours, jeux et parties de cette période. Seules les parties suivies par Game Manager y
-comptent : les journaux de RetroArch (`.lrtl`) ne donnent qu'un total par jeu, sans dates.
+"From … to …" filter: days, games and sessions in that period. Only sessions tracked by Game Manager
+count: RetroArch logs (`.lrtl`) only give a total per game, without dates.
 
-Effacer : la corbeille d'un jeu (dans « Par jeu ») ou « Tout effacer », avec confirmation. Les parties de Game
-Manager sont supprimées ; rien n'est modifié sur la console : le total des journaux RetroArch du jeu au moment de
-l'effacement est retenu (table `play_reset`) et retiré ensuite, si bien que seul le temps joué depuis compte. La
-partie en cours, si elle est concernée, repart de zéro.
-## Tableau de bord
+Erasing: a game's trash icon (in "Per game") or "Erase everything", with confirmation. Game
+Manager's sessions are deleted; nothing is changed on the console: the game's RetroArch log total at the time of
+erasing is recorded (`play_reset` table) and subtracted afterwards, so that only the time played since then counts. The
+current session, if affected, starts again from zero.
+## Dashboard
 
-Dans l'ordre : le jeu en cours, les jeux joués récemment (bouton ▶ pour les relancer sur la console ;
-historique RetroArch de la console complété par les parties suivies par Game Manager, `GET /api/play/recent`),
-les derniers ajouts avec un lien « Ajouter des jeux », la carte microSD, puis les consoles les plus fournies et
-l'activité (dernière partie, temps de jeu du jour, synchronisation, jeux en cours d'ajout).
+In order: the running game, recently played games (▶ button to relaunch them on the console;
+the console's RetroArch history supplemented by sessions tracked by Game Manager, `GET /api/play/recent`),
+the latest additions with an "Add games" link, the microSD card, then the consoles with the most games and
+activity (last session, today's play time, sync, games being added).
 
-## Recherche (Typesense)
+## Search (Typesense)
 
-La barre de recherche du haut, sur toutes les pages, propose consoles, genres et jeux pendant la frappe (flèches +
-Entrée ouvrent la fiche, « Voir les N résultats » ouvre la bibliothèque). Dans la bibliothèque, elle filtre en plus
-la liste affichée, combinée aux filtres (console, genre, format, région) et aux tris (dont « Année de sortie » :
-du plus ancien au plus récent par défaut, jeux sans année connue à la fin ; le bouton à côté du tri dit l'ordre
-en clair, « Plus anciens d'abord », « A → Z »…, et l'inverse d'un clic). Fautes de frappe tolérées
-(« castlvania », « zelad », « stret fihgter »), recherche par début de mot (« final fant »), pertinence d'abord
-(titre complet, puis nom de fichier, console et genre).
+The search bar at the top, on every page, suggests consoles, genres and games as you type (arrows +
+Enter open the game page, "See all N results" opens the library). In the library, it also filters
+the displayed list, combined with the filters (console, genre, format, region) and the sort options (including "Release year":
+oldest to newest by default, games with no known year at the end; the button next to the sort states the order
+in plain words, "Oldest first", "A → Z"…, and reverses it in one click). Typos are tolerated
+("castlvania", "zelad", "stret fihgter"), prefix search ("final fant"), relevance first
+(full title, then file name, console and genre).
 
-Champ vide : les 6 dernières recherches (Entrée, choix d'une suggestion, « Voir les N résultats », ou saisie qui a
-filtré la bibliothèque), à reprendre d'un clic, à retirer une par une ou toutes. Gardées dans le navigateur
-(`localStorage`) : le Mac et le téléphone ont chacun leur liste.
+Empty field: the last 6 searches (Enter, picking a suggestion, "See all N results", or typing that
+filtered the library), to reuse in one click, to remove one by one or all at once. Kept in the browser
+(`localStorage`): the Mac and the phone each have their own list.
 
-Le moteur est [Typesense](https://typesense.org) : Game Manager démarre son propre conteneur Docker
-`agm-typesense` (image `typesense/typesense:27.1`), joignable seulement depuis ce Mac sur `127.0.0.1:8118`,
-données et clé d'API dans le dossier de données (`typesense/`, `typesense.key`). L'index est reconstruit au
-démarrage puis dès que le catalogue change (vérifié toutes les 2 s), sans coupure : « games » est un alias, basculé
-sur la nouvelle collection une fois celle-ci remplie. Sans Docker, ou tant que Typesense n'est pas
-prêt, la recherche SQLite d'origine prend le relais (`GET /api/search/status` indique le moteur utilisé).
-Variables : `AGM_TYPESENSE_URL` et `AGM_TYPESENSE_KEY` pour un autre serveur, `AGM_TYPESENSE=0` pour s'en passer.
-API : `GET /api/search?q=…` (recherche rapide), `GET /api/games?q=…` (bibliothèque).
+The engine is [Typesense](https://typesense.org): Game Manager starts its own Docker container
+`agm-typesense` (image `typesense/typesense:27.1`), reachable only from this Mac on `127.0.0.1:8118`,
+data and API key in the data folder (`typesense/`, `typesense.key`). The index is rebuilt at
+startup and then whenever the catalog changes (checked every 2 s), without downtime: "games" is an alias, switched
+to the new collection once it is filled. Without Docker, or until Typesense is
+ready, the original SQLite search takes over (`GET /api/search/status` shows the engine in use).
+Variables: `AGM_TYPESENSE_URL` and `AGM_TYPESENSE_KEY` for another server, `AGM_TYPESENSE=0` to do without it.
+API: `GET /api/search?q=…` (quick search), `GET /api/games?q=…` (library).
 
-**Jeux ajoutés sans Game Manager** (carte lue sur le Mac, autre outil) : une veille lit chaque minute le dossier des
-ROMs, en lecture seule, et relit les dossiers de consoles dont la date a changé ; une console apparue ou disparue
-déclenche une synchronisation complète. Au démarrage, elle rattrape ce qui a changé depuis la dernière lecture. Ces
-relectures apparaissent dans l'historique des synchronisations avec le déclencheur `watch`. Limite : un fichier
-ajouté dans un sous-dossier (jeu multi-disque) n'apparaît qu'à la prochaine synchronisation complète.
-`AGM_NO_WATCH=1` coupe la veille.
+**Games added without Game Manager** (card read on the Mac, another tool): a watcher reads the ROMs folder every
+minute, read-only, and re-reads the console folders whose date has changed; a console appearing or disappearing
+triggers a full sync. At startup, it catches up on what changed since the last read. These
+re-reads appear in the sync history with the `watch` trigger. Limitation: a file
+added in a subfolder (multi-disc game) only appears at the next full sync.
+`AGM_NO_WATCH=1` turns off the watcher.
 
-## Connexion à la console
+## Connecting to the console
 
-Une seule connexion SSH, partagée et gardée ouverte 90 s après le dernier usage (`app/device/pool.py`), sert
-les jaquettes, les sauvegardes et toutes les commandes (jeu en cours, Bluetooth, temps de jeu, lancement) :
-ouvrir une connexion coûte ~0,5 s sur la console, une commande sur la connexion ouverte 0,02 à 0,15 s. Si la
-console ne répond pas, les appels suivants échouent aussitôt pendant 15 s au lieu d'attendre chacun le délai
-de connexion. Les ajouts de jeux et le test de connexion des Paramètres gardent leur propre connexion.
+A single SSH connection, shared and kept open 90 s after its last use (`app/device/pool.py`), serves
+the box art, the saves and all commands (running game, Bluetooth, play time, launch):
+opening a connection costs ~0.5 s on the console, a command on the open connection 0.02 to 0.15 s. If the
+console does not respond, subsequent calls fail immediately for 15 s instead of each waiting for the connection
+timeout. Game additions and the connection test in Settings keep their own connection.
 
-## Autres consoles et systèmes
+## Other consoles and systems
 
-Game Manager reconnaît le firmware de la console par SSH (quelques `test -d`, lecture seule) ; on peut aussi le
-choisir dans Paramètres → « Système de la console ». Chaque profil (`backend/app/device/systems.py`) dit où sont
-les ROMs et les sauvegardes, comment lancer et quitter un jeu, et ce qui est disponible ; l'interface masque le reste
+Game Manager detects the console's firmware over SSH (a few `test -d`, read-only); you can also
+choose it in Settings → "Console system". Each profile (`backend/app/device/systems.py`) says where
+the ROMs and saves are, how to launch and quit a game, and what is available; the interface hides the rest
 (`GET /api/device/system`, `GET /api/systems`, `POST /api/device/system/detect`).
 
-| Profil | Consoles | ROMs | Lancer / quitter depuis le Mac | État |
+| Profile | Consoles | ROMs | Launch / quit from the Mac | Status |
 |---|---|---|---|---|
-| Anbernic + Stock OS Mod | RG35XX Pro/Plus/H/SP/2024, RG28XX, RG34XX, RG40XX, RG CubeXX | `/mnt/mmc/Roms` | oui, reprise sur sauvegarde comprise | testé |
-| Anbernic d'origine | mêmes consoles, sans le mod | `/mnt/mmc/Roms` | quitter seulement | expérimental |
-| Knulli, Batocera | H700, RK3566, Miyoo Flip, TrimUI, PC… | `/userdata/roms` | oui (serveur web d'EmulationStation, port 1234) | expérimental |
-| ROCKNIX / JELOS | Anbernic, Powkiddy, Retroid, AYN | `/storage/roms` | quitter ; lancer si le serveur web d'ES répond | expérimental |
-| muOS | Anbernic, TrimUI | `/mnt/mmc/ROMS` | quitter | expérimental |
-| ArkOS / dArkOS | R36S et clones, RG351, RG353 | `/roms` | quitter | expérimental |
-| Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | oui (comme le menu d'Onion), quitter | expérimental |
-| spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | quitter | expérimental |
-| MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | non | expérimental |
-| Autre (Linux + SSH) | — | à régler | quitter (RetroArch) | expérimental |
+| Anbernic + Stock OS Mod | RG35XX Pro/Plus/H/SP/2024, RG28XX, RG34XX, RG40XX, RG CubeXX | `/mnt/mmc/Roms` | yes, including resuming from a save | tested |
+| Stock Anbernic | same consoles, without the mod | `/mnt/mmc/Roms` | quit only | experimental |
+| Knulli, Batocera | H700, RK3566, Miyoo Flip, TrimUI, PC… | `/userdata/roms` | yes (EmulationStation web server, port 1234) | experimental |
+| ROCKNIX / JELOS | Anbernic, Powkiddy, Retroid, AYN | `/storage/roms` | quit; launch if the ES web server responds | experimental |
+| muOS | Anbernic, TrimUI | `/mnt/mmc/ROMS` | quit | experimental |
+| ArkOS / dArkOS | R36S and clones, RG351, RG353 | `/roms` | quit | experimental |
+| Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | yes (like Onion's menu), quit | experimental |
+| spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | quit | experimental |
+| MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | no | experimental |
+| Other (Linux + SSH) | — | to configure | quit (RetroArch) | experimental |
 
-Noms de dossiers : chaque firmware a les siens (« snes », « SFC », « Super Nintendo Entertainment System (SFC) »,
-noms libres sur muOS). `app.platforms.canonical` les ramène à un code commun (`platform.code` dans l'API) pour les
-genres, jaquettes, bandes-annonces et illustrations. Les dossiers de médias rangés à côté des ROMs (`images`,
-`videos`, `manuals`…) sont ignorés. Quitter un jeu ailleurs que sur Anbernic : commande réseau `QUIT` de RetroArch
-(bash ou `nc`), puis `SIGTERM` si RetroArch ne l'écoute pas. Seul le profil Anbernic + Stock OS Mod a été essayé
-sur une vraie console ; les autres suivent la documentation de leur firmware.
+Folder names: each firmware has its own ("snes", "SFC", "Super Nintendo Entertainment System (SFC)",
+free-form names on muOS). `app.platforms.canonical` maps them to a common code (`platform.code` in the API) for
+genres, box art, trailers and illustrations. Media folders stored next to the ROMs (`images`,
+`videos`, `manuals`…) are ignored. Quitting a game on anything other than Anbernic: RetroArch's `QUIT` network command
+(bash or `nc`), then `SIGTERM` if RetroArch is not listening. Only the Anbernic + Stock OS Mod profile has been tried
+on a real console; the others follow their firmware's documentation.
 
-Onion OS : le menu (MainUI) écrit la commande du jeu dans `/tmp/cmd_to_run.sh` puis se ferme, et la boucle
-`.tmp_update/runtime.sh` lance le jeu. `onion_launch.sh` (copié dans `/tmp`) fait pareil : commande au format
-de MainUI (émulateur de `Emu/<console>/config.json`), puis fermeture du menu (`SIGTERM`, `SIGKILL` en secours) ; un jeu ouvert est d'abord quitté
-(`QUIT` de RetroArch), une appli fermée, le temps que le menu revienne (journal `/tmp/agm-launch.log`). Onion
-coupe SSH au lancement des jeux, sauf avec « Keep services alive » (Tweaks > Network) : le script l'active
-(`.tmp_update/config/.keepServicesAlive_` renommé en `.keepServicesAlive`, comme le fait Tweaks), seule écriture
-sur la carte, pour garder la console joignable pendant la partie (jeu en cours, Quitter).
+Onion OS: the menu (MainUI) writes the game's command to `/tmp/cmd_to_run.sh` then closes, and the
+`.tmp_update/runtime.sh` loop launches the game. `onion_launch.sh` (copied to `/tmp`) does the same: a command in
+MainUI's format (emulator from `Emu/<console>/config.json`), then closing the menu (`SIGTERM`, `SIGKILL` as a fallback); an open game is quit first
+(RetroArch's `QUIT`), an app closed, while the menu comes back (log `/tmp/agm-launch.log`). Onion
+cuts SSH when games launch, except with "Keep services alive" (Tweaks > Network): the script turns it on
+(`.tmp_update/config/.keepServicesAlive_` renamed to `.keepServicesAlive`, as Tweaks does), the only write
+to the card, to keep the console reachable during the game (running game, Quit).
 
-## Sources et crédits
+## Sources and credits
 
-ROMKADE Manager ne fournit aucun jeu. Ce qu'il reprend d'ailleurs est cité dans l'interface
-(Paramètres > Sources et crédits, liste dans `frontend/src/lib/credits.ts`, et sous chaque fiche de jeu) :
+ROMKADE Manager does not provide any games. What it takes from elsewhere is credited in the interface
+(Settings > Sources & credits, list in `frontend/src/lib/credits.ts`, and under each game page):
 
-| Source | Usage | Licence |
+| Source | Use | License |
 |---|---|---|
-| [libretro-thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails) | Jaquettes (images © leurs éditeurs) | — |
-| [retroarch-assets](https://github.com/libretro/retroarch-assets) | Illustrations des consoles | CC BY 4.0 |
-| [libretro-database](https://github.com/libretro/libretro-database) | Genres, sortie, développeur, éditeur, franchise, titres arcade | — |
-| [OpenVGDB](https://github.com/OpenVGDB/OpenVGDB) | Résumés, dates, lien GameFAQs, genres | MIT |
-| [catver.ini (progettoSNAPS)](https://www.progettosnaps.net/catver/) | Catégories arcade | — |
-| MAME, FBNeo, HBMAME | Titres complets, année, fabricant (via libretro-database) | — |
-| Wikipédia, GameFAQs, YouTube, Claude (Anthropic) | Liens, bandes-annonces et descriptions IA (clés de l'utilisateur) | — |
-| [Lucide](https://lucide.dev/), Archivo, Atkinson Hyperlegible Next | Pictogrammes, polices | ISC, SIL OFL 1.1 |
+| [libretro-thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails) | Box art (images © their publishers) | — |
+| [retroarch-assets](https://github.com/libretro/retroarch-assets) | Console illustrations | CC BY 4.0 |
+| [libretro-database](https://github.com/libretro/libretro-database) | Genres, release, developer, publisher, franchise, arcade titles | — |
+| [OpenVGDB](https://github.com/OpenVGDB/OpenVGDB) | Summaries, dates, GameFAQs link, genres | MIT |
+| [catver.ini (progettoSNAPS)](https://www.progettosnaps.net/catver/) | Arcade categories | — |
+| MAME, FBNeo, HBMAME | Full titles, year, manufacturer (via libretro-database) | — |
+| Wikipedia, GameFAQs, YouTube, Claude (Anthropic) | Links, trailers and AI descriptions (user's own keys) | — |
+| [Lucide](https://lucide.dev/), Archivo, Atkinson Hyperlegible Next | Icons, fonts | ISC, SIL OFL 1.1 |
 
-Toute nouvelle source (script `backend/scripts/build_*.py`, service en ligne, illustration) s'ajoute à
-`CREDITS` dans `frontend/src/lib/credits.ts`.
+Any new source (`backend/scripts/build_*.py` script, online service, illustration) is added to
+`CREDITS` in `frontend/src/lib/credits.ts`.
 
-Si l'outil vous plaît, une étoile sur [GitHub](https://github.com/arnoweb/romkade-manager) aide le projet.
+If you like the tool, a star on [GitHub](https://github.com/arnoweb/romkade-manager) helps the project.
 
