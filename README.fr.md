@@ -1,59 +1,126 @@
-# ROMKADE Manager
+<p align="center">
+  <a href="https://romkade.com"><img src="frontend/src/assets/brand/romkade-manager-logo-480.webp" alt="ROMKADE Manager" width="360"></a>
+</p>
 
-<p align="center"><strong>🌐 <a href="https://romkade.com">romkade.com</a></strong></p>
+<p align="center"><strong>🌐 <a href="https://romkade.com">romkade.com</a></strong> · <a href="https://romkade.com/docs/fr/">Documentation</a> · <a href="https://github.com/RomKade/romkade-manager/releases/latest">Dernière version</a></p>
 
 <p align="center"><a href="README.md">English</a> · <strong>Français</strong> · <a href="README.es.md">Español</a></p>
 
-Gère et pilote tes consoles rétro portables (Anbernic, Miyoo…) depuis le navigateur du Mac : bibliothèque, ajout
-de jeux, lancement sur la console, sauvegardes, temps de jeu, manettes, Bluetooth. **La console n'est modifiée que
-par des actions que tu lances : ajout de jeux, restauration ou suppression d'une sauvegarde, réglages Bluetooth et
-manettes des joueurs.**
+# ROMKADE Manager
 
-Site du projet : **[romkade.com](https://romkade.com)**.
+Gère et pilote tes consoles rétro portables (Anbernic, Miyoo, TrimUI…) depuis le navigateur de ton ordinateur, sous
+macOS, Windows ou Linux : bibliothèque, ajout de jeux, lancement sur la console, sauvegardes, temps de jeu, manettes,
+Bluetooth. **La console n'est modifiée que par des actions que tu lances : ajout de jeux, restauration ou suppression
+d'une sauvegarde, réglages Bluetooth et manettes des joueurs.**
 
-Architecture, modèle de données et choix techniques : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Guide d'utilisation : **[romkade.com/docs](https://romkade.com/docs/fr/)**. Architecture, modèle de données et choix
+techniques : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Sommaire
+
+- **Installation** :
+  - [Installer avec Docker (macOS, Windows, Linux)](#installer-avec-docker-macos-windows-linux) — [Mettre à jour, sauvegarder, désinstaller](#mettre-à-jour-sauvegarder-désinstaller) · [Clé SSH et IA locale avec Docker](#clé-ssh-et-ia-locale-avec-docker) · [Publier une version](#publier-une-version)
+  - [Lancer depuis le code source (macOS)](#lancer-depuis-le-code-source-macos)
+- **Développement** : [1. Diagnostic de la vraie console (recommandé d'abord)](#1-diagnostic-de-la-vraie-console-recommandé-dabord) · [2. Synchroniser le catalogue (phase 2)](#2-synchroniser-le-catalogue-phase-2) · [3. Lancer l'application](#3-lancer-lapplication) · [Modifier l'interface (Node 20 ou plus : brew install node)](#modifier-linterface-node-20-ou-plus--brew-install-node) · [4. Premier branchement via l'API (inutile si catalog_report.py a été lancé)](#4-premier-branchement-via-lapi-inutile-si-catalog_reportpy-a-été-lancé) · [5. Utilisation](#5-utilisation)
+- **Fonctions** : [Ajouter des jeux](#ajouter-des-jeux) · [Genres](#genres) · [Illustrations des consoles](#illustrations-des-consoles) · [Bandes-annonces](#bandes-annonces) · [Jaquettes](#jaquettes) · [Jouer sur la console depuis l'interface](#jouer-sur-la-console-depuis-linterface) · [Langues](#langues) · [Sauvegardes](#sauvegardes) · [Reprendre une partie depuis une sauvegarde](#reprendre-une-partie-depuis-une-sauvegarde) · [Bluetooth](#bluetooth) · [Manettes](#manettes) · [Volume](#volume) · [Depuis le téléphone (ngrok)](#depuis-le-téléphone-ngrok) · [Informations sur les jeux](#informations-sur-les-jeux) · [Commandes des jeux](#commandes-des-jeux) · [Connexion à une IA (LLM)](#connexion-à-une-ia-llm) · [Favoris](#favoris) · [Temps de jeu](#temps-de-jeu) · [Tableau de bord](#tableau-de-bord)
+- **Fonctionnement** : [Garanties](#garanties) · [Recherche (Typesense)](#recherche-typesense) · [Connexion à la console](#connexion-à-la-console) · [Autres consoles et systèmes](#autres-consoles-et-systèmes)
+- **Projet** : [Version, conditions d'utilisation](#version-conditions-dutilisation) · [Sources et crédits](#sources-et-crédits)
 
 ## Installer avec Docker (macOS, Windows, Linux)
 
+L'installation recommandée, identique sur les trois systèmes, sur processeurs Intel/AMD et ARM (Apple Silicon,
+Raspberry Pi).
+
 1. Installe Docker : [Docker Desktop](https://docs.docker.com/desktop/) sur macOS et Windows, ou
    [Docker Engine](https://docs.docker.com/engine/install/) avec le plugin Compose sur Linux.
-2. Place [`compose.yaml`](compose.yaml) dans un dossier (par exemple `romkade`), puis dans ce dossier :
+2. Télécharge le fichier `compose.yaml` de la dernière version et démarre ROMKADE Manager :
+
+   macOS et Linux :
+
+   ```bash
+   mkdir romkade && cd romkade
+   curl -fsSLO https://github.com/RomKade/romkade-manager/releases/latest/download/compose.yaml
+   docker compose up -d
+   ```
+
+   Windows (PowerShell) :
+
+   ```powershell
+   mkdir romkade; cd romkade
+   curl.exe -fsSLO https://github.com/RomKade/romkade-manager/releases/latest/download/compose.yaml
+   docker compose up -d
+   ```
+
+3. Ouvre http://localhost:8765, puis **Paramètres > Connexion** : adresse IP de la console, utilisateur SSH et mot de
+   passe, approbation de la clé de la console, test de connexion, puis synchronisation.
+
+Image : `ghcr.io/romkade/romkade-manager` (`latest`, ou une version comme `0.4.0`). La recherche (Typesense) est un
+second service du même fichier, sans port publié. L'interface n'écoute que sur cet ordinateur (`127.0.0.1`) : ne
+l'expose pas sur Internet, elle pilote ta console. Le conteneur joint la console sur le réseau local en SSH :
+ordinateur et console sur le même réseau.
+
+### Mettre à jour, sauvegarder, désinstaller
+
+Dans le dossier `romkade` :
+
+| Action | Commande |
+|---|---|
+| Mettre à jour | `docker compose pull && docker compose up -d` |
+| Journaux | `docker compose logs -f` |
+| Arrêter | `docker compose down` (données conservées) |
+| Sauvegarder les données | `docker run --rm -v romkade_romkade-data:/data -v "$PWD":/backup alpine tar czf /backup/romkade-data.tgz -C /data .` |
+| Tout supprimer | `docker compose down`, puis `docker volume rm romkade_romkade-data romkade_typesense-data` |
+
+Le volume `romkade-data` garde le catalogue, les réglages, les copies de sauvegardes et les secrets (`secrets.json`,
+lisible par le seul compte du conteneur). Jamais `docker compose down -v` par habitude : cela supprime les volumes.
+
+Options, dans un fichier `.env` à côté de `compose.yaml` : `ROMKADE_PORT` (défaut `8765`), `ROMKADE_VERSION` (défaut
+`latest`), `TZ` (défaut `Europe/Paris`).
+
+### Clé SSH et IA locale avec Docker
+
+- **Clé SSH** au lieu d'un mot de passe : le conteneur ne voit que son volume. Copie la clé dedans une fois, puis
+  indique `/data/id_ed25519` comme chemin de la clé privée :
+
+  ```bash
+  docker compose exec -T romkade sh -c 'cat > /data/id_ed25519 && chmod 600 /data/id_ed25519' < ~/.ssh/id_ed25519
+  ```
+
+- **IA locale** (Ollama, LM Studio) sur cet ordinateur : adresse `http://host.docker.internal:11434/v1` dans
+  Paramètres > IA. Guide : [docs/local-llm.fr.md](docs/local-llm.fr.md).
+
+### Publier une version
+
+Même numéro dans `backend/pyproject.toml` et `frontend/package.json`, puis `git tag vX.Y.Z && git push origin vX.Y.Z`.
+Le workflow [Image Docker](.github/workflows/docker.yml) publie l'image (`X.Y.Z`, `X.Y`, `latest`, amd64 + arm64) et
+une release GitHub avec `compose.yaml`. Chaque push sur `main` publie `edge`.
+
+## Lancer depuis le code source (macOS)
+
+Pour le développement, ou pour utiliser l'application [depuis le téléphone](#depuis-le-téléphone-ngrok). Il faut le
+Python 3.13 officiel de [python.org](https://www.python.org/downloads/macos/) (le Python de Homebrew est bloqué par
+l'autorisation « Réseau local » de macOS et renvoie « No route to host »), et Node 20 ou plus (`brew install node`)
+pour compiler l'interface.
 
 ```bash
-docker compose up -d
-```
-
-3. Ouvre http://localhost:8765, puis Paramètres > Connexion : adresse IP de la console, utilisateur et mot de passe SSH.
-
-La même image tourne sur Intel/AMD et ARM (Apple Silicon, Raspberry Pi). Le volume `romkade-data` garde le
-catalogue, les réglages, les copies de sauvegardes et les secrets (`secrets.json`, lisible par son seul
-propriétaire), et survit aux mises à jour : `docker compose pull && docker compose up -d`. La recherche
-(Typesense) est un second service du même fichier, sans port publié. L'interface n'écoute que sur cet ordinateur
-(`127.0.0.1`) : ne l'expose pas sur Internet, elle pilote ta console. Le conteneur joint la console sur le réseau
-local par SSH : ordinateur et console sur le même réseau. Dossier de données hors Docker : `ROMKADE_DATA_DIR`
-(par défaut selon le système : `~/Library/Application Support/AnbernicGameManager`,
-`%APPDATA%\AnbernicGameManager`, `~/.local/share/AnbernicGameManager`).
-
-## Démarrage rapide
-
-```bash
+git clone https://github.com/RomKade/romkade-manager.git
 cd romkade-manager
 ./run.sh
 ```
 
-Le script prépare l'environnement Python au premier lancement, démarre le serveur et ouvre
-http://127.0.0.1:8765 dans le navigateur. L'interface est livrée déjà compilée (`frontend/dist`) :
-Node n'est nécessaire que pour la modifier. `Ctrl+C` arrête le serveur.
+Au premier lancement, le script prépare l'environnement Python et compile l'interface (`frontend/dist`), puis démarre
+le serveur et ouvre http://127.0.0.1:8765 dans le navigateur. `Ctrl+C` arrête le serveur. Mots de passe et clés vont
+dans le trousseau du système ; les données dans `~/Library/Application Support/AnbernicGameManager`
+(`ROMKADE_DATA_DIR` pour en changer ; sous Windows `%APPDATA%\AnbernicGameManager`, sous Linux
+`~/.local/share/AnbernicGameManager`).
 
-## Installation manuelle (macOS, Apple Silicon)
+Installation manuelle et tests :
 
 ```bash
 cd romkade-manager/backend
-# Python officiel python.org (signé) : le Python Homebrew est bloqué par la permission
-# macOS « Réseau local » et renvoie « No route to host ».
 /Library/Frameworks/Python.framework/Versions/3.13/bin/python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest -q               # 114 tests contre un serveur SFTP simulé
+.venv/bin/pytest -q               # tests contre un serveur SFTP simulé
 ```
 
 ## 1. Diagnostic de la vraie console (recommandé d'abord)

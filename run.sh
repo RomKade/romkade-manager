@@ -1,6 +1,7 @@
 #!/bin/sh
 # Lance Anbernic Game Manager sur http://127.0.0.1:8765 et ouvre le navigateur.
-# L'interface est déjà compilée dans frontend/dist : Node n'est nécessaire que pour la modifier.
+# L'interface (frontend/dist, hors dépôt) est compilée au premier lancement : Node 20 ou plus (brew install node).
+# Pour l'installation sans Node ni Python, sur macOS, Windows et Linux : Docker (voir README).
 #
 #   ./run.sh               sur ce Mac seulement
 #   ./run.sh --telephone   aussi depuis le téléphone, par une adresse ngrok protégée par mot de passe
@@ -33,6 +34,12 @@ if [ ! -x .venv/bin/python ]; then
   "$PY" -m venv .venv
 fi
 .venv/bin/pip install -q --disable-pip-version-check -e ".[dev]"
+
+if [ ! -f ../frontend/dist/index.html ]; then
+  command -v npm >/dev/null || { echo "L'interface n'est pas encore compilée et Node est introuvable : brew install node, puis ./run.sh"; exit 1; }
+  echo "Compilation de l'interface (première fois)..."
+  ( cd ../frontend && npm ci --no-audit --no-fund --loglevel=error && npm run build >/dev/null )
+fi
 
 if [ $PHONE = 0 ]; then
   ( sleep 2 && open "http://127.0.0.1:$PORT" ) &

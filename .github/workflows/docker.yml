@@ -17,6 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Un tag doit porter le numéro de version du code : l'interface et l'image affichent la même version.
+      - name: Tag et version du code
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          CODE=$(sed -n 's/^version = "\(.*\)"/\1/p' backend/pyproject.toml)
+          [ "v$CODE" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME, mais backend/pyproject.toml dit $CODE"; exit 1; }
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -42,3 +48,35 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      # compose.yaml de l'utilisateur : l'image publiée, sans la ligne « build: . » qui sert au développement.
+      - run: mkdir -p out && sed '/^    build: \.$/d' compose.yaml > out/compose.yaml && ! grep -q 'build:' out/compose.yaml
+      - name: Release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat > out/notes.md <<EOF
+          Image : \`ghcr.io/romkade/romkade-manager:$VERSION\` (aussi \`latest\`), macOS, Windows et Linux, Intel/AMD et ARM.
+
+          Installer : dans un dossier vide,
+
+          \`\`\`
+          curl -fsSLO https://github.com/RomKade/romkade-manager/releases/latest/download/compose.yaml
+          docker compose up -d
+          \`\`\`
+
+          puis ouvrir http://localhost:8765. Mettre à jour : \`docker compose pull && docker compose up -d\`.
+          Guide complet : https://romkade.com/docs/getting-started/installation/
+          EOF
+          sed -i 's/^          //' out/notes.md
+          gh release create "$GITHUB_REF_NAME" out/compose.yaml --title "ROMKADE Manager $VERSION" \
+            --notes-file out/notes.md --generate-notes --verify-tag
