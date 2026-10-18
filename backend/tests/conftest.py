@@ -212,6 +212,8 @@ async def app_factory(tmp_path, ssh_server):
                          cache_dir=tmp_path / "cache", staging_dir=tmp_path / "staging")
         if trust:
             app.state.host_keys.trust("127.0.0.1", ssh_server["port"], ssh_server["host_key"])
+        # Jamais Wikidata / Wikipédia / StrategyWiki pendant les tests : ceux qui en ont besoin posent leur faux serveur.
+        app.state.knowledge.fetcher.transport = httpx.MockTransport(lambda request: httpx.Response(503))
         created.append(app)
         return app
     yield make

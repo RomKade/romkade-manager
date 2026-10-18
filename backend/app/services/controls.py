@@ -1,5 +1,9 @@
 """Commandes d'un jeu sur la console : quelle touche de la console fait quoi, rédigées par le LLM configuré
-(Paramètres > IA : Claude, ChatGPT, Mistral, Gemini ou un modèle local ; app/services/llm.py).
+(Paramètres > Assistant : Claude, ChatGPT, Mistral, Gemini ou un modèle local ; app/services/llm.py).
+
+Le modèle reçoit les passages du jeu qui parlent des commandes (Wikipédia, StrategyWiki : connaissances récupérées
+sans IA, services/knowledge.py) : il n'a plus qu'à les convertir en touches de la console, ce qu'un petit modèle
+local fait bien, au lieu de s'en souvenir. Sans passage utile, il s'appuie sur ce qu'il sait du jeu.
 
 À la demande, depuis la fiche du jeu (un appel par jeu, pas de lot), puis gardées en base (table game_controls) :
 toutes les éditions d'un même jeu (plateforme + titre normalisé) les partagent. Corrigeables à la main.
@@ -9,6 +13,7 @@ console, en français, anglais et espagnol. S'il ne connaît pas bien le jeu, il
 habituelles de la console pour ce genre de jeu (« cautious »), affiché comme tel.
 """
 
+import re
 from datetime import datetime
 
 from sqlalchemy import select
@@ -65,18 +70,45 @@ Each control: one button and what it does in this game, short (2 to 8 words), e.
 movement. In French as written in France and Spanish as written in Spain; keep game-specific names.
 "notes": one or two sentences of useful extra tips (special moves, button combos, 2-player), or "" if none.
 
-Never invent controls. If you do not really know this specific game, set "known" to false and list only the
-controls that are standard for its platform and genre, keeping actions generic."""
+Reference passages about the game (Wikipedia, StrategyWiki) may follow the game facts. When they describe the
+controls, base your answer on them (they name the ORIGINAL controller buttons: convert them with the mapping) and
+set "from_sources" to true; otherwise set "from_sources" to false and use what you know of the game.
+
+Never invent controls. If the passages do not describe the controls and you do not really know this specific game,
+set "known" to false and list only the controls that are standard for its platform and genre, keeping actions
+generic."""
 
 PROMPT = """Game: {title}
 Platform: {platform}
 {facts}
-Button mapping from the original controller to the handheld: {mapping}"""
+Button mapping from the original controller to the handheld: {mapping}{passages}"""
+
+# Passages des connaissances envoyés au modèle : les plus proches de cette recherche, coupés à cette longueur.
+CONTROLS_QUERY = "controls buttons button joystick move attack jump punch kick gameplay commandes touches"
+PASSAGES = 3
+PASSAGE_CHARS = 1200
+# Pages ou sections consacrées aux commandes (StrategyWiki : « Jeu/Controls », sections « Buttons », « Joystick »…).
+CONTROLS_HEADING = re.compile(r"control|button|joystick|joypad|gamepad|commande|touche|mando|bot[oó]n", re.I)
+# Un passage qui parle de boutons à presser (le reste, intrigue ou critiques, n'aide pas et ralentit un modèle local).
+CONTROLS_TEXT = re.compile(r"\b(buttons?|press(es|ed|ing)?|d-pad|directional pad|joystick|boutons?|appuy\w*|"
+                           r"croix directionnelle|botón|botones|pulsa\w*)\b", re.I)
+
+
+def pick_passages(chunks: list, ranked: list) -> list:
+    """Seulement des passages sur les commandes : ceux dont la page ou la section en parle d'abord, puis ceux de la
+    recherche (`ranked`) qui parlent de boutons, sans doublon, au plus PASSAGES. Aucun : rédaction sans passage."""
+    first = [c for c in chunks if CONTROLS_HEADING.search(f"{c.page} {c.section}")]
+    out = []
+    for c in first + [c for c in ranked if CONTROLS_TEXT.search(c.text)]:
+        if c not in out:
+            out.append(c)
+    return out[:PASSAGES]
 
 SCHEMA = {
     "type": "object",
     "properties": {
         "known": {"type": "boolean"},
+        "from_sources": {"type": "boolean"},
         "controls": {"type": "array", "items": {
             "type": "object",
             "properties": {"button": {"type": "string", "enum": list(BUTTONS)}, "en": {"type": "string"},
@@ -85,7 +117,7 @@ SCHEMA = {
         "notes": {"type": "object", "properties": {lang: {"type": "string"} for lang in LANGS},
                   "required": list(LANGS), "additionalProperties": False},
     },
-    "required": ["known", "controls", "notes"],
+    "required": ["known", "from_sources", "controls", "notes"],
     "additionalProperties": False,
 }
 
@@ -97,13 +129,21 @@ def mapping_for(directory: str) -> str:
     return MAPPINGS.get(code, "Use the RetroArch default core mapping for this platform.")
 
 
-def prompt_for(f: RemoteFile) -> str:
+def passages_text(passages: list[dict]) -> str:
+    """Bloc ajouté à la demande : chaque passage avec sa source, sa page et sa section."""
+    if not passages:
+        return ""
+    blocks = [f"[{p['source']} · {p['page']} · {p['section']}]\n{p['text'][:PASSAGE_CHARS]}" for p in passages]
+    return "\n\nReference passages about this game:\n\n" + "\n\n".join(blocks)
+
+
+def prompt_for(f: RemoteFile, passages: list[dict] | None = None) -> str:
     facts = [f"{label}: {value}" for label, value in (
         ("Release year", f.release_year), ("Genre (French label)", GENRES.get(f.genre or "")),
         ("Publisher", f.publisher), ("Developer", f.developer), ("Summary", f.description)) if value]
     return PROMPT.format(title=display_title(f.full_title) if f.full_title else f.title,
                          platform=f.platform.label or f.platform.directory, facts="\n".join(facts),
-                         mapping=mapping_for(f.platform.directory))
+                         mapping=mapping_for(f.platform.directory), passages=passages_text(passages or []))
 
 
 def params_for(f: RemoteFile, model: str = MODEL) -> dict:
@@ -127,8 +167,22 @@ def parse(message) -> dict | None:
     return clean(parse_anthropic(message))
 
 
-def generate(llm: LLM, f: RemoteFile) -> dict | None:
-    return clean(llm.complete_json(SYSTEM, prompt_for(f), SCHEMA, max_tokens=MAX_TOKENS, effort=EFFORT, name="controls"))
+def generate(llm: LLM, f: RemoteFile, passages: list[dict] | None = None) -> dict | None:
+    # Modèle local à raisonnement (Gemma 4, Qwen 3…) : sans « reasoning_effort: none », LM Studio peut réfléchir
+    # plusieurs minutes et épuiser les jetons sans rien répondre (comme pour l'assistant, api/assistant.py).
+    reasoning = "none" if llm.provider.id == "local" else None
+    return clean(llm.complete_json(SYSTEM, prompt_for(f, passages), SCHEMA, max_tokens=MAX_TOKENS, effort=EFFORT,
+                                   name="controls", reasoning=reasoning))
+
+
+def page_sources(passages: list[dict]) -> list[dict]:
+    """Pages distinctes des passages envoyés, dans l'ordre : ce qu'affiche la fiche sous « d'après »."""
+    seen, out = set(), []
+    for p in passages:
+        if p["url"] not in seen:
+            seen.add(p["url"])
+            out.append({"source": p["source"], "page": p["page"], "url": p["url"]})
+    return out
 
 
 def cached(s: Session, f: RemoteFile) -> GameControls | None:
@@ -142,22 +196,26 @@ def _clean_notes(notes: dict | None) -> dict | None:
 
 
 def store(s: Session, f: RemoteFile, controls: list[dict], notes: dict | None, origin: str,
-          model: str | None) -> GameControls:
+          model: str | None, sources: list[dict] | None = None) -> GameControls:
     row = cached(s, f) or GameControls(platform_id=f.platform_id, normalized_title=f.normalized_title)
     row.controls = [{"button": c["button"], **{lang: c[lang].strip() for lang in LANGS}} for c in controls]
     row.notes = _clean_notes(notes)
-    row.origin, row.model, row.updated_at = origin, model, utcnow()
+    row.origin, row.model, row.sources, row.updated_at = origin, model, sources or None, utcnow()
     s.add(row)
     return row
 
 
-def store_generated(s: Session, f: RemoteFile, data: dict, model: str = MODEL) -> GameControls:
+def store_generated(s: Session, f: RemoteFile, data: dict, model: str = MODEL,
+                    passages: list[dict] | None = None) -> GameControls:
     notes = data.get("notes") if isinstance(data.get("notes"), dict) else None
+    if passages and data.get("from_sources"):
+        return store(s, f, data["controls"], notes, "sourced", model[:40], page_sources(passages))
     return store(s, f, data["controls"], notes, "written" if data.get("known") else "cautious", model[:40])
 
 
 def to_out(row: GameControls | None) -> dict:
     if row is None:
-        return {"status": "none", "controls": [], "notes": None, "origin": None, "updated_at": None}
+        return {"status": "none", "controls": [], "notes": None, "origin": None, "sources": None, "updated_at": None}
     updated: datetime = row.updated_at
-    return {"status": "found", "controls": row.controls, "notes": row.notes, "origin": row.origin, "updated_at": updated}
+    return {"status": "found", "controls": row.controls, "notes": row.notes, "origin": row.origin,
+            "sources": row.sources, "updated_at": updated}

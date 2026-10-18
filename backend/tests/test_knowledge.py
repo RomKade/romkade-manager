@@ -94,7 +94,7 @@ async def test_fetch_one_game_then_search(app_factory, monkeypatch):
         assert {(s["source"], s["lang"]) for s in body["sources"]} >= {("wikipedia", "en"), ("wikipedia", "fr"),
                                                                        ("strategywiki", "en")}
         assert all(s["license"] == "CC BY-SA 4.0" for s in body["sources"])
-        assert not any("Controls" in (t or "") for _, _, t in calls)  # commandes : notre propre fiche
+        assert any("Controls" in (t or "") for _, _, t in calls)  # page des commandes : sert aussi à la fiche
         assert "Gameplay" in body["sections"]
 
         hits = (await c.get(f"/api/games/{mario['id']}/knowledge/search", params={"q": "castle Vanilla Dome cape"})).json()

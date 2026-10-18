@@ -55,7 +55,8 @@ SKIP_SECTIONS = {
     "bibliografía", "awards", "distinctions", "premios", "galerie", "gallery",
 }
 # Sous-pages StrategyWiki les plus utiles d'abord (soluce, secrets, boss, objets…).
-GUIDE_PRIORITY = ("walkthrough", "getting started", "gameplay", "basics", "secret", "boss", "tips", "strateg",
+# « controls » d'abord : la page des commandes sert aussi à rédiger celles de la fiche (services/controls.py).
+GUIDE_PRIORITY = ("controls", "walkthrough", "getting started", "gameplay", "basics", "secret", "boss", "tips", "strateg",
                   "items", "power-up", "power up", "characters", "enemies", "level", "world", "stage", "cheat")
 
 
@@ -243,7 +244,6 @@ class Fetcher:
         listing = await self._get(http, STRATEGYWIKI, {"action": "query", "list": "allpages",
                                                        "apprefix": f"{main}/", "aplimit": "200"})
         subpages = [p["title"] for p in listing.get("query", {}).get("allpages", [])]
-        subpages = [p for p in subpages if not p.lower().endswith("/controls")]  # commandes : notre propre fiche
 
         def rank(title: str) -> int:
             low = title.lower()

@@ -37,6 +37,7 @@ let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
 let assistantBodies: Record<string, unknown>[] = [];
+let controlsSourced = false;
 let sheetImages: { boxart_url?: string | null; image_url?: string | null } = {};
 let knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null as string | null, stopping: false };
 type FakeLlm = { provider: string | null; model: string | null; base_url: string | null; key: boolean; tested: boolean };
@@ -190,7 +191,9 @@ function mockFetch() {
     }
     if (url.startsWith("/api/favorites")) return json(favoriteIds.map((id) => game(id, id === 1 ? "Super Mario World" : "Zelda")));
     if (/^\/api\/games\/\d+\/controls/.test(url)) {
-      if (init?.method === "POST") return json({ status: "found", origin: "written", updated_at: "2026-10-17T10:00:00Z",
+      if (init?.method === "POST") return json({ status: "found", origin: controlsSourced ? "sourced" : "written",
+        sources: controlsSourced ? [{ source: "strategywiki", page: "Super Mario World/Controls",
+          url: "https://strategywiki.org/wiki/Super_Mario_World/Controls" }] : null, updated_at: "2026-10-17T10:00:00Z",
         can_generate: true, notes: { fr: "Haut + B : uppercut.", en: "Up + B: uppercut.", es: "Arriba + B: gancho." },
         controls: [{ button: "dpad", fr: "Se déplacer", en: "Move", es: "Moverse" },
           { button: "b", fr: "Coup de poing", en: "Punch", es: "Puñetazo" }] });
@@ -576,6 +579,22 @@ describe("Commandes du jeu", () => {
     expect(await within(section).findByText("Tir")).toBeInTheDocument();
     expect(bodies.at(-1)).toMatchObject({ controls: [{ button: "dpad", text: "Se déplacer" }, { button: "b", text: "Tir" }] });
     expect(within(section).getByText("Corrigé à la main.")).toBeInTheDocument();
+  });
+
+  it("commandes rédigées d'après StrategyWiki : la source est citée avec son lien", async () => {
+    controlsSourced = true;
+    try {
+      renderAt("/bibliotheque?all=1");
+      await userEvent.click(await screen.findByText("Super Mario World"));
+      const dialog = await screen.findByRole("dialog");
+      const section = (await within(dialog).findByRole("heading", { name: "Commandes" })).closest("section")!;
+      await userEvent.click(within(section).getByRole("button", { name: /Demander à l'IA/ }));
+      expect(await within(section).findByText(/d'après :/)).toBeInTheDocument();
+      expect(within(section).getByRole("link", { name: "StrategyWiki · Super Mario World/Controls" }))
+        .toHaveAttribute("href", "https://strategywiki.org/wiki/Super_Mario_World/Controls");
+    } finally {
+      controlsSourced = false;
+    }
   });
 });
 

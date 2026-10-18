@@ -232,8 +232,9 @@ class GameControls(Base):
     (services/controls.py) ou corrigées à la main.
 
     Clé : plateforme + titre normalisé, comme GameText. `controls` : liste ordonnée {button, fr, en, es} ;
-    `notes` : {fr, en, es} ou None. `origin` : « written » (jeu connu du modèle), « cautious » (jeu mal connu :
-    commandes génériques de la console), « edited » (corrigé à la main).
+    `notes` : {fr, en, es} ou None. `origin` : « sourced » (d'après les passages Wikipédia / StrategyWiki du jeu,
+    services/knowledge.py), « written » (jeu connu du modèle), « cautious » (jeu mal connu : commandes génériques de
+    la console), « edited » (corrigé à la main). `sources` : pages utilisées [{source, page, url}] ou None.
     """
 
     __tablename__ = "game_controls"
@@ -245,6 +246,7 @@ class GameControls(Base):
     notes: Mapped[dict | None] = mapped_column(JSON)
     origin: Mapped[str] = mapped_column(String(16))
     model: Mapped[str | None] = mapped_column(String(40))
+    sources: Mapped[list | None] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 

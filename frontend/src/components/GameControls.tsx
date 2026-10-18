@@ -77,7 +77,18 @@ export function GameControlsSection({ id }: { id: number }) {
                 ))}
               </ul>
               {data.notes?.[lang] && <p className="controls__notes">{data.notes[lang]}</p>}
-              <p className="muted controls__origin">{t(`sheet.controls.origin.${data.origin}`)}</p>
+              <p className="muted controls__origin">
+                {t(`sheet.controls.origin.${data.origin}`)}
+                {data.origin === "sourced" && data.sources && data.sources.length > 0 && <>
+                  {" "}{data.sources.map((s, i) => (
+                    <span key={s.url}>{i > 0 && ", "}
+                      <a href={s.url} target="_blank" rel="noreferrer noopener">
+                        {t(`settings.kn.source.${s.source}`)} · {s.page}
+                      </a>
+                    </span>
+                  ))}.
+                </>}
+              </p>
             </>
           ) : (
             <p className="muted">{t("sheet.controls.none")}</p>

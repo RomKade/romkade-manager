@@ -1408,6 +1408,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Assistant
+         * @description Question à l'assistant (bibliothèque, ou un jeu). Réponse en flux SSE.
+         */
+        post: operations["assistant_api_assistant_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/play/settings": {
         parameters: {
             query?: never;
@@ -1675,6 +1695,25 @@ export interface components {
             scope: string;
             /** Game Title */
             game_title: string;
+        };
+        /** AssistantIn */
+        AssistantIn: {
+            /**
+             * Scope
+             * @default library
+             * @enum {string}
+             */
+            scope: "library" | "game";
+            /** Game Id */
+            game_id?: number | null;
+            /**
+             * Lang
+             * @default fr
+             * @enum {string}
+             */
+            lang: "fr" | "en" | "es";
+            /** Messages */
+            messages: components["schemas"]["TurnIn"][];
         };
         /** AudioIn */
         AudioIn: {
@@ -1993,6 +2032,15 @@ export interface components {
             /** Es */
             es: string;
         };
+        /** ControlSourceOut */
+        ControlSourceOut: {
+            /** Source */
+            source: string;
+            /** Page */
+            page: string;
+            /** Url */
+            url: string;
+        };
         /** ControllerOut */
         ControllerOut: {
             /** Index */
@@ -2200,7 +2248,9 @@ export interface components {
              */
             status: "found" | "none";
             /** Origin */
-            origin: ("written" | "cautious" | "edited") | null;
+            origin: ("sourced" | "written" | "cautious" | "edited") | null;
+            /** Sources */
+            sources?: components["schemas"]["ControlSourceOut"][] | null;
             /** Controls */
             controls: components["schemas"]["ControlOut"][];
             /** Notes */
@@ -3243,6 +3293,16 @@ export interface components {
              * @description Empreinte SHA256 affichée par GET /api/device/host-key, recopiée pour confirmation
              */
             fingerprint: string;
+        };
+        /** TurnIn */
+        TurnIn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
         };
         /** UnmatchedImagesOut */
         UnmatchedImagesOut: {
@@ -5775,6 +5835,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeHitOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assistant_api_assistant_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
