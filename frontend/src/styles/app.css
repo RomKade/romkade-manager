@@ -365,8 +365,7 @@ button, input, select { font: inherit; color: inherit; }
 @keyframes slide-in { from { transform: translateX(24px); opacity: 0; } }
 .sheet__close { position: absolute; top: 12px; right: 12px; z-index: 2; }
 .sheet__body { display: flex; flex-direction: column; gap: 18px; }
-.sheet__screen { background: var(--screen); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: var(--r-panel); box-shadow: var(--shadow-inset); margin-top: 28px; overflow: hidden; }
-.sheet__head { display: flex; flex-direction: column; gap: 6px; }
+.sheet__head { display: flex; flex-direction: column; gap: 6px; padding-right: 44px; }  /* place du bouton Fermer */
 .sheet__platform { color: var(--accent); font-weight: 700; font-size: var(--fs-sm); }
 .sheet__title { font-size: var(--fs-xl); font-stretch: 112%; }
 .sheet__section { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
@@ -686,11 +685,6 @@ button, input, select { font: inherit; color: inherit; }
   border-radius: var(--r-pill); background: var(--panel); box-shadow: var(--shadow-raised); font-weight: 600; font-size: var(--fs-sm);
 }
 .genre-pill svg { color: var(--genre-hue, var(--accent)); }
-.sheet__box { width: 120px; aspect-ratio: 3 / 4; margin: 0 0 6px; box-shadow: 0 6px 16px rgb(0 0 0 / 0.3); }
-.sheet__box.cover--empty { display: none; }
-.sheet__credit { display: block; width: 120px; margin: -2px 0 8px; font-size: var(--fs-xs); color: var(--ink-3); }
-.sheet__credit a { color: inherit; }
-.sheet__box.cover--empty + .sheet__credit { display: none; }
 
 .sheet__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
 .sheet__launch-error { flex-basis: 100%; }
@@ -1362,3 +1356,29 @@ kbd {
 .assistant__form input { flex: 1; min-width: 0; height: 38px; padding: 0 10px; border-radius: var(--r-control); border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink); font: inherit; }
 .assistant__disclaimer { margin: 0; font-size: 0.72rem; color: var(--ink-3); }
 @media (prefers-reduced-motion: no-preference) { .assistant__panel { animation: fade 160ms ease; } }
+
+/* Fiche d'un jeu : diaporama des images (jaquette d'abord, puis image de la carte) */
+.gallery { display: flex; flex-direction: column; gap: 8px; }
+.gallery__stage { position: relative; background: var(--screen); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: var(--r-panel); box-shadow: var(--shadow-inset); overflow: hidden; }
+.gallery__stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gallery__frame { border-radius: 0; }
+.gallery__loading { position: absolute; inset: 0; margin: auto; color: var(--ink-3); }
+.gallery__arrow { position: absolute; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 50%; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 82%, transparent); color: var(--ink);
+  cursor: pointer; backdrop-filter: blur(6px); }
+.gallery__arrow:hover { border-color: var(--accent); color: var(--accent); }
+.gallery__arrow--prev { left: 10px; }
+.gallery__arrow--next { right: 10px; }
+.gallery__dots { position: absolute; bottom: 10px; left: 50%; translate: -50% 0; display: flex; gap: 6px; padding: 5px 8px;
+  border-radius: 999px; background: color-mix(in srgb, var(--panel) 75%, transparent); }
+.gallery__dot { width: 8px; height: 8px; padding: 0; border-radius: 50%; border: 0; background: var(--ink-3); cursor: pointer; }
+.gallery__dot.is-active { background: var(--accent); }
+.gallery__under { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; min-height: 1.4em; }
+.gallery__credit { font-size: var(--fs-xs); color: var(--ink-3); margin-left: auto; }
+.gallery__credit a { color: inherit; }
+.sheet__trailer { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; }
+
+/* Logo de la barre latérale : retour au tableau de bord */
+.brand__home { display: inline-flex; border-radius: 10px; }
+.brand__home:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

@@ -7,7 +7,6 @@ import { Link } from "react-router-dom";
 import { saveFileUrl, type GameDetail } from "../api/client";
 import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetFavorite, useSetPlayers } from "../api/queries";
 import { useT } from "../i18n";
-import { creditUrl } from "../lib/credits";
 import { bytes, date, dateTime } from "../lib/format";
 import { assignPlayer, completePlayers } from "../lib/players";
 import { saveLabel } from "../lib/saves";
@@ -16,7 +15,7 @@ import { assistant } from "../lib/assistant";
 import { AssistantBubble } from "./AssistantBubble";
 import { GameControlsSection } from "./GameControls";
 import { GameInfo } from "./GameInfo";
-import { Cover } from "./Cover";
+import { GameGallery } from "./GameGallery";
 import { PlaySaveButton } from "./PlaySaveButton";
 import { TrailerButton, YoutubeIcon } from "./Trailer";
 import { ErrorNotice, Spinner } from "./ui";
@@ -87,32 +86,25 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
 
   return (
     <div className="sheet__body">
-      <div className="sheet__screen">
-        <Cover game={game} size="full" art="card" className="cover--large" />
-      </div>
+      {/* Titre, puis console, au-dessus des images ; sous les images : bande-annonce (lien) et source de la jaquette. */}
       <div className="sheet__head">
-        {game.boxart_url && (
-          <>
-            <Cover game={game} size="full" art="box" fallback={false} className="sheet__box" />
-            {/* Masqué en CSS quand la jaquette ne se charge pas (.cover--empty + .sheet__credit). */}
-            <small className="sheet__credit">
-              {t("sheet.coverCredit")} <a href={creditUrl("thumbnails")} target="_blank" rel="noreferrer noopener">libretro-thumbnails</a>
-            </small>
-          </>
-        )}
+        <Dialog.Title className="sheet__title">{game.title}</Dialog.Title>
         <p className="sheet__platform"><ConsoleBadge code={game.platform.code} label={game.platform.label} />
           {game.platform.label && <span>{game.platform.label}</span>}</p>
-        <Dialog.Title className="sheet__title">{game.title}</Dialog.Title>
         {!game.present && <p className="tag tag--warn">{t("sheet.absent")}</p>}
-        <PlayingBanner gameId={game.id} />
-        <div className="sheet__actions">
-          {game.role === "candidate" && game.present && <LaunchButton id={game.id} />}
-          {game.role === "candidate" && <FavoriteButton id={game.id} on={game.favorite ?? false} />}
-          <TrailerButton game={game} onVideo={onVideo} className="button">
-            <YoutubeIcon size={18} className="yt-icon--brand" /> {t("sheet.trailer")}
-          </TrailerButton>
-        </div>
       </div>
+      <GameGallery key={game.id} game={game} left={
+        <TrailerButton game={game} onVideo={onVideo} className="link-button sheet__trailer">
+          <YoutubeIcon size={16} className="yt-icon--brand" /> {t("sheet.trailer")}
+        </TrailerButton>
+      } />
+      <PlayingBanner gameId={game.id} />
+      {game.role === "candidate" && (
+        <div className="sheet__actions">
+          {game.present && <LaunchButton id={game.id} />}
+          <FavoriteButton id={game.id} on={game.favorite ?? false} />
+        </div>
+      )}
 
       <GameInfo game={game} />
 

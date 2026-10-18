@@ -1,4 +1,4 @@
-import { Bluetooth, BookOpen, ExternalLink, Gamepad2, Gauge, HardDriveUpload, Hourglass, Library, Loader2, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
+import { Bluetooth, BookOpen, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 
 import { isActive, useCaps, useDeviceStatus, useSettings, useStatus, useSystem, useTransfers } from "../api/queries";
@@ -33,9 +33,11 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <img className="brand__logo" src={logo240} srcSet={`${logo240} 240w, ${logo480} 480w`} sizes="196px"
-          width={196} height={43} alt="ROMKADE Manager" />
-        <img className="brand__icon" src={icon80} width={34} height={34} alt="ROMKADE Manager" />
+        <Link to="/" className="brand__home" aria-label={t("common.nav.home")}>
+          <img className="brand__logo" src={logo240} srcSet={`${logo240} 240w, ${logo480} 480w`} sizes="196px"
+            width={196} height={43} alt="" />
+          <img className="brand__icon" src={icon80} width={34} height={34} alt="" />
+        </Link>
         <p className="brand__device">{system ? system.profile.label : "\u00a0"}</p>
       </div>
       <nav aria-label={t("common.nav.main")}>
@@ -55,6 +57,14 @@ export function Sidebar() {
             <a href={docsUrl()} target="_blank" rel="noreferrer noopener" className="nav__link">
               <BookOpen aria-hidden size={18} strokeWidth={1.75} />
               <span>{t("common.nav.docs")}</span>
+              <ExternalLink aria-hidden size={13} className="nav__external" />
+              <span className="visually-hidden"> {t("common.nav.newTab")}</span>
+            </a>
+          </li>
+          <li>
+            <a href="https://romkade.com" target="_blank" rel="noreferrer noopener" className="nav__link">
+              <Globe aria-hidden size={18} strokeWidth={1.75} />
+              <span>romkade.com</span>
               <ExternalLink aria-hidden size={13} className="nav__external" />
               <span className="visually-hidden"> {t("common.nav.newTab")}</span>
             </a>

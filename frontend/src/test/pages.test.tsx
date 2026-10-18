@@ -37,6 +37,7 @@ let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
 let assistantBodies: Record<string, unknown>[] = [];
+let sheetImages: { boxart_url?: string | null; image_url?: string | null } = {};
 let knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null as string | null, stopping: false };
 type FakeLlm = { provider: string | null; model: string | null; base_url: string | null; key: boolean; tested: boolean };
 const NO_LLM: FakeLlm = { provider: null, model: null, base_url: null, key: false, tested: false };
@@ -204,7 +205,7 @@ function mockFetch() {
       status: "no_key", query: "Super Mario World SNES gameplay", videos: [],
       search_url: "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay",
     });
-    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), favorite: favoriteIds.includes(1), release_year: 1990, release_date: "1990-11-21",
+    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), ...sheetImages, favorite: favoriteIds.includes(1), release_year: 1990, release_date: "1990-11-21",
       publisher: "Nintendo", developer: "Nintendo EAD", franchise: "Mario", description: "Mario's quest to save the princess.",
       descriptions: { fr: { text: "Mario part sauver la princesse.", origin: "translated" } },
       info_url: "http://www.gamefaqs.com/snes/519824-super-mario-world", remote_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc", image_relpath: null, possible_duplicates: [], history: [{ scan_run_id: 1, change: "added", old_size: null, new_size: 1, old_mtime: null, new_mtime: null, run_started_at: "2026-10-16T10:00:00Z" }] });
@@ -251,9 +252,9 @@ beforeEach(() => {
   volume = { percent: 60, muted: false };
   playAlerts = [];
   vi.stubGlobal("fetch", mockFetch());
-  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} unobserve() {} });
   // Comme Chrome : scrollIntoView renvoie une promesse (un effet qui la renvoyait faisait planter toute la page).
   Element.prototype.scrollIntoView = function () { return Promise.resolve() as unknown as void; };
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} unobserve() {} });
   Element.prototype.getBoundingClientRect = function () {
     return { width: 1000, height: 800, top: 0, left: 0, right: 1000, bottom: 800, x: 0, y: 0, toJSON() {} } as DOMRect;
   };
@@ -301,6 +302,36 @@ describe("Bibliothèque", () => {
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByRole("link", { name: /Bande-annonce/ }))
       .toHaveAttribute("href", "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay");
+  });
+
+  it("fiche : titre puis console, diaporama jaquette puis image de la carte, bande-annonce et source dessous", async () => {
+    sheetImages = { boxart_url: "/api/games/1/boxart", image_url: "/api/games/1/image" };
+    try {
+      renderAt("/bibliotheque?all=1");
+      await userEvent.click(await screen.findByText("Super Mario World"));
+      const dialog = await screen.findByRole("dialog");
+      const title = await within(dialog).findByRole("heading", { name: "Super Mario World" });
+      const gallery = within(dialog).getByRole("region", { name: "Images du jeu" });
+      expect(title.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(gallery).getByRole("group", { name: "Jaquette, 1 sur 2" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("link", { name: "libretro-thumbnails" })).toBeInTheDocument();
+      await userEvent.click(within(gallery).getByRole("button", { name: "Image suivante" }));
+      expect(within(gallery).getByRole("group", { name: "Image de la carte, 2 sur 2" })).toBeInTheDocument();
+      expect(within(dialog).queryByRole("link", { name: "libretro-thumbnails" })).not.toBeInTheDocument();
+      const trailer = within(dialog).getByRole("link", { name: /Bande-annonce/ });
+      expect(trailer).not.toHaveClass("button");
+      expect(gallery.compareDocumentPosition(trailer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      sheetImages = {};
+    }
+  });
+
+  it("le logo de la barre latérale mène au tableau de bord ; romkade.com sous Documentation", async () => {
+    renderAt("/bibliotheque?all=1");
+    expect(await screen.findByRole("link", { name: "ROMKADE Manager, tableau de bord" })).toHaveAttribute("href", "/");
+    const site = screen.getByRole("link", { name: /romkade\.com/ });
+    expect(site).toHaveAttribute("href", "https://romkade.com");
+    expect(screen.getByRole("link", { name: /^Documentation/ }).compareDocumentPosition(site) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("affiche tous les jeux et filtre à la frappe", async () => {
