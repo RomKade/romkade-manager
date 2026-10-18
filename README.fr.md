@@ -87,7 +87,7 @@ Options, dans un fichier `.env` à côté de `compose.yaml` : `ROMKADE_PORT` (d�
   ```
 
 - **IA locale** (Ollama, LM Studio) sur cet ordinateur : adresse `http://host.docker.internal:11434/v1` dans
-  Paramètres > IA. Guide : [docs/local-llm.fr.md](docs/local-llm.fr.md).
+  Paramètres > Assistant. Guide : [docs/local-llm.fr.md](docs/local-llm.fr.md).
 
 ### Publier une version
 
@@ -430,11 +430,12 @@ console (Mega Drive : A = Y, B = B, C = A ; PlayStation : Croix = B, Rond = A…
 pièce = Select). Réponse en français, anglais et espagnol, gardée en base (table `game_controls`, partagée par
 les éditions d'un même jeu). Jeu mal connu du modèle : commandes habituelles de la console, signalé comme tel.
 « Corriger » / « Saisir à la main » remplace la liste par la sienne (même texte dans les trois langues). Même clé
-d'API IA que les descriptions (Paramètres > IA).
+d'API IA que les descriptions (Paramètres > Assistant).
 
 ## Connexion à une IA (LLM)
 
-Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions et commandes des jeux), avec un voyant d'état
+Paramètres > Assistant : l'IA de l'[assistant de jeu](#assistant-de-jeu), qui sert aussi, à la demande, aux
+descriptions et aux commandes des jeux, avec un voyant d'état
 (gris : aucune, orange : vérification, vert : connectée, rouge : erreur). `backend/app/services/llm.py` :
 
 | Choix | Clé | Remarques |
@@ -461,14 +462,14 @@ Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions et com
 Une bulle en bas à droite de toutes les pages : un assistant IA pour **ta bibliothèque** (trouver un jeu, en
 comparer deux, se servir de l'application). Sur la fiche d'un jeu, ou pendant qu'un jeu tourne sur la console, il
 propose de discuter de **ce jeu** seulement (commandes, objectifs, passage difficile, secrets : un indice d'abord, la
-solution sur demande). Il utilise l'IA réglée dans Paramètres > IA, en ligne ou locale (Ollama, LM Studio ; on demande
+solution sur demande). Il utilise l'IA réglée dans Paramètres > Assistant, en ligne ou locale (Ollama, LM Studio ; on demande
 aux modèles à raisonnement de répondre sans réflexion préalable, ce qui garde un modèle local de 12B autour de 10 s par
 réponse). Chaque question passe par deux appels : un aiguillage structuré (dans le sujet ou non, intention, genre,
 console), puis la réponse en flux, construite à partir de la fiche du jeu et des passages de **connaissances**. Les
 questions hors sujet, les demandes de ROM ou de BIOS et les tentatives de changer ses consignes reçoivent le refus de
 l'application, jamais le texte du modèle. Les conversations restent dans le navigateur.
 
-**Connaissances** (Paramètres > Contenu IA) : pour chaque jeu, ses pages Wikipédia (en, fr, es) et sa soluce
+**Connaissances** (Paramètres > Connaissances, sans IA) : pour chaque jeu, ses pages Wikipédia (en, fr, es) et sa soluce
 StrategyWiki, récupérées sans IA par les API MediaWiki une fois le jeu identifié par Wikidata (jeu vidéo + bonne
 console), découpées en passages avec leur source et leur licence (CC BY-SA 4.0, citée dans les réponses), indexées
 dans Typesense. Récupération pour un jeu (test, avec une question de test qui montre les passages trouvés) ou pour

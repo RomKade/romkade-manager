@@ -87,7 +87,7 @@ defecto `latest`), `TZ` (por defecto `Europe/Paris`).
   ```
 
 - **IA local** (Ollama, LM Studio) en este ordenador: dirección `http://host.docker.internal:11434/v1` en
-  Ajustes > IA. Guía: [docs/local-llm.es.md](docs/local-llm.es.md).
+  Ajustes > Asistente. Guía: [docs/local-llm.es.md](docs/local-llm.es.md).
 
 ### Publicar una versión
 
@@ -428,11 +428,12 @@ consola (Mega Drive: A = Y, B = B, C = A; PlayStation: Cruz = B, Círculo = A…
 moneda = Select). Respuesta en francés, inglés y español, guardada en la base (tabla `game_controls`, compartida por
 las ediciones de un mismo juego). Juego poco conocido por el modelo: controles habituales de la consola, indicado como tal.
 «Corregir» / «Introducir a mano» sustituye la lista por la tuya (mismo texto en los tres idiomas). La misma clave
-de API de IA que las descripciones (Ajustes > IA).
+de API de IA que las descripciones (Ajustes > Asistente).
 
 ## Conexión a una IA (LLM)
 
-Ajustes > IA: una sola IA para todo lo que la usa (descripciones y controles de los juegos), con un indicador de estado
+Ajustes > Asistente: la IA del [asistente de juego](#asistente-de-juego), que también sirve, bajo petición, para las
+descripciones y los controles de los juegos, con un indicador de estado
 (gris: ninguna, naranja: comprobando, verde: conectada, rojo: error). `backend/app/services/llm.py`:
 
 | Opción | Clave | Notas |
@@ -458,14 +459,14 @@ Ajustes > IA: una sola IA para todo lo que la usa (descripciones y controles de 
 Una burbuja abajo a la derecha en todas las páginas: un asistente de IA para **tu biblioteca** (encontrar un juego,
 comparar dos, usar la aplicación). En la ficha de un juego, o mientras un juego funciona en la consola, propone hablar
 solo de **ese juego** (controles, objetivos, una parte difícil, secretos: primero una pista, la solución si se pide).
-Usa la IA configurada en Ajustes > IA, en línea o local (Ollama, LM Studio; a los modelos de razonamiento se les pide
+Usa la IA configurada en Ajustes > Asistente, en línea o local (Ollama, LM Studio; a los modelos de razonamiento se les pide
 responder sin reflexión previa, lo que deja un modelo local de 12B en unos 10 s por respuesta). Cada pregunta pasa
 por dos llamadas: una clasificación estructurada (dentro del tema o no, intención, género, consola) y luego la
 respuesta en flujo, construida con la ficha del juego y los pasajes de **conocimientos**. Las preguntas fuera de tema,
 las peticiones de ROM o BIOS y los intentos de cambiar sus instrucciones reciben el rechazo de la aplicación, nunca
 el texto del modelo. Las conversaciones se quedan en el navegador.
 
-**Conocimientos** (Ajustes > Contenido IA): para cada juego, sus páginas de Wikipedia (en, fr, es) y su guía de
+**Conocimientos** (Ajustes > Conocimientos, sin IA): para cada juego, sus páginas de Wikipedia (en, fr, es) y su guía de
 StrategyWiki, obtenidas sin IA mediante las API de MediaWiki una vez identificado el juego en Wikidata (videojuego +
 consola correcta), divididas en pasajes con su fuente y su licencia (CC BY-SA 4.0, citada en las respuestas) e
 indexadas en Typesense. Obtención para un juego (prueba, con una pregunta de prueba que muestra los pasajes

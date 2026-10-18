@@ -54,7 +54,7 @@ Le serveur répond à l'adresse `http://localhost:1234/v1`.
 
 ## Connecter le modèle dans ROMKADE Manager
 
-1. Ouvre **Paramètres > IA**.
+1. Ouvre **Paramètres > Assistant**.
 2. Choisis **Ollama, LM Studio, autre…**.
 3. Clique sur l'adresse : **Ollama** ou **LM Studio** (ou **Ollama (Docker)**, voir plus bas).
 4. Clique sur le modèle dans la liste.
@@ -62,7 +62,7 @@ Le serveur répond à l'adresse `http://localhost:1234/v1`.
 La connexion est vérifiée toute seule : le voyant passe au **vert** (« Connectée »). Le premier essai peut prendre
 une minute, le temps de charger le modèle en mémoire.
 
-Les descriptions partent ensuite **jeu par jeu**, en arrière-plan (Paramètres > Descriptions) ; les commandes se
+Les descriptions partent ensuite **jeu par jeu**, en arrière-plan (bas de Paramètres > Assistant) ; les commandes se
 demandent depuis la fiche d'un jeu.
 
 ## ROMKADE Manager dans Docker

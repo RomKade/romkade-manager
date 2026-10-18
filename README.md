@@ -86,7 +86,7 @@ Options, in a `.env` file next to `compose.yaml`: `ROMKADE_PORT` (default `8765`
   ```
 
 - **Local AI** (Ollama, LM Studio) on this computer: address `http://host.docker.internal:11434/v1` in
-  Settings > AI. Guide: [docs/local-llm.md](docs/local-llm.md).
+  Settings > Assistant. Guide: [docs/local-llm.md](docs/local-llm.md).
 
 ### Publishing a version
 
@@ -427,11 +427,12 @@ buttons (Mega Drive: A = Y, B = B, C = A; PlayStation: Cross = B, Circle = A…;
 coin = Select). Answer in French, English and Spanish, stored in the database (`game_controls` table, shared by
 the editions of the same game). Game the model barely knows: the console's usual controls, flagged as such.
 "Edit" / "Write them myself" replaces the list with your own (same text in all three languages). Same AI
-API key as the descriptions (Settings > AI).
+API key as the descriptions (Settings > Assistant).
 
 ## Connecting to an AI (LLM)
 
-Settings > AI: a single AI for everything that uses one (game descriptions, game controls), with a status light
+Settings > Assistant: the AI of the [game assistant](#game-assistant), also used on request for game descriptions and
+controls, with a status light
 (grey: none, orange: being checked, green: connected, red: error). `backend/app/services/llm.py`:
 
 | Choice | Key | Notes |
@@ -463,7 +464,7 @@ or not, intent, genre, console) then the streamed answer, built from the game pa
 Off-topic questions, ROM/BIOS download requests and attempts to change its instructions get the app's own refusal,
 never the model's text. Conversations stay in the browser.
 
-**Knowledge** (Settings > AI content): for each game, its Wikipedia pages (en, fr, es) and its StrategyWiki guide,
+**Knowledge** (Settings > Knowledge, no AI involved): for each game, its Wikipedia pages (en, fr, es) and its StrategyWiki guide,
 fetched without AI through the MediaWiki APIs once Wikidata has identified the game (video game + matching console),
 split into passages with source and license (CC BY-SA 4.0, cited in answers), indexed in Typesense. Fetch one game (to
 test, with a test question that shows the passages found) or all; option to fetch automatically for new games after
