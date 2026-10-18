@@ -9,7 +9,7 @@ import { useDebounced } from "../lib/hooks";
 import { ErrorNotice, Meter, Spinner } from "./ui";
 
 /**
- * Paramètres > Contenu IA > Connaissances : pages Wikipédia et StrategyWiki de chaque jeu, récupérées sans IA, que
+ * Paramètres > Connaissances : pages Wikipédia et StrategyWiki de chaque jeu, récupérées sans IA, que
  * l'assistant lit pour répondre (RAG). Couverture, récupération de tous les jeux en attente, option automatique
  * après synchronisation, et test sur un jeu (récupérer, puis voir les passages trouvés pour une question).
  */
@@ -91,6 +91,7 @@ function KnowledgeTest() {
   return (
     <div className="knowledge__test">
       <h3>{t("settings.kn.testTitle")}</h3>
+      <p className="muted">{t("settings.kn.testLead")}</p>
       <label className="field knowledge__search">
         <span className="field__label">{t("settings.kn.pick")}</span>
         <input type="search" value={text} placeholder={t("settings.kn.pickPlaceholder")} onChange={(e) => setText(e.target.value)} />

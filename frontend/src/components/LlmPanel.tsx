@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, Bot, Cloud, ExternalLink, HardDrive, Loader2, PlugZap, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { api, type LlmProvider, type LlmSettings } from "../api/client";
 import { useLlmSettings } from "../api/queries";
@@ -15,7 +14,7 @@ import { ErrorNotice, Spinner } from "./ui";
 export const localLlmDoc = () => `${REPO_URL}/blob/main/docs/local-llm${getLang() === "en" ? "" : `.${getLang()}`}.md`;
 
 /**
- * Paramètres > IA : la connexion à un modèle de langage, partagée par tout ce qui utilise l'IA (descriptions et
+ * Paramètres > Assistant : la connexion à un modèle de langage, partagée par tout ce qui utilise l'IA (assistant, descriptions et
  * commandes des jeux). Service en ligne : choisir le fournisseur, coller la clé, c'est tout (modèle proposé d'après
  * la liste du fournisseur, connexion vérifiée d'elle-même). Modèle local ou service compatible OpenAI : adresse
  * (Ollama, LM Studio, Docker) et modèle. Voir backend app/services/llm.py.
@@ -143,10 +142,7 @@ function StatusCard({ settings, checking, onCheck, onDisconnect }: {
           )}
         </div>
       </div>
-      <p className="muted">
-        {t("settings.ai.usesTitle")} <Link to="/parametres/descriptions">{t("settings.ai.useDescriptions")}</Link>
-        {" · "}{t("settings.ai.useControls")}.
-      </p>
+      <p className="muted">{t("settings.ai.uses")}</p>
     </section>
   );
 }

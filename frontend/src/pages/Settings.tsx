@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpenText, MessageCircle, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
@@ -27,7 +27,7 @@ const TABS = [
   { slug: "temps-de-jeu", label: "settings.tab.playtime", icon: Hourglass },
   { slug: "videos", label: "settings.tab.videos", icon: Video },
   { slug: "ia", label: "settings.tab.ai", icon: Bot },
-  { slug: "descriptions", label: "settings.tab.descriptions", icon: Languages },
+  { slug: "connaissances", label: "settings.tab.knowledge", icon: BookOpenText },
   { slug: "a-propos", label: "legal.about.title", icon: Info },
 ] as const;
 
@@ -35,7 +35,8 @@ export function SettingsPage() {
   const t = useT();
   const settings = useSettings();
   const { tab: raw = "" } = useParams();
-  const tab = raw === "credits" ? "a-propos" : raw;  // ancienne adresse de Sources et crédits
+  // Anciennes adresses : Sources et crédits, Contenu IA (devenu Connaissances).
+  const tab = raw === "credits" ? "a-propos" : raw === "descriptions" ? "connaissances" : raw;
   const current = TABS.find((x) => x.slug === tab) ? tab : "";
   if (settings.isPending) return <div className="page"><Spinner label={t("common.loading")} /></div>;
   if (settings.isError) return <div className="page"><ErrorNotice error={settings.error} /></div>;
@@ -68,8 +69,8 @@ export function SettingsPage() {
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}
       {current === "videos" && <YouTubePanel />}
-      {current === "ia" && <LlmPanel />}
-      {current === "descriptions" && <DescriptionsPanel />}
+      {current === "ia" && <><AssistantPanel /><LlmPanel /><DescriptionsPanel /></>}
+      {current === "connaissances" && <KnowledgePanel />}
       {current === "a-propos" && <><AboutPanel /><CreditsPanel /></>}
     </div>
   );
@@ -525,6 +526,24 @@ function TestPanel() {
 const hasError = (code: string) => getLang() !== "fr" && has(`common.error.${code}`);
 
 /**
+ * Paramètres > Assistant, en tête : ce que fait l'assistant de jeu (la bulle), avant l'IA qui le fait fonctionner
+ * (LlmPanel) et les autres usages de cette IA (descriptions, commandes). Les connaissances qu'il lit sont récupérées
+ * sans IA : onglet Connaissances.
+ */
+function AssistantPanel() {
+  const t = useT();
+  return (
+    <section className="block" aria-labelledby="as-h">
+      <div className="block__head">
+        <h2 id="as-h"><MessageCircle size={18} aria-hidden /> {t("settings.as.title")}</h2>
+      </div>
+      <p className="muted block__lead">{t("settings.as.lead")}</p>
+      <p><Link to="/parametres/connaissances"><BookOpenText size={14} aria-hidden /> {t("settings.as.knowledge")}</Link></p>
+    </section>
+  );
+}
+
+/**
  * Descriptions des jeux en français, anglais et espagnol, rédigées ou traduites par Claude : clé d'API Anthropic
  * (trousseau), avancement, lancement d'un lot (API Batches) et suivi. Voir backend app/services/descriptions.py.
  */
@@ -538,7 +557,6 @@ function DescriptionsPanel() {
   const running = st?.batches.find((b) => !b.imported);
   return (
     <>
-      <KnowledgePanel />
       <section className="block" aria-labelledby="desc-h">
         <div className="block__head">
           <h2 id="desc-h"><Languages size={18} aria-hidden /> {t("settings.desc.title")}</h2>

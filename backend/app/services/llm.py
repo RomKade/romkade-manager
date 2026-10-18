@@ -97,7 +97,7 @@ def is_local_url(url: str | None) -> bool:
     return host in _LOCAL_HOSTS or host.endswith(".local") or host.startswith("192.168.") or host.startswith("10.")
 
 
-# Clé Anthropic : même entrée du trousseau qu'avant (Paramètres > Descriptions), pour ne rien perdre.
+# Clé Anthropic : même entrée du trousseau qu'avant (ancien onglet Paramètres > Descriptions), pour ne rien perdre.
 ANTHROPIC_KEY = ("api.anthropic.com", "game-descriptions")
 
 
@@ -430,18 +430,18 @@ def build(cfg: LlmConfig, credentials, transport: httpx.BaseTransport | None = N
     """Modèle prêt à l'emploi d'après les réglages, ou AppError expliquant ce qui manque."""
     pid = effective_provider(cfg, credentials)
     if pid is None:
-        raise errors.AppError("llm_none", "Aucune IA n'est connectée : choisis-en une dans Paramètres > IA.", 409)
+        raise errors.AppError("llm_none", "Aucune IA n'est connectée : choisis-en une dans Paramètres > Assistant.", 409)
     provider = PROVIDERS[pid]
     base_url = (cfg.base_url or provider.base_url or "").strip()
     if not base_url:
-        raise errors.AppError("llm_no_url", "Indique l'adresse du service (Paramètres > IA).", 409)
+        raise errors.AppError("llm_no_url", "Indique l'adresse du service (Paramètres > Assistant).", 409)
     key = saved_key(credentials, provider) or (os.environ.get(provider.env) if provider.env else None)
     if provider.key == "required" and not key and not (provider.id == "anthropic" and key_source(credentials, provider)):
-        raise errors.AppError("llm_key_missing", f"Ajoute d'abord une clé d'API {provider.label} (Paramètres > IA).",
+        raise errors.AppError("llm_key_missing", f"Ajoute d'abord une clé d'API {provider.label} (Paramètres > Assistant).",
                               409, {"provider": provider.id})
     model = (cfg.model or provider.default_model or "").strip()
     if require_model and not model:
-        raise errors.AppError("llm_no_model", "Choisis un modèle (Paramètres > IA).", 409, {"provider": provider.id})
+        raise errors.AppError("llm_no_model", "Choisis un modèle (Paramètres > Assistant).", 409, {"provider": provider.id})
     return LLM(provider, model, base_url, key, transport)
 
 
@@ -478,7 +478,7 @@ def record_test(state, llm: LLM, ok: bool, error: str | None = None) -> None:
 
 
 def status(state) -> dict:
-    """Réglages et état de la connexion, pour Paramètres > IA (sans jamais renvoyer de clé).
+    """Réglages et état de la connexion, pour Paramètres > Assistant (sans jamais renvoyer de clé).
 
     `state` : none (aucune IA), incomplete (clé, modèle ou adresse manquants), untested (prête, pas encore vérifiée
     avec ces réglages), connected (dernière vérification réussie), error (dernière vérification en échec)."""

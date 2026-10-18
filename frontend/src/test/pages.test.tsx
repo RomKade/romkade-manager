@@ -437,11 +437,29 @@ describe("Nouvelle console : clé à approuver", () => {
   });
 });
 
-describe("Contenu IA : connaissances", () => {
-  it("lance la récupération, puis teste un jeu : pages trouvées et passages pour une question", async () => {
+describe("Paramètres : assistant et connaissances", () => {
+  it("onglet Assistant : l'assistant d'abord, puis son IA, puis les descriptions rédigées par l'IA", async () => {
+    renderAt("/parametres/ia");
+    expect(await screen.findByRole("link", { name: /^Assistant$/ })).toHaveAttribute("aria-current", "page");
+    const headings = (await screen.findAllByRole("heading", { level: 2 })).map((h) => h.textContent ?? "");
+    const order = ["Assistant de jeu", "IA de l'assistant", "Descriptions des jeux, rédigées par l'IA"].map((x) => headings.findIndex((h) => h.includes(x)));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(screen.getByRole("link", { name: /Connaissances de l'assistant/ })).toHaveAttribute("href", "/parametres/connaissances");
+    expect(screen.queryByRole("heading", { name: /Connaissances de l'assistant/ })).not.toBeInTheDocument();
+  });
+
+  it("l'ancienne adresse de Contenu IA mène aux connaissances", async () => {
     renderAt("/parametres/descriptions");
-    expect(await screen.findByRole("link", { name: /Contenu IA/ })).toBeInTheDocument();
-    const panel = (await screen.findByRole("heading", { name: /Connaissances pour l'assistant/ })).closest("section")!;
+    expect(await screen.findByRole("heading", { name: /Connaissances de l'assistant/ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Descriptions des jeux/ })).not.toBeInTheDocument();
+  });
+
+  it("connaissances : lance la récupération, puis un seul jeu : pages enregistrées et passages pour une question", async () => {
+    renderAt("/parametres/connaissances");
+    expect(await screen.findByRole("link", { name: /^Connaissances$/ })).toBeInTheDocument();
+    const panel = (await screen.findByRole("heading", { name: /Connaissances de l'assistant/ })).closest("section")!;
+    expect(within(panel).getByText(/ce n'est pas un simple essai/)).toBeInTheDocument();
     expect(await within(panel).findByText(/1 jeux documentés sur 2/)).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: /Récupérer pour le jeu restant/ }));
     expect(await within(panel).findByText(/Récupération : 0 sur 1/)).toBeInTheDocument();
