@@ -132,7 +132,13 @@ async def test_openai_controls_end_to_end(app_factory):
     from tests.test_catalog import sync
 
     app = app_factory()
-    transport, seen = fake_server(lambda body: json.dumps(ANSWER))
+    def answer(body):
+        if body["response_format"]["json_schema"]["name"] == "translation":
+            return json.dumps({"items": [{"en": "Up + B: uppercut.", "fr": "Haut + B : uppercut.", "es": "Arriba + B: gancho."}]})
+        return json.dumps({"known": True, "from_sources": False, "notes": "Up + B: uppercut.",
+                           "controls": [{"button": "D-pad", "action": "Move"}, {"button": "B", "action": "Punch"}]})
+
+    transport, seen = fake_server(answer)
     app.state.llm_transport = transport
     async with client(app) as c:
         await sync(c)
@@ -142,7 +148,8 @@ async def test_openai_controls_end_to_end(app_factory):
         assert (await c.get(f"/api/games/{game['id']}/controls")).json()["can_generate"] is True
         r = await c.post(f"/api/games/{game['id']}/controls")
         assert r.status_code == 200, r.text
-        assert r.json()["controls"][1]["en"] == "Punch"
+        assert r.json()["controls"][1] == {"button": "b", "en": "Punch", "fr": "Coup de poing", "es": "Puñetazo"}
+        assert r.json()["notes"]["fr"] == "Haut + B : uppercut."
         body = seen[0]
         assert body["url"] == "https://api.openai.com/v1/chat/completions" and body["auth"].startswith("Bearer sk-proj-")
         assert body["model"] == "gpt-test" and "max_completion_tokens" in body

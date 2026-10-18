@@ -6,25 +6,58 @@ from app.services import controls as ctl
 from app.services import descriptions as d
 
 
-class Msg:
-    def __init__(self, text, stop="end_turn"):
-        self.stop_reason = stop
-        self.content = [type("B", (), {"type": "text", "text": text})()]
-
-
 ANSWER = {"known": True, "notes": {"fr": "Haut + B : uppercut.", "en": "Up + B: uppercut.", "es": "Arriba + B: gancho."},
           "controls": [{"button": "dpad", "fr": "Se déplacer", "en": "Move", "es": "Moverse"},
                        {"button": "b", "fr": "Coup de poing", "en": "Punch", "es": "Puñetazo"},
                        {"button": "a", "fr": "Tir", "en": "Fire", "es": "Disparo"}]}
 
 
-def test_mapping_and_params():
-    assert ctl.mapping_for("MD").startswith("Mega Drive") and "C = A" in ctl.mapping_for("md")
-    assert ctl.mapping_for("FBNEO") == ctl.ARCADE and "button 1 = B" in ctl.ARCADE
-    assert "default core mapping" in ctl.mapping_for("INCONNU")
-    assert ctl.parse(Msg(json.dumps(ANSWER)))["controls"][1]["button"] == "b"
-    assert ctl.parse(Msg(json.dumps({**ANSWER, "controls": []}))) is None
-    assert ctl.parse(Msg("", stop="refusal")) is None
+# Réponse du modèle : boutons de la manette d'origine (liste fermée), en anglais.
+RAW_SFC = {"known": True, "from_sources": True, "notes": "Down, down-forward, forward + punch: fireball.",
+           "controls": [{"button": "D-pad", "action": "Move"}, {"button": "Y", "action": "Light punch"},
+                        {"button": "X", "action": "Medium punch"}, {"button": "L", "action": "Heavy punch"},
+                        {"button": "B", "action": "Light kick"}, {"button": "Start", "action": "Pause"}]}
+
+
+def test_layouts_convert_original_buttons():
+    assert ctl.layout_for("MD")["C"] == "a" and ctl.layout_for("md")["A"] == "y"
+    assert ctl.layout_for("FBNEO")["Button 1"] == "b" and ctl.layout_for("NEOGEO")["D"] == "x"
+    assert ctl.layout_for("SFC")["L"] == "l1" and ctl.layout_for("PS")["Cross"] == "b"
+    assert ctl.layout_for("INCONNU") == ctl.IDENTITY
+    assert "C = a" in ctl.mapping_for("MD")
+    assert all(v in ctl.BUTTONS for layout in [*ctl.LAYOUTS.values(), ctl.ARCADE, ctl.NEOGEO] for v in layout.values())
+    enum = ctl.schema_for(ctl.layout_for("SFC"))["properties"]["controls"]["items"]["properties"]["button"]["enum"]
+    assert {"Y", "X", "L", "R"} <= set(enum) and "L2" not in enum  # pas de touche qui n'existe pas
+    out = ctl.convert(RAW_SFC, ctl.layout_for("SFC"))
+    assert [(c["button"], c["en"]) for c in out["controls"]][:4] == [
+        ("dpad", "Move"), ("y", "Light punch"), ("x", "Medium punch"), ("l1", "Heavy punch")]
+    # bouton inconnu ignoré, deux boutons d'origine sur la même touche réunis
+    md = ctl.convert({"controls": [{"button": "A", "action": "Jump"}, {"button": "L2", "action": "?"},
+                                   {"button": "A", "action": "Swim"}], "notes": ""}, ctl.layout_for("MD"))
+    assert md["controls"] == [{"button": "y", "en": "Jump / Swim"}]
+    assert ctl.convert({"controls": [{"button": "L2", "action": "?"}]}, ctl.layout_for("SFC")) is None
+
+
+def test_translate_glossary_then_model():
+    data = ctl.convert(RAW_SFC, ctl.layout_for("SFC"))
+    asked = []
+
+    class FakeLLM:
+        provider = type("P", (), {"id": "local"})
+
+        def complete_json(self, system, prompt, schema, **kw):
+            asked.append((prompt, kw.get("reasoning")))
+            return {"items": [{"en": "Down, down-forward, forward + punch: fireball.",
+                               "fr": "Bas, bas-avant, avant + poing : boule de feu.",
+                               "es": "Abajo, abajo-adelante, adelante + puño: bola de fuego."}]}
+
+    out = ctl.translate(FakeLLM(), data)
+    assert out["controls"][1] == {"button": "y", "en": "Light punch", "fr": "Coup de poing faible", "es": "Puñetazo débil"}
+    assert out["notes"]["fr"].startswith("Bas, bas-avant")
+    assert len(asked) == 1 and "Light punch" not in asked[0][0] and asked[0][1] == "none"  # glossaire : sans IA
+    # sans modèle (ou sans réponse) : l'anglais dans les trois langues
+    plain = ctl.translate(None, data)
+    assert plain["notes"] == {"en": data["notes"], "fr": data["notes"], "es": data["notes"]}
 
 
 async def test_generate_store_and_edit(app_factory, monkeypatch):
@@ -37,7 +70,7 @@ async def test_generate_store_and_edit(app_factory, monkeypatch):
 
     def fake_generate(model, f, passages=None):
         seen["params"] = ctl.params_for(f)
-        return ctl.parse(Msg(json.dumps(ANSWER)))
+        return ctl.clean(ANSWER)
 
     monkeypatch.setattr(ctl, "generate", fake_generate)
     app = app_factory()
@@ -53,7 +86,7 @@ async def test_generate_store_and_edit(app_factory, monkeypatch):
         body = r.json()
         assert body["origin"] == "written" and body["controls"][1] == {"button": "b", "fr": "Coup de poing",
                                                                         "en": "Punch", "es": "Puñetazo"}
-        assert "Same letters" in seen["params"]["messages"][0]["content"]
+        assert "Original controller buttons: D-pad, A, B, Start, Select, X, Y, L, R" in seen["params"]["messages"][0]["content"]
         assert seen["params"]["output_config"]["effort"] == "medium"
 
         r = await c.put(f"/api/games/{game['id']}/controls",
