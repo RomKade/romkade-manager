@@ -239,6 +239,51 @@ async def test_favorites(app_factory):
         assert (await c.put("/api/games/999999/favorite")).status_code == 404
 
 
+async def test_favorites_per_console(app_factory, monkeypatch):
+    """Favoris rattachés à la console : ceux d'une autre console ne s'affichent pas, et reviennent avec elle."""
+    from app.api import catalog
+    from app.db.models import Favorite, RemoteFile
+
+    app = app_factory()
+    console = {"id": "SHA256:anbernic"}
+    monkeypatch.setattr(catalog, "console_id", lambda request: console["id"])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        items = (await c.get("/api/games", params={"limit": 3})).json()["items"]
+        a, b, legacy = items[0]["id"], items[1]["id"], items[2]["id"]
+        await c.put(f"/api/games/{a}/favorite")
+        with app.state.sessions.begin() as s:
+            s.add(Favorite(file_id=legacy, console=None))  # favori d'avant la distinction par console
+
+        console["id"] = "SHA256:onion"
+        assert {g["id"] for g in (await c.get("/api/favorites")).json()} == {legacy}
+        assert (await c.get(f"/api/games/{a}")).json()["favorite"] is False
+        await c.put(f"/api/games/{b}/favorite")
+        assert (await c.get("/api/games", params={"favorite": True})).json()["page"]["total"] == 2
+
+        console["id"] = "SHA256:anbernic"
+        assert {g["id"] for g in (await c.get("/api/favorites")).json()} == {a, legacy}
+        # Un favori disparu de la carte n'est plus listé, mais reste en base.
+        with app.state.sessions.begin() as s:
+            s.get(RemoteFile, a).deleted_at = s.get(RemoteFile, a).last_seen_at
+        assert {g["id"] for g in (await c.get("/api/favorites")).json()} == {legacy}
+        with app.state.sessions() as s:
+            assert s.query(Favorite).count() == 3
+
+
+def test_host_key_fingerprint_offline(tmp_path):
+    import asyncssh
+
+    from app.device.ssh_client import HostKeyStore, fingerprint
+
+    store = HostKeyStore(tmp_path / "known_hosts")
+    key = asyncssh.generate_private_key("ssh-ed25519")
+    assert store.fingerprint("192.168.1.5", 22) is None
+    store.trust("192.168.1.5", 2222, key)
+    assert store.fingerprint("192.168.1.5", 2222) == fingerprint(key)
+    assert store.fingerprint("192.168.1.5", 22) is None
+
+
 async def test_sort_by_release_year(app_factory):
     from app.db.models import RemoteFile
 

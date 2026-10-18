@@ -77,7 +77,7 @@ SortKey = Literal["name", "size", "date", "added", "year"]
 
 def search_games(s: Session, *, q: str | None, platforms: list[str] | None, extensions: list[str] | None,
                  regions: list[str] | None, role: str, genres: list[str] | None = None, subgenres: list[str] | None = None,
-                 has_image: bool | None, include_removed: bool, favorite: bool = False,
+                 has_image: bool | None, include_removed: bool, favorite: bool = False, console: str | None = None,
                  sort: SortKey, order: Literal["asc", "desc"], offset: int, limit: int) -> GamesPageOut:
     conds = []
     if role != "all":
@@ -103,7 +103,7 @@ def search_games(s: Session, *, q: str | None, platforms: list[str] | None, exte
     if has_image is not None:
         conds.append(RemoteFile.image_relpath.is_not(None) if has_image else RemoteFile.image_relpath.is_(None))
     if favorite:
-        conds.append(RemoteFile.id.in_(select(Favorite.file_id)))
+        conds.append(RemoteFile.id.in_(select(Favorite.file_id).where(_console_scope(console))))
     if q:
         for word in search_key(q).split():
             conds.append(RemoteFile.search_key.like(f"%{word}%", escape="\\"))
@@ -127,20 +127,32 @@ def games_by_ids(s: Session, ids: list[int], total: int, offset: int, limit: int
                         items=[to_game(rows[i]) for i in ids if i in rows])
 
 
-def favorites(s: Session, limit: int | None = None) -> list[GameOut]:
-    """Jeux favoris, le dernier ajouté en tête (y compris ceux disparus de la carte, signalés par `present`)."""
+def _console_scope(console: str | None):
+    """Favoris de cette console, plus ceux d'avant la distinction par console (NULL)."""
+    return or_(Favorite.console == console, Favorite.console.is_(None))
+
+
+def favorites(s: Session, console: str | None, limit: int | None = None) -> list[GameOut]:
+    """Favoris de la console branchée présents sur sa carte, le dernier ajouté en tête. Ceux d'une autre console
+    (ou disparus de la carte) restent en base et reviennent quand on la rebranche."""
     q = (select(RemoteFile).join(Favorite, Favorite.file_id == RemoteFile.id).options(joinedload(RemoteFile.platform))
-         .order_by(Favorite.created_at.desc(), Favorite.id.desc()))
-    return [to_game(f) for f in s.scalars(q.limit(limit) if limit else q)]
+         .where(_console_scope(console), RemoteFile.deleted_at.is_(None))
+         .group_by(RemoteFile.id).order_by(func.max(Favorite.created_at).desc(), func.max(Favorite.id).desc()))
+    return [to_game(f) for f in s.scalars(q.limit(limit) if limit else q).unique()]
 
 
-def set_favorite(s: Session, file_id: int, on: bool) -> None:
+def is_favorite(s: Session, console: str | None, file_id: int) -> bool:
+    return s.scalar(select(Favorite.id).where(Favorite.file_id == file_id, _console_scope(console)).limit(1)) is not None
+
+
+def set_favorite(s: Session, console: str | None, file_id: int, on: bool) -> None:
     get_file(s, file_id)
-    row = s.scalar(select(Favorite).where(Favorite.file_id == file_id))
-    if on and row is None:
-        s.add(Favorite(file_id=file_id))
-    elif not on and row is not None:
-        s.delete(row)
+    rows = s.scalars(select(Favorite).where(Favorite.file_id == file_id, _console_scope(console))).all()
+    if on and not rows:
+        s.add(Favorite(file_id=file_id, console=console))
+    elif not on:
+        for row in rows:
+            s.delete(row)
 
 
 def get_file(s: Session, file_id: int) -> RemoteFile:
@@ -150,7 +162,7 @@ def get_file(s: Session, file_id: int) -> RemoteFile:
     return f
 
 
-def game_detail(s: Session, file_id: int, roms_root: str) -> GameDetailOut:
+def game_detail(s: Session, file_id: int, roms_root: str, console: str | None = None) -> GameDetailOut:
     f = get_file(s, file_id)
     dups = s.scalars(select(RemoteFile).options(joinedload(RemoteFile.platform)).where(
         RemoteFile.platform_id == f.platform_id, RemoteFile.normalized_title == f.normalized_title,
@@ -162,7 +174,7 @@ def game_detail(s: Session, file_id: int, roms_root: str) -> GameDetailOut:
         release_date=f.release_date, franchise=f.franchise, description=f.description, info_url=f.info_url,
         descriptions={t.lang: {"text": t.text, "origin": t.origin} for t in s.scalars(select(GameText).where(
             GameText.platform_id == f.platform_id, GameText.normalized_title == f.normalized_title))},
-        favorite=s.scalar(select(Favorite.id).where(Favorite.file_id == f.id)) is not None,
+        favorite=is_favorite(s, console, f.id),
         remote_path=safe_join(roms_root, f.platform.directory, f.relative_path),
         image_relpath=f.image_relpath,
         possible_duplicates=[to_game(d) for d in dups] if f.role == "candidate" else [],

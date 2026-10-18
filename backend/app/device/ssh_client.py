@@ -47,6 +47,18 @@ class HostKeyStore:
                 return True
         return False
 
+    def fingerprint(self, host: str, port: int) -> str | None:
+        """Empreinte SHA-256 de la clé approuvée pour cet hôte, sans contacter la console (None si aucune)."""
+        target = known_hosts_entry_host(host, port)
+        for line in self.path.read_text().splitlines():
+            parts = line.split()
+            if len(parts) >= 3 and not line.startswith("#") and target in parts[0].split(","):
+                try:
+                    return fingerprint(asyncssh.import_public_key(" ".join(parts[1:3])))
+                except (asyncssh.KeyImportError, ValueError):
+                    return None
+        return None
+
     def trust(self, host: str, port: int, key: asyncssh.SSHKey) -> None:
         target = known_hosts_entry_host(host, port)
         lines = [

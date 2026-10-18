@@ -35,6 +35,13 @@ def _client(request: Request) -> DeviceClient:
     return DeviceClient(st.settings_store.load(), st.credentials, st.host_keys)
 
 
+def console_id(request: Request) -> str:
+    """Identité de la console configurée : empreinte de sa clé SSH approuvée, sinon « hôte:port »."""
+    st = request.app.state
+    s = st.settings_store.load()
+    return st.host_keys.fingerprint(s.host, s.port) or f"{s.host}:{s.port}"
+
+
 # ---------- synchronisation ----------
 
 @router.post("/catalog/sync", status_code=202, response_model=ScanRunOut, tags=["catalog"])
@@ -120,7 +127,7 @@ async def games(
             search.ready = False
     return await asyncio.to_thread(_with_session, request, lambda s: cq.search_games(
         s, q=q, platforms=platform, extensions=extension, regions=region, role=role, genres=genre, subgenres=subgenre,
-        has_image=has_image, favorite=favorite,
+        has_image=has_image, favorite=favorite, console=console_id(request) if favorite else None,
         include_removed=include_removed, sort=sort, order=order, offset=offset, limit=limit))
 
 
@@ -143,23 +150,23 @@ def search_status(request: Request) -> dict:
 @router.get("/favorites", response_model=list[GameOut], tags=["catalog"])
 async def favorites(request: Request, limit: int | None = Query(None, ge=1, le=500)) -> list[GameOut]:
     """Jeux favoris, le dernier ajouté en tête."""
-    return await asyncio.to_thread(_with_session, request, cq.favorites, limit)
+    return await asyncio.to_thread(_with_session, request, cq.favorites, console_id(request), limit)
 
 
 @router.put("/games/{game_id}/favorite", status_code=204, tags=["catalog"])
 async def add_favorite(game_id: int, request: Request) -> None:
-    await asyncio.to_thread(_with_write, request, cq.set_favorite, game_id, True)
+    await asyncio.to_thread(_with_write, request, cq.set_favorite, console_id(request), game_id, True)
 
 
 @router.delete("/games/{game_id}/favorite", status_code=204, tags=["catalog"])
 async def remove_favorite(game_id: int, request: Request) -> None:
-    await asyncio.to_thread(_with_write, request, cq.set_favorite, game_id, False)
+    await asyncio.to_thread(_with_write, request, cq.set_favorite, console_id(request), game_id, False)
 
 
 @router.get("/games/{game_id}", response_model=GameDetailOut, tags=["catalog"])
 def game(game_id: int, request: Request) -> GameDetailOut:
     root = request.app.state.settings_store.load().roms_root
-    return _with_session(request, cq.game_detail, game_id, root)
+    return _with_session(request, cq.game_detail, game_id, root, console_id(request))
 
 
 @router.get("/games/{game_id}/image", tags=["catalog"],

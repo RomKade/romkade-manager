@@ -249,11 +249,17 @@ class GameControls(Base):
 
 
 class Favorite(Base):
-    """Jeu mis en favori depuis sa fiche (l'édition choisie, pas toutes celles du même titre)."""
+    """Jeu mis en favori depuis sa fiche (l'édition choisie, pas toutes celles du même titre), pour une console.
+
+    `console` : empreinte SHA-256 de la clé SSH de la console (stable, contrairement à son adresse IP), à défaut
+    « hôte:port ». Changer de console (celle d'un ami, un autre firmware) n'affiche que ses propres favoris.
+    NULL : favori d'avant cette distinction, montré sur toute console où le jeu est présent."""
 
     __tablename__ = "favorite"
+    __table_args__ = (UniqueConstraint("console", "file_id"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    file_id: Mapped[int] = mapped_column(ForeignKey("remote_file.id", ondelete="CASCADE"), unique=True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("remote_file.id", ondelete="CASCADE"), index=True)
+    console: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
