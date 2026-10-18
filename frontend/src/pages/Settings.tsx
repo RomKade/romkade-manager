@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpenText, MessageCircle, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Activity, BookOpenText, MessageCircle, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, ChevronRight, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
 import { api, ApiError, type Capabilities, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
@@ -85,32 +85,57 @@ function fieldErrors(err: unknown): Record<string, string> {
 
 /**
  * Mise en route en trois étapes : 1. la console (adresse, utilisateur, mot de passe ou clé SSH) ; 2. son identité
- * (empreinte de sa clé, approuvée une fois) ; 3. le test de connexion. Chaque étape faite est cochée.
+ * (empreinte de sa clé, approuvée une fois) ; 3. le test de connexion. Chaque étape est une carte cliquable, faite ou
+ * non : ce qui est réglé est résumé, et l'action (Modifier, Revoir, Lancer le test) est écrite en toutes lettres. Un clic
+ * fait glisser la page jusqu'à la section et la signale brièvement.
  */
 function ConnectionSteps({ settings }: { settings: Settings }) {
   const t = useT();
   const auth = settings.auth_method === "password" ? settings.has_password : !!settings.key_path;
+  const authLabel = t(settings.auth_method === "password" ? "settings.steps.authPassword" : "settings.steps.authKey");
   const steps = [
-    { n: 1, label: t("settings.steps.console"), done: !!settings.host && auth, href: "#conn-h" },
-    { n: 2, label: t("settings.steps.identity"), done: settings.host_key_trusted, href: "#hk" },
-    { n: 3, label: t("settings.steps.test"), done: false, to: "/parametres/test" },
+    { n: 1, label: t("settings.steps.console"), done: !!settings.host && auth, href: "conn-h",
+      sub: settings.host && auth ? t("settings.steps.consoleSub", { host: settings.host, user: settings.username, auth: authLabel })
+        : t("settings.steps.consoleTodo") },
+    { n: 2, label: t("settings.steps.identity"), done: settings.host_key_trusted, href: "hk",
+      sub: t(settings.host_key_trusted ? "settings.steps.identityDone" : "settings.steps.identityTodo") },
+    { n: 3, label: t("settings.steps.test"), done: false, to: "/parametres/test", sub: t("settings.steps.testSub") },
   ];
   const current = steps.find((s) => !s.done)?.n ?? 3;
+  const goTo = (id: string) => (e: MouseEvent) => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    e.preventDefault();
+    const block = target.closest<HTMLElement>(".block") ?? target;
+    block.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    block.classList.remove("is-flash");
+    void block.offsetWidth;  // relance l'animation si on clique deux fois
+    block.classList.add("is-flash");
+    history.replaceState(null, "", `#${id}`);
+  };
   return (
     <nav className="steps" aria-label={t("settings.steps.label")}>
       <ol>
         {steps.map((s) => {
+          const action = s.to ? t("settings.steps.run") : s.done ? t(s.n === 1 ? "settings.steps.edit" : "settings.steps.review")
+            : t("settings.steps.open");
           const body = (
             <>
-              <span className="steps__num" aria-hidden>{s.done ? <CheckCircle2 size={16} /> : s.n}</span>
-              <span>{s.label}</span>
+              <span className="steps__num" aria-hidden>{s.done ? <CheckCircle2 size={18} /> : s.n}</span>
+              <span className="steps__text">
+                <span className="steps__label">
+                  <span className="steps__index">{t("settings.steps.index", { n: s.n })}</span> {s.label}
+                </span>
+                <span className="steps__sub">{s.sub}</span>
+              </span>
+              <span className="steps__action">{action} <ChevronRight size={16} aria-hidden /></span>
               <span className="visually-hidden"> — {t(s.done ? "settings.steps.done" : s.n === current ? "settings.steps.current" : "settings.steps.todo")}</span>
             </>
           );
           const cls = `steps__item ${s.done ? "is-done" : ""} ${s.n === current ? "is-current" : ""}`;
           return (
             <li key={s.n}>
-              {s.to ? <Link to={s.to} className={cls}>{body}</Link> : <a href={s.href} className={cls}>{body}</a>}
+              {s.to ? <Link to={s.to} className={cls}>{body}</Link> : <a href={`#${s.href}`} className={cls} onClick={goTo(s.href!)}>{body}</a>}
             </li>
           );
         })}

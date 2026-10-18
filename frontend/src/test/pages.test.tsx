@@ -442,6 +442,12 @@ describe("Connexion en étapes", () => {
     const steps = await screen.findByRole("navigation", { name: "Mise en route de la connexion" });
     expect(within(steps).getByRole("link", { name: /La console.*fait/ })).toBeInTheDocument();
     expect(within(steps).getByRole("link", { name: /Identifier la console.*étape en cours/ })).toBeInTheDocument();
+    // Une étape faite reste une action claire : résumé de ce qui est réglé, « Modifier », lien vers sa section.
+    const first = within(steps).getByRole("link", { name: /La console/ });
+    expect(first).toHaveTextContent("192.168.86.242 · root · mot de passe");
+    expect(first).toHaveTextContent("Modifier");
+    expect(first).toHaveAttribute("href", "#conn-h");
+    expect(within(steps).getByRole("link", { name: /Tester la connexion/ })).toHaveTextContent("Lancer le test");
     const form = (await screen.findByRole("heading", { name: /La console/ })).closest("form")!;
     expect(within(form).getByLabelText("Remplacer le mot de passe")).toBeInTheDocument();
     await userEvent.click(within(form).getByRole("radio", { name: /Clé SSH/ }));
