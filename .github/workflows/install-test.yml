@@ -1,0 +1,109 @@
+# Test de l'installation Docker telle que la fait un utilisateur (tests/install/e2e.sh) : compose.yaml démarré, fausse
+# console SSH, réglages, clé, test de connexion, synchronisation, recherche, redémarrage.
+#
+# - Linux (Docker Engine) x86 et ARM : parcours complet.
+# - Windows : les runners GitHub ne font pas tourner de conteneurs Linux (pas de virtualisation imbriquée) ; on vérifie
+#   les commandes PowerShell de la documentation (curl.exe, $env:ROMKADE_PORT), le fichier et l'image annoncée.
+# - macOS (Docker Desktop) : pas de Docker sur les runners GitHub ; e2e.sh se lance à la main sur un Mac.
+#
+# Sur push / pull request : image construite depuis le code. Appelé par docker.yml après une release (input « tag ») :
+# compose.yaml téléchargé depuis la release et image tirée de ghcr.io sans authentification, comme chez l'utilisateur.
+name: Test d'installation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "compose.yaml"
+      - "backend/**"
+      - "frontend/**"
+      - "tests/install/**"
+      - ".github/workflows/install-test.yml"
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "compose.yaml"
+      - "backend/**"
+      - "frontend/**"
+      - "tests/install/**"
+      - ".github/workflows/install-test.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag de la release à vérifier (vX.Y.Z)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: compose.yaml de l'utilisateur
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/romkade"
+          if [ -n "$TAG" ]; then
+            # Exactement la commande de la documentation, et l'image publiée (latest), sans connexion à ghcr.io.
+            cd "$RUNNER_TEMP/romkade"
+            curl -fsSLO "https://github.com/${{ github.repository }}/releases/latest/download/compose.yaml"
+            grep -q 'image: ghcr.io/romkade/romkade-manager' compose.yaml
+          else
+            sed '/^    build: \.$/d' compose.yaml > "$RUNNER_TEMP/romkade/compose.yaml"
+            docker build -t ghcr.io/romkade/romkade-manager:ci .
+            echo "ROMKADE_VERSION=ci" >> "$GITHUB_ENV"
+          fi
+
+      - name: Parcours complet
+        run: tests/install/e2e.sh "$RUNNER_TEMP/romkade"
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Commandes PowerShell de la documentation
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir romkade; cd romkade
+          if ($env:TAG) {
+            curl.exe -fsSLO "https://github.com/${{ github.repository }}/releases/latest/download/compose.yaml"
+            if ($LASTEXITCODE) { throw "téléchargement de compose.yaml" }
+          } else {
+            Get-Content ..\compose.yaml | Where-Object { $_ -notmatch '^    build: \.$' } | Set-Content compose.yaml
+          }
+          docker compose config --quiet
+          if ($LASTEXITCODE) { throw "compose.yaml invalide" }
+          $env:ROMKADE_PORT = 8780
+          $published = docker compose config --format json | ConvertFrom-Json
+          $port = $published.services.romkade.ports[0]
+          if ($port.published -ne "8780" -or $port.host_ip -ne "127.0.0.1") { throw "ROMKADE_PORT ignoré : $($port | ConvertTo-Json -Compress)" }
+          Write-Output "OK : compose.yaml valide, port choisi par `$env:ROMKADE_PORT pris en compte"
+
+      - name: Image publiée pour Windows (Docker Desktop, linux/amd64 et linux/arm64)
+        if: inputs.tag != ''
+        run: |
+          $m = docker manifest inspect ghcr.io/romkade/romkade-manager:latest | ConvertFrom-Json
+          if ($LASTEXITCODE) { throw "image introuvable sans authentification : est-elle publique ?" }
+          $platforms = $m.manifests | ForEach-Object { "$($_.platform.os)/$($_.platform.architecture)" }
+          Write-Output "Plateformes : $($platforms -join ', ')"
+          foreach ($p in "linux/amd64", "linux/arm64") { if ($platforms -notcontains $p) { throw "plateforme manquante : $p" } }

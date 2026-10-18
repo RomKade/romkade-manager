@@ -83,3 +83,11 @@ jobs:
           EOF
           gh release create "$GITHUB_REF_NAME" out/compose.yaml --title "ROMKADE Manager $VERSION" \
             --notes-file out/notes.md --generate-notes --verify-tag
+
+  # L'installation telle que la fait un utilisateur, avec le compose.yaml de la release et l'image publiée
+  # (une release créée par GITHUB_TOKEN ne déclenche pas d'autre workflow : appel direct).
+  verify:
+    needs: release
+    uses: ./.github/workflows/install-test.yml
+    with:
+      tag: ${{ github.ref_name }}
