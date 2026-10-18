@@ -225,3 +225,14 @@ async def client(app_factory):
     app = app_factory()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture
+def no_llm_env(monkeypatch):
+    """Ni clé d'API dans l'environnement ni profil Anthropic du Mac : seules comptent celles du test."""
+    from app.services import llm
+
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "MISTRAL_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(llm, "_anthropic_profile", lambda: False)
+

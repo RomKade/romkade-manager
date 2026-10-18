@@ -49,28 +49,15 @@ async def test_parse_and_store(app_factory):
     assert rows["en"] == ("Mario's quest.", "source") and rows["fr"] == ("La quête de Mario.", "translated")
 
 
-async def test_api_key_and_start(app_factory, monkeypatch):
-    monkeypatch.setattr(d, "has_credentials", lambda creds: False)
+async def test_api_key_and_start(app_factory, monkeypatch, no_llm_env):
     monkeypatch.setattr(d, "load_state", lambda: [])
     app = app_factory()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
-        assert (await c.put("/api/settings/anthropic", json={"api_key": "pas-une-cle"})).status_code == 422
+        assert (await c.put("/api/settings/llm/key", json={"provider": "anthropic", "api_key": "pas-une-cle"})).status_code == 422
         r = await c.post("/api/descriptions/start")
-        assert r.status_code == 409 and r.json()["error"]["code"] == "anthropic_key_missing"
-        assert (await c.put("/api/settings/anthropic", json={"api_key": "sk-ant-api03-" + "x" * 40})).status_code == 204
+        assert r.status_code == 409 and r.json()["error"]["code"] == "llm_key_missing"
+        key = {"provider": "anthropic", "api_key": "sk-ant-api03-" + "x" * 40}
+        assert (await c.put("/api/settings/llm/key", json=key)).status_code == 204
         st = (await c.get("/api/descriptions")).json()
-        assert st["key_in_keychain"] and st["model"] == "claude-opus-5-5" and st["batches"] == []
-
-
-async def test_ai_settings_source(app_factory, monkeypatch):
-    """La clé IA du trousseau est signalée comme telle ; sans elle, les identifiants du Mac (variable, profil)."""
-    monkeypatch.setattr(d, "has_credentials", lambda creds: False)
-    app = app_factory()
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
-        assert (await c.get("/api/settings/anthropic")).json() == {"configured": False, "source": None}
-        assert (await c.put("/api/settings/anthropic", json={"api_key": "sk-ant-api03-" + "x" * 40})).status_code == 204
-        assert (await c.get("/api/settings/anthropic")).json() == {"configured": True, "source": "keychain"}
-        assert (await c.delete("/api/settings/anthropic")).status_code == 204
-        monkeypatch.setattr(d, "has_credentials", lambda creds: True)
-        assert (await c.get("/api/settings/anthropic")).json() == {"configured": True, "source": "environment"}
-
+        assert st["credentials"] and st["model"] == "claude-opus-5-5" and st["batch"] and st["batches"] == []
+        assert st["estimate_usd"] is not None

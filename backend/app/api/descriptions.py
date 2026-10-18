@@ -1,20 +1,15 @@
-"""Descriptions des jeux (fr, en, es) par Claude : clé d'API, lancement d'un lot, suivi et import."""
+"""Descriptions des jeux (fr, en, es) par le LLM configuré (Paramètres > IA) : lancement, suivi et import."""
 
 import asyncio
-import re
-from typing import Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app import errors
 from app.services import descriptions as d
+from app.services import llm as llm_mod
 
 router = APIRouter(prefix="/api", tags=["descriptions"])
-
-
-class AnthropicKeyIn(BaseModel):
-    api_key: str
 
 
 class BatchOut(BaseModel):
@@ -30,13 +25,17 @@ class BatchOut(BaseModel):
 
 
 class DescriptionsStatusOut(BaseModel):
-    credentials: bool  # clé du trousseau, variable d'environnement ou profil Anthropic
-    key_in_keychain: bool
-    model: str
+    credentials: bool  # LLM prêt (fournisseur, clé et modèle) : voir GET /api/settings/llm
+    problem: str | None  # llm_key_missing, llm_no_model, llm_no_url
+    provider: str
+    provider_label: str
+    model: str | None
+    batch: bool  # lot à moitié prix (Claude) ; sinon jeu par jeu
+    local: bool  # modèle local : gratuit
     games: int
     complete: int
     pending: int
-    estimate_usd: float
+    estimate_usd: float | None  # Claude seulement (coût observé) ; inconnu pour les autres fournisseurs
     batches: list[BatchOut]
 
 
@@ -46,10 +45,16 @@ def _status(request: Request) -> dict:
         cov = d.coverage(s)
     batches = []
     client = None
+    d.close_interrupted()
     for entry in reversed(d.load_state()):
         out = {"batch_id": entry["batch_id"], "created_at": entry["created_at"], "games": len(entry["games"]),
                "status": "unknown", "imported": entry.get("imported", False), "result": entry.get("result")}
-        if not out["imported"]:
+        if d.is_direct(entry):
+            c = entry.get("counts", {})
+            out.update(status="in_progress" if d.running(entry["batch_id"]) else "ended",
+                       succeeded=c.get("done", 0) - c.get("errored", 0), errored=c.get("errored", 0),
+                       processing=len(entry["games"]) - c.get("done", 0))
+        elif not out["imported"]:
             try:
                 client = client or d.make_client(st.credentials)
                 b = client.messages.batches.retrieve(entry["batch_id"])
@@ -67,10 +72,16 @@ def _status(request: Request) -> dict:
             out["status"] = "ended"
         batches.append(out)
     pending = cov["games"] - cov["complete"]
-    return {"credentials": d.has_credentials(st.credentials),
-            "key_in_keychain": bool(st.credentials.get_password(d.KEY_HOST, d.KEY_ACCOUNT)),
-            "model": d.MODEL, **cov, "pending": pending, "estimate_usd": round(pending * d.COST_PER_GAME_USD, 2),
-            "batches": batches}
+    cfg = st.llm_config.load()
+    provider = llm_mod.PROVIDERS[cfg.provider]
+    try:
+        llm = llm_mod.resolve(st)
+        ready, problem, model = True, None, llm.model
+    except errors.AppError as exc:
+        ready, problem, model = False, exc.code, cfg.model or provider.default_model
+    return {"credentials": ready, "problem": problem, "provider": provider.id, "provider_label": provider.label,
+            "model": model, "batch": provider.batch, "local": provider.kind == "local", **cov, "pending": pending,
+            "estimate_usd": round(pending * d.COST_PER_GAME_USD, 2) if provider.batch else None, "batches": batches}
 
 
 @router.get("/descriptions", response_model=DescriptionsStatusOut)
@@ -81,47 +92,25 @@ async def descriptions_status(request: Request) -> dict:
 
 @router.post("/descriptions/start", response_model=DescriptionsStatusOut)
 async def descriptions_start(request: Request) -> dict:
-    """Soumet un lot pour tous les jeux sans description complète (coût facturé sur le compte Anthropic)."""
+    """Décrit tous les jeux sans description complète : lot Anthropic (facturé sur le compte, moitié prix), ou jeu
+    par jeu en arrière-plan avec un autre fournisseur ou un modèle local."""
     st = request.app.state
-    if not d.has_credentials(st.credentials):
-        raise errors.AppError("anthropic_key_missing", "Ajoute d'abord une clé d'API Anthropic.", 409)
+    llm = llm_mod.resolve(st)  # 409 si la clé, le modèle ou l'adresse manquent
+    d.close_interrupted()
     if any(not e.get("imported") for e in d.load_state()):
-        raise errors.AppError("descriptions_running", "Un lot est déjà en cours : attends qu'il se termine.", 409)
+        raise errors.AppError("descriptions_running", "Une génération est déjà en cours : attends qu'elle se termine.", 409)
 
     def run() -> None:
-        with st.sessions() as s:
-            d.submit(s, d.make_client(st.credentials))
+        if llm.provider.batch:
+            with st.sessions() as s:
+                d.submit(s, llm.anthropic_client(), model=llm.model)
+        else:
+            d.start_direct(st.sessions, llm)
 
     try:
         await asyncio.to_thread(run)
+    except errors.AppError:
+        raise
     except Exception as exc:  # noqa: BLE001
-        raise errors.AppError("descriptions_submit_failed", f"Le lot n'a pas pu être soumis : {exc}", 502) from exc
+        raise errors.AppError("descriptions_submit_failed", f"La génération n'a pas pu démarrer : {exc}", 502) from exc
     return await asyncio.to_thread(_status, request)
-
-
-class AiSettingsOut(BaseModel):
-    """Clé d'API IA (Anthropic), partagée par tout ce qui utilise Claude : descriptions des jeux, commandes (touches)."""
-    configured: bool
-    source: Literal["keychain", "environment"] | None  # trousseau macOS, ou variable / profil du SDK sur ce Mac
-
-
-@router.get("/settings/anthropic", response_model=AiSettingsOut)
-def anthropic_settings(request: Request) -> AiSettingsOut:
-    creds = request.app.state.credentials
-    if creds.get_password(d.KEY_HOST, d.KEY_ACCOUNT):
-        return AiSettingsOut(configured=True, source="keychain")
-    env = d.has_credentials(None)
-    return AiSettingsOut(configured=env, source="environment" if env else None)
-
-
-@router.put("/settings/anthropic", status_code=204)
-def put_anthropic_key(body: AnthropicKeyIn, request: Request) -> None:
-    key = body.api_key.strip()
-    if not re.fullmatch(d.KEY_RE, key):
-        raise errors.AppError("anthropic_key_format", "Ce n'est pas une clé d'API Anthropic (elle commence par « sk-ant- »).", 422)
-    request.app.state.credentials.set_password(d.KEY_HOST, d.KEY_ACCOUNT, key)
-
-
-@router.delete("/settings/anthropic", status_code=204)
-def delete_anthropic_key(request: Request) -> None:
-    request.app.state.credentials.delete_password(d.KEY_HOST, d.KEY_ACCOUNT)

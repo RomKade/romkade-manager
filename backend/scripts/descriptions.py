@@ -5,7 +5,7 @@ Usage (depuis backend/) :
     .venv/bin/python scripts/descriptions.py lancer       # soumet le lot de tous les jeux sans description complète
     .venv/bin/python scripts/descriptions.py suivre       # état des lots ; importe ceux qui sont terminés
 
-Identifiants Anthropic : la clé enregistrée dans Paramètres > Descriptions (trousseau macOS), sinon ceux du SDK
+Identifiants Anthropic : la clé Anthropic enregistrée dans Paramètres > IA (trousseau macOS), sinon ceux du SDK
 (ANTHROPIC_API_KEY, ou le profil de ~/.config/anthropic). Le coût est facturé sur le compte Anthropic correspondant.
 """
 

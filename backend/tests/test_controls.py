@@ -30,11 +30,12 @@ def test_mapping_and_params():
 async def test_generate_store_and_edit(app_factory, monkeypatch):
     from tests.test_catalog import sync
 
-    monkeypatch.setattr(d, "has_credentials", lambda creds: True)
-    monkeypatch.setattr(d, "make_client", lambda creds: object())
+    from app.services import llm
+
+    monkeypatch.setattr(llm, "resolve", lambda state: llm.LLM(llm.PROVIDERS["anthropic"], "claude-opus-5-5", "x", "k"))
     seen = {}
 
-    def fake_generate(client, f):
+    def fake_generate(model, f):
         seen["params"] = ctl.params_for(f)
         return ctl.parse(Msg(json.dumps(ANSWER)))
 
@@ -62,13 +63,12 @@ async def test_generate_store_and_edit(app_factory, monkeypatch):
         assert (await c.get(f"/api/games/{game['id']}/controls")).json()["controls"][0]["button"] == "y"
 
 
-async def test_generate_needs_key(app_factory, monkeypatch):
+async def test_generate_needs_key(app_factory, no_llm_env):
     from tests.test_catalog import sync
 
-    monkeypatch.setattr(d, "has_credentials", lambda creds: False)
     app = app_factory()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         await sync(c)
         game = (await c.get("/api/games")).json()["items"][0]
         r = await c.post(f"/api/games/{game['id']}/controls")
-        assert r.status_code == 409 and r.json()["error"]["code"] == "anthropic_key_missing"
+        assert r.status_code == 409 and r.json()["error"]["code"] == "llm_key_missing"

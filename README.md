@@ -337,12 +337,25 @@ les éditions d'un même jeu). Jeu mal connu du modèle : commandes habituelles 
 « Corriger » / « Saisir à la main » remplace la liste par la sienne (même texte dans les trois langues). Même clé
 d'API IA que les descriptions (Paramètres > IA).
 
-## Clé d'API IA
+## Connexion à une IA (LLM)
 
-Paramètres > IA, comme la clé YouTube de Paramètres > Vidéos : une seule clé Anthropic (`sk-ant-…`), gardée dans
-le trousseau macOS, pour tout ce qui utilise Claude : descriptions des jeux et commandes (touches). Sans clé dans
-le trousseau, les identifiants du SDK sur le Mac (variable `ANTHROPIC_API_KEY` ou profil) servent s'ils existent.
-`GET /api/settings/anthropic` indique si une clé est disponible et d'où elle vient (`keychain`, `environment`).
+Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions des jeux, commandes des jeux).
+`backend/app/services/llm.py` :
+
+| Fournisseur | Clé | Remarques |
+|---|---|---|
+| Claude (Anthropic) | `sk-ant-…` | Claude Opus 5.5 par défaut ; descriptions en lot (moitié prix) |
+| ChatGPT (OpenAI), Mistral, Gemini | clé du fournisseur | protocole OpenAI (chat completions) |
+| Autre service compatible OpenAI | facultative | adresse au choix (`…/v1`) |
+| Modèle local (Ollama, LM Studio) | aucune | poids ouverts sur le Mac, gratuit et hors ligne ; `ollama pull qwen2.5:7b` |
+
+- Clés dans le trousseau macOS, une par fournisseur (la clé Anthropic garde son ancienne entrée) ; à défaut la
+  variable d'environnement du fournisseur (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
+- Fournisseur, modèle et adresse dans `llm.json` (dossier de données). Le modèle n'est jamais deviné : la liste
+  vient du fournisseur (`GET /api/settings/llm/models`) ; « Tester » fait une petite demande réelle.
+- Réponses en JSON : sorties structurées (`json_schema`), sinon JSON simple avec le schéma dans la consigne
+  (modèles locaux qui ne les gèrent pas).
+- Descriptions sans Claude : jeu par jeu en arrière-plan (arrêt après 5 échecs d'affilée, reprise possible).
 
 ## Favoris
 

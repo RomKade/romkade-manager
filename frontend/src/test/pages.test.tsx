@@ -35,6 +35,7 @@ let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
+let llm: { provider: string; model: string | null; base_url: string | null } = { provider: "anthropic", model: "claude-opus-5-5", base_url: null };
 let systemCaps: Record<string, boolean> | null = null; // null : système inconnu (tout reste affiché)
 let volume = { percent: 60, muted: false };
 let playAlerts: { id: number; created_at: string; minutes: number; scope: string; game_title: string }[] = [];
@@ -56,8 +57,23 @@ function mockFetch() {
       return json(deviceOnline ? { connected: true, error: null } : { connected: false, error: { code: "device_unreachable", message: "Console injoignable sur 192.168.86.242:22" } });
     if (url === "/api/device/host-key/trust") { hostKeyTrusted = true; return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: true }); }
     if (url === "/api/device/host-key") return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: false });
-    if (url.startsWith("/api/settings/anthropic")) return init?.method && init.method !== "GET" ? new Response(null, { status: 204 }) : json({ configured: true, source: "keychain" });
-    if (url.startsWith("/api/settings")) return json({ host: "192.168.86.242", port: 22, username: "root", auth_method: "password", key_path: null, roms_root: "/mnt/mmc/Roms", connect_timeout: 8, has_password: true, host_key_trusted: hostKeyTrusted });
+    if (url.startsWith("/api/settings/llm/models")) return json(["llama3.2:3b", "qwen2.5:7b"]);
+    if (url === "/api/settings/llm/test") return json({ ok: true, provider: "local", model: "qwen2.5:7b", seconds: 2.4 });
+    if (url.startsWith("/api/settings/llm/key")) return new Response(null, { status: 204 });
+    if (url === "/api/settings/llm") {
+      if (init?.body) llm = { ...llm, ...(JSON.parse(String(init.body)) as object) };
+      const local = llm.provider === "local";
+      return json({ ...llm, ready: local ? !!llm.model : true, problem: local && !llm.model ? "llm_no_model" : null,
+        local_presets: { Ollama: "http://localhost:11434/v1", "LM Studio": "http://localhost:1234/v1" },
+        providers: [
+          { id: "anthropic", label: "Claude (Anthropic)", kind: "cloud", key: "required", keys_url: "https://console.anthropic.com/settings/keys",
+            base_url: "https://api.anthropic.com/v1", default_model: "claude-opus-5-5", batch: true, key_source: "keychain" },
+          { id: "openai", label: "ChatGPT (OpenAI)", kind: "cloud", key: "required", keys_url: null, base_url: "https://api.openai.com/v1",
+            default_model: null, batch: false, key_source: null },
+          { id: "local", label: "Modèle local", kind: "local", key: "none", keys_url: null, base_url: "http://localhost:11434/v1",
+            default_model: null, batch: false, key_source: null },
+        ] });
+    }    if (url.startsWith("/api/settings")) return json({ host: "192.168.86.242", port: 22, username: "root", auth_method: "password", key_path: null, roms_root: "/mnt/mmc/Roms", connect_timeout: 8, has_password: true, host_key_trusted: hostKeyTrusted });
     if (url.startsWith("/api/platforms")) return json([{ ...platform, label_status: "confirmed", kind: "emulated", present: true, image_dir_present: true, last_scanned_at: null, game_count: 2, file_count: 2, total_bytes: 1048576, image_count: 0, images_matched: 0 }]);
     if (url.startsWith("/api/catalog/facets")) return json({
       extensions: [{ value: "smc", count: 2 }], regions: [{ value: "USA", count: 2 }],
@@ -195,6 +211,7 @@ beforeEach(() => {
   playingId = null;
   favoriteIds = [];
   hostKeyTrusted = true;
+  llm = { provider: "anthropic", model: "claude-opus-5-5", base_url: null };
   volume = { percent: 60, muted: false };
   playAlerts = [];
   vi.stubGlobal("fetch", mockFetch());
@@ -419,7 +436,7 @@ describe("Commandes du jeu", () => {
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
     const section = (await within(dialog).findByRole("heading", { name: "Commandes" })).closest("section")!;
-    await userEvent.click(within(section).getByRole("button", { name: /Demander à Claude/ }));
+    await userEvent.click(within(section).getByRole("button", { name: /Demander à l'IA/ }));
     expect(await within(section).findByText("Coup de poing")).toBeInTheDocument();
     expect(within(section).getByText("Haut + B : uppercut.")).toBeInTheDocument();
     expect(within(section).getByText(/à vérifier en jeu/)).toBeInTheDocument();
@@ -541,16 +558,32 @@ describe("Paramètres", () => {
   });
 });
 
-describe("Clé d'API IA", () => {
-  it("a son onglet, liste ses usages et enregistre la clé dans le trousseau", async () => {
+describe("Connexion à une IA", () => {
+  it("passe de Claude à un modèle local : liste des modèles, enregistrement, test", async () => {
     renderAt("/parametres/ia");
-    const form = (await screen.findByRole("heading", { name: "Clé d'API IA (Anthropic)" })).closest("form")!;
-    expect(await within(form).findByText("Une clé est enregistrée dans le trousseau.")).toBeInTheDocument();
-    expect(within(form).getByRole("link", { name: /Descriptions des jeux/ })).toHaveAttribute("href", "/parametres/descriptions");
-    expect(within(form).getByText(/Commandes des jeux/)).toBeInTheDocument();
-    await userEvent.type(within(form).getByLabelText("Remplacer la clé"), "sk-ant-api03-test");
+    expect(await screen.findByText(/Prête : Claude \(Anthropic\) · claude-opus-5-5/)).toBeInTheDocument();
+    const form = screen.getByRole("heading", { name: /Choisir l'IA/ }).closest("form")!;
+    expect(within(form).getByText("Une clé est enregistrée dans le trousseau macOS.")).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole("radio", { name: /Ollama, LM Studio/ }));
+    expect(within(form).queryByLabelText(/Clé d'API/)).not.toBeInTheDocument();
+    await userEvent.click(within(form).getByRole("button", { name: "LM Studio" }));
+    await userEvent.click(await within(form).findByRole("option", { name: "qwen2.5:7b" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "local", model: "qwen2.5:7b",
+      base_url: "http://localhost:1234/v1" }));
+    expect(await screen.findByText(/Prête : Ollama, LM Studio… · qwen2.5:7b/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Tester/ }));
+    expect(await screen.findByText(/qwen2.5:7b répond/)).toBeInTheDocument();
+  });
+
+  it("demande une clé pour un service en ligne et l'enregistre dans le trousseau", async () => {
+    renderAt("/parametres/ia");
+    const form = (await screen.findByRole("heading", { name: /Choisir l'IA/ })).closest("form")!;
+    await userEvent.click(within(form).getByRole("radio", { name: /ChatGPT/ }));
+    expect(within(form).getByText(/Enregistre d'abord la clé/)).toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText("Clé d'API ChatGPT (OpenAI)"), "sk-proj-test");
     await userEvent.click(within(form).getByRole("button", { name: /trousseau/ }));
-    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/anthropic", api_key: "sk-ant-api03-test" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm/key", provider: "openai", api_key: "sk-proj-test" }));
   });
 });
 

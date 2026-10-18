@@ -1,4 +1,5 @@
-"""Commandes d'un jeu (quelle touche fait quoi) : lecture, rédaction par Claude à la demande, correction à la main."""
+"""Commandes d'un jeu (quelle touche fait quoi) : lecture, rédaction par le LLM configuré à la demande, correction
+à la main."""
 
 import asyncio
 from datetime import datetime
@@ -11,6 +12,7 @@ from app import errors
 from app.services import catalog_query as cq
 from app.services import controls as ctl
 from app.services import descriptions as d
+from app.services import llm as llm_mod
 
 router = APIRouter(prefix="/api", tags=["controls"])
 
@@ -31,7 +33,7 @@ class GameControlsOut(BaseModel):
     controls: list[ControlOut]
     notes: dict[str, str] | None
     updated_at: datetime | None
-    can_generate: bool  # identifiants Anthropic disponibles
+    can_generate: bool  # LLM prêt (Paramètres > IA)
 
 
 class ControlIn(BaseModel):
@@ -45,8 +47,16 @@ class GameControlsIn(BaseModel):
     notes: str = Field("", max_length=600)
 
 
+def _ready(request: Request) -> bool:
+    try:
+        llm_mod.resolve(request.app.state)
+        return True
+    except errors.AppError:
+        return False
+
+
 def _out(request: Request, row) -> dict:
-    return {**ctl.to_out(row), "can_generate": d.has_credentials(request.app.state.credentials)}
+    return {**ctl.to_out(row), "can_generate": _ready(request)}
 
 
 @router.get("/games/{game_id}/controls", response_model=GameControlsOut)
@@ -60,22 +70,23 @@ async def game_controls(game_id: int, request: Request) -> dict:
 
 @router.post("/games/{game_id}/controls", response_model=GameControlsOut)
 async def generate_controls(game_id: int, request: Request) -> dict:
-    """Fait rédiger les commandes par Claude (un appel, facturé sur le compte Anthropic) et les garde."""
+    """Fait rédiger les commandes par le LLM configuré (un appel ; facturé chez le fournisseur, gratuit en local)."""
     st = request.app.state
-    if not d.has_credentials(st.credentials):
-        raise errors.AppError("anthropic_key_missing", "Ajoute d'abord une clé d'API Anthropic (Paramètres).", 409)
+    llm = llm_mod.resolve(st)  # 409 si la clé, le modèle ou l'adresse manquent
 
     def run():
         with st.sessions() as s:
             f = cq.get_file(s, game_id)
             try:
-                data = ctl.generate(d.make_client(st.credentials), f)
+                data = ctl.generate(llm, f)
+            except errors.AppError:
+                raise
             except Exception as exc:  # noqa: BLE001 — réseau, identifiants, quota
-                raise errors.AppError("controls_failed", f"Claude n'a pas pu répondre : {exc}", 502) from exc
+                raise errors.AppError("controls_failed", f"{llm.provider.label} n'a pas pu répondre : {exc}", 502) from exc
         if data is None:
-            raise errors.AppError("controls_unreadable", "Claude n'a pas donné de commandes utilisables pour ce jeu.", 502)
+            raise errors.AppError("controls_unreadable", f"{llm.label} n'a pas donné de commandes utilisables pour ce jeu.", 502)
         with st.sessions.begin() as s:
-            row = ctl.store_generated(s, cq.get_file(s, game_id), data)
+            row = ctl.store_generated(s, cq.get_file(s, game_id), data, llm.model)
             s.flush()
             return _out(request, row)
 

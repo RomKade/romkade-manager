@@ -1172,28 +1172,11 @@ export interface paths {
         put?: never;
         /**
          * Descriptions Start
-         * @description Soumet un lot pour tous les jeux sans description complète (coût facturé sur le compte Anthropic).
+         * @description Décrit tous les jeux sans description complète : lot Anthropic (facturé sur le compte, moitié prix), ou jeu
+         *     par jeu en arrière-plan avec un autre fournisseur ou un modèle local.
          */
         post: operations["descriptions_start_api_descriptions_start_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/anthropic": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Put Anthropic Key */
-        put: operations["put_anthropic_key_api_settings_anthropic_put"];
-        post?: never;
-        /** Delete Anthropic Key */
-        delete: operations["delete_anthropic_key_api_settings_anthropic_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1212,9 +1195,101 @@ export interface paths {
         put: operations["edit_controls_api_games__game_id__controls_put"];
         /**
          * Generate Controls
-         * @description Fait rédiger les commandes par Claude (un appel, facturé sur le compte Anthropic) et les garde.
+         * @description Fait rédiger les commandes par le LLM configuré (un appel ; facturé chez le fournisseur, gratuit en local).
          */
         post: operations["generate_controls_api_games__game_id__controls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Llm Settings */
+        get: operations["llm_settings_api_settings_llm_get"];
+        /** Put Llm Settings */
+        put: operations["put_llm_settings_api_settings_llm_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Llm Key */
+        put: operations["put_llm_key_api_settings_llm_key_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm/key/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Llm Key */
+        delete: operations["delete_llm_key_api_settings_llm_key__provider__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Llm Models
+         * @description Modèles proposés par le fournisseur (avec la clé enregistrée), pour choisir sans rien deviner.
+         */
+        get: operations["llm_models_api_settings_llm_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Llm Test
+         * @description Petite demande réelle au modèle configuré (quelques jetons).
+         */
+        post: operations["llm_test_api_settings_llm_test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1488,11 +1563,6 @@ export interface components {
             scope: string;
             /** Game Title */
             game_title: string;
-        };
-        /** AnthropicKeyIn */
-        AnthropicKeyIn: {
-            /** Api Key */
-            api_key: string;
         };
         /** AudioIn */
         AudioIn: {
@@ -1838,10 +1908,18 @@ export interface components {
         DescriptionsStatusOut: {
             /** Credentials */
             credentials: boolean;
-            /** Key In Keychain */
-            key_in_keychain: boolean;
+            /** Problem */
+            problem: string | null;
+            /** Provider */
+            provider: string;
+            /** Provider Label */
+            provider_label: string;
             /** Model */
-            model: string;
+            model: string | null;
+            /** Batch */
+            batch: boolean;
+            /** Local */
+            local: boolean;
             /** Games */
             games: number;
             /** Complete */
@@ -1849,7 +1927,7 @@ export interface components {
             /** Pending */
             pending: number;
             /** Estimate Usd */
-            estimate_usd: number;
+            estimate_usd: number | null;
             /** Batches */
             batches: components["schemas"]["BatchOut"][];
         };
@@ -2276,6 +2354,52 @@ export interface components {
             /** Slot */
             slot?: string | null;
         };
+        /** LlmKeyIn */
+        LlmKeyIn: {
+            /** Provider */
+            provider: string;
+            /** Api Key */
+            api_key: string;
+        };
+        /** LlmSettingsIn */
+        LlmSettingsIn: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+        };
+        /** LlmSettingsOut */
+        LlmSettingsOut: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string | null;
+            /** Base Url */
+            base_url: string | null;
+            /** Ready */
+            ready: boolean;
+            /** Problem */
+            problem: string | null;
+            /** Local Presets */
+            local_presets: {
+                [key: string]: string;
+            };
+            /** Providers */
+            providers: components["schemas"]["ProviderOut"][];
+        };
+        /** LlmTestOut */
+        LlmTestOut: {
+            /** Ok */
+            ok: boolean;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Seconds */
+            seconds: number;
+        };
         /** NowPlayingOut */
         NowPlayingOut: {
             /** Playing */
@@ -2526,6 +2650,27 @@ export interface components {
             applied: boolean;
             /** Game Running */
             game_running: boolean;
+        };
+        /** ProviderOut */
+        ProviderOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Key */
+            key: string;
+            /** Keys Url */
+            keys_url: string | null;
+            /** Base Url */
+            base_url: string | null;
+            /** Default Model */
+            default_model: string | null;
+            /** Batch */
+            batch: boolean;
+            /** Key Source */
+            key_source: string | null;
         };
         /** RecentGameOut */
         RecentGameOut: {
@@ -4979,55 +5124,6 @@ export interface operations {
             };
         };
     };
-    put_anthropic_key_api_settings_anthropic_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AnthropicKeyIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_anthropic_key_api_settings_anthropic_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     game_controls_api_games__game_id__controls_get: {
         parameters: {
             query?: never;
@@ -5121,6 +5217,171 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    llm_settings_api_settings_llm_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsOut"];
+                };
+            };
+        };
+    };
+    put_llm_settings_api_settings_llm_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_llm_key_api_settings_llm_key_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_key_api_settings_llm_key__provider__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    llm_models_api_settings_llm_models_get: {
+        parameters: {
+            query: {
+                provider: string;
+                base_url?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    llm_test_api_settings_llm_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmTestOut"];
                 };
             };
         };

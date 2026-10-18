@@ -1,4 +1,5 @@
-"""Commandes d'un jeu sur la console : quelle touche de la console Anbernic fait quoi, rédigées par Claude.
+"""Commandes d'un jeu sur la console : quelle touche de la console fait quoi, rédigées par le LLM configuré
+(Paramètres > IA : Claude, ChatGPT, Mistral, Gemini ou un modèle local ; app/services/llm.py).
 
 À la demande, depuis la fiche du jeu (un appel par jeu, pas de lot), puis gardées en base (table game_controls) :
 toutes les éditions d'un même jeu (plateforme + titre normalisé) les partagent. Corrigeables à la main.
@@ -8,10 +9,8 @@ console, en français, anglais et espagnol. S'il ne connaît pas bien le jeu, il
 habituelles de la console pour ce genre de jeu (« cautious »), affiché comme tel.
 """
 
-import json
 from datetime import datetime
 
-import anthropic
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,6 +19,7 @@ from app.platforms import canonical
 from app.services.classify import display_title
 from app.services.descriptions import LANGS
 from app.services.genres import ARCADE_DIRS, GENRES
+from app.services.llm import LLM, parse_anthropic
 
 MODEL = "claude-opus-5-5"
 EFFORT = "medium"  # la correspondance manette d'origine -> touches de la console demande un peu de réflexion
@@ -97,33 +97,38 @@ def mapping_for(directory: str) -> str:
     return MAPPINGS.get(code, "Use the RetroArch default core mapping for this platform.")
 
 
-def params_for(f: RemoteFile) -> dict:
+def prompt_for(f: RemoteFile) -> str:
     facts = [f"{label}: {value}" for label, value in (
         ("Release year", f.release_year), ("Genre (French label)", GENRES.get(f.genre or "")),
         ("Publisher", f.publisher), ("Developer", f.developer), ("Summary", f.description)) if value]
-    prompt = PROMPT.format(title=display_title(f.full_title) if f.full_title else f.title,
-                           platform=f.platform.label or f.platform.directory, facts="\n".join(facts),
-                           mapping=mapping_for(f.platform.directory))
-    return {"model": MODEL, "max_tokens": MAX_TOKENS, "system": SYSTEM,
+    return PROMPT.format(title=display_title(f.full_title) if f.full_title else f.title,
+                         platform=f.platform.label or f.platform.directory, facts="\n".join(facts),
+                         mapping=mapping_for(f.platform.directory))
+
+
+def params_for(f: RemoteFile, model: str = MODEL) -> dict:
+    """Paramètres de la demande au format Anthropic (aussi ce que reçoivent les autres fournisseurs)."""
+    return {"model": model, "max_tokens": MAX_TOKENS, "system": SYSTEM,
             "output_config": {"effort": EFFORT, "format": {"type": "json_schema", "schema": SCHEMA}},
-            "messages": [{"role": "user", "content": prompt}]}
+            "messages": [{"role": "user", "content": prompt_for(f)}]}
 
 
-def parse(message) -> dict | None:
-    """Champs JSON de la réponse, ou None (refus, réponse tronquée ou illisible)."""
-    if message.stop_reason in ("refusal", "max_tokens"):
+def clean(data: dict | None) -> dict | None:
+    """Garde les touches connues ; None si aucune commande utilisable."""
+    if not data:
         return None
-    text = next((b.text for b in message.content if b.type == "text"), "")
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    controls = [c for c in data.get("controls", []) if c.get("button") in BUTTONS]
+    controls = [c for c in data.get("controls", []) if isinstance(c, dict) and c.get("button") in BUTTONS
+                and all(isinstance(c.get(lang), str) for lang in LANGS)]
     return {**data, "controls": controls} if controls else None
 
 
-def generate(client: anthropic.Anthropic, f: RemoteFile) -> dict | None:
-    return parse(client.messages.create(**params_for(f)))
+def parse(message) -> dict | None:
+    """Champs JSON d'un message Anthropic, ou None (refus, réponse tronquée ou illisible)."""
+    return clean(parse_anthropic(message))
+
+
+def generate(llm: LLM, f: RemoteFile) -> dict | None:
+    return clean(llm.complete_json(SYSTEM, prompt_for(f), SCHEMA, max_tokens=MAX_TOKENS, effort=EFFORT, name="controls"))
 
 
 def cached(s: Session, f: RemoteFile) -> GameControls | None:
@@ -146,8 +151,9 @@ def store(s: Session, f: RemoteFile, controls: list[dict], notes: dict | None, o
     return row
 
 
-def store_generated(s: Session, f: RemoteFile, data: dict) -> GameControls:
-    return store(s, f, data["controls"], data.get("notes"), "written" if data.get("known") else "cautious", MODEL)
+def store_generated(s: Session, f: RemoteFile, data: dict, model: str = MODEL) -> GameControls:
+    notes = data.get("notes") if isinstance(data.get("notes"), dict) else None
+    return store(s, f, data["controls"], notes, "written" if data.get("known") else "cautious", model[:40])
 
 
 def to_out(row: GameControls | None) -> dict:

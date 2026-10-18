@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import bluetooth, catalog, controls, descriptions, play, players, playtime, saves, system, transfers, videos, volume
+from app.api import bluetooth, catalog, controls, descriptions, llm, play, players, playtime, saves, system, transfers, videos, volume
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
 from app.credentials import CredentialStore, KeyringStore
@@ -21,6 +21,7 @@ from app.errors import AppError
 from app.security import LocalOnlyMiddleware
 from app.services.catalog_sync import SyncManager
 from app.services.gameinfo import apply_all as apply_gameinfo
+from app.services.llm import LlmConfigStore
 from app.services.genres import apply_all as apply_genres
 from app.services.boxart import BoxartStore
 from app.services.images import ImageCache
@@ -87,6 +88,8 @@ def create_app(
                                      lambda: DeviceClient(st.settings_store.load(), st.credentials, st.host_keys))
     app.state.search = SearchService(st.sessions, cache_dir.parent if cache_dir else base)
     app.state.play_settings = PlaySettingsStore((cache_dir.parent if cache_dir else base) / "play_settings.json")
+    app.state.llm_config = LlmConfigStore((cache_dir.parent if cache_dir else base) / "llm.json")
+    app.state.llm_transport = None  # les tests y branchent un faux fournisseur (httpx.MockTransport)
     app.state.tracker = PlayTracker(
         st.sessions, st.play_settings, lambda: st.settings_store.load().roms_root, lambda: st.device_runner,
         lambda: DeviceClient(st.settings_store.load(), st.credentials, st.host_keys),
@@ -131,6 +134,7 @@ def create_app(
     app.include_router(volume.router)
     app.include_router(descriptions.router)
     app.include_router(controls.router)
+    app.include_router(llm.router)
     app.include_router(playtime.router)
     app.include_router(system.router)
     _mount_frontend(app, frontend_dist)

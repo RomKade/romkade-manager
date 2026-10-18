@@ -1223,3 +1223,16 @@ kbd {
 .auth-choice__panel { padding: 14px; border-radius: var(--r-control); background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line);
   display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
 @media (max-width: 760px) { .steps ol { grid-template-columns: 1fr; } }
+
+/* ---------- Connexion à une IA (Paramètres > IA) ---------- */
+.llm { display: flex; flex-direction: column; gap: 12px; }
+.llm__group { margin: 0; padding: 0; border: none; display: flex; flex-direction: column; gap: 6px; }
+.llm__group legend { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; margin-bottom: 2px; }
+.llm__group > p { font-size: var(--fs-sm); margin: 0 0 4px; }
+.llm__panel { max-width: 720px; gap: 14px; }
+.llm__inline { display: flex; gap: 8px; align-items: center; }
+.llm__inline input { flex: 1; min-width: 0; }
+.llm__models, .llm__presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; max-height: 160px; overflow: auto; }
+.llm__key { display: flex; flex-direction: column; gap: 6px; }
+.llm__help { font-size: var(--fs-sm); color: var(--ink-2); }
+.llm__help ol { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }

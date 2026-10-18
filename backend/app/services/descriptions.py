@@ -1,4 +1,6 @@
-"""Descriptions des jeux en français, anglais et espagnol, rédigées ou traduites par Claude.
+"""Descriptions des jeux en français, anglais et espagnol, rédigées ou traduites par le LLM configuré
+(Paramètres > IA, app/services/llm.py). Avec Claude : par lot (moitié prix) ; avec un autre fournisseur ou un modèle
+local : jeu par jeu, en arrière-plan.
 
 Un jeu = plateforme + titre normalisé (toutes ses éditions partagent la description, table game_text).
 - Jeu avec un résumé OpenVGDB (anglais, gameinfo.py) : le résumé est gardé tel quel en anglais (« source »), Claude
@@ -13,6 +15,8 @@ reste sans description, à relancer.
 
 import hashlib
 import json
+import logging
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -27,14 +31,17 @@ from app.db.models import GameText, Platform, RemoteFile
 from app.services.catalog_query import GAME_KINDS_EXCLUDED
 from app.services.classify import display_title
 from app.services.genres import GENRES
+from app.services.llm import LLM, parse_anthropic
 from app.services.subgenres import LABELS as SUB_LABELS
+
+log = logging.getLogger(__name__)
 
 MODEL = "claude-opus-5-5"
 EFFORT = "low"  # descriptions courtes et traductions : peu de réflexion utile, coût réduit
 MAX_TOKENS = 4000
 LANGS = ("fr", "en", "es")
 STATE_FILE = "descriptions_batches.json"
-# Clé d'API Anthropic dans le trousseau macOS (Paramètres > Descriptions), comme la clé YouTube.
+# Clé d'API Anthropic : Paramètres > IA (trousseau macOS), voir app/services/llm.py.
 KEY_HOST, KEY_ACCOUNT = "api.anthropic.com", "game-descriptions"
 KEY_RE = r"sk-ant-[A-Za-z0-9_\-]{20,}"
 # Coût moyen observé par jeu en lot (Opus 5.5, effort bas, moitié prix) : pour l'estimation affichée.
@@ -148,8 +155,8 @@ def pending_games(s: Session, limit: int | None = None) -> list[dict]:
     return list(games.values())
 
 
-def params_for(game: dict) -> tuple[str, MessageCreateParamsNonStreaming]:
-    """(mode, paramètres de la demande) : « translate » s'il y a un résumé anglais, sinon « write »."""
+def request_for(game: dict) -> tuple[str, str, dict]:
+    """(mode, consigne, schéma) : « translate » s'il y a un résumé anglais, sinon « write »."""
     if game["summary"]:
         mode = "translate"
         prompt = TRANSLATE.format(title=game["title"], platform=game["platform"], summary=game["summary"])
@@ -163,37 +170,37 @@ def params_for(game: dict) -> tuple[str, MessageCreateParamsNonStreaming]:
                   if game[k]]
         prompt = WRITE.format(facts="\n".join(facts))
         schema = WRITE_SCHEMA
+    return mode, prompt, schema
+
+
+def params_for(game: dict, model: str = MODEL) -> tuple[str, MessageCreateParamsNonStreaming]:
+    """(mode, paramètres de la demande au format Anthropic, pour les lots)."""
+    mode, prompt, schema = request_for(game)
     return mode, MessageCreateParamsNonStreaming(
-        model=MODEL, max_tokens=MAX_TOKENS, system=SYSTEM,
+        model=model, max_tokens=MAX_TOKENS, system=SYSTEM,
         output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": schema}},
         messages=[{"role": "user", "content": prompt}],
     )
 
 
 def parse(message) -> dict | None:
-    """Champs JSON de la réponse, ou None (refus, réponse tronquée ou illisible)."""
-    if message.stop_reason in ("refusal", "max_tokens"):
-        return None
-    text = next((b.text for b in message.content if b.type == "text"), "")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
+    """Champs JSON d'un message Anthropic, ou None (refus, réponse tronquée ou illisible)."""
+    return parse_anthropic(message)
 
 
-def store(s: Session, game: dict, mode: str, data: dict) -> int:
+def store(s: Session, game: dict, mode: str, data: dict, model: str = MODEL) -> int:
     """Enregistre les langues manquantes d'un jeu. Renvoie le nombre de textes écrits."""
     have = set(s.scalars(select(GameText.lang).where(GameText.platform_id == game["platform_id"],
                                                      GameText.normalized_title == game["normalized_title"])))
     if mode == "translate":
-        texts = {"en": (game["summary"], "source", None), "fr": (data["fr"], "translated", MODEL),
-                 "es": (data["es"], "translated", MODEL)}
+        texts = {"en": (game["summary"], "source", None), "fr": (data.get("fr"), "translated", model[:40]),
+                 "es": (data.get("es"), "translated", model[:40])}
     else:
         origin = "written" if data.get("known") else "cautious"
-        texts = {lang: (data[lang], origin, MODEL) for lang in LANGS}
+        texts = {lang: (data.get(lang), origin, model[:40]) for lang in LANGS}
     written = 0
     for lang, (text, origin, model) in texts.items():
-        if lang in have or not (text or "").strip():
+        if lang in have or not isinstance(text, str) or not text.strip():
             continue
         s.add(GameText(platform_id=game["platform_id"], normalized_title=game["normalized_title"], lang=lang,
                        text=text.strip(), origin=origin, model=model))
@@ -220,21 +227,21 @@ def _save_state(state: list[dict]) -> None:
     path.chmod(0o600)
 
 
-def submit(s: Session, client: anthropic.Anthropic, limit: int | None = None) -> dict:
-    """Soumet un lot pour les jeux sans description complète. Renvoie {batch_id, games}."""
+def submit(s: Session, client: anthropic.Anthropic, limit: int | None = None, model: str = MODEL) -> dict:
+    """Soumet un lot Anthropic pour les jeux sans description complète. Renvoie {batch_id, games}."""
     games = pending_games(s, limit)
     if not games:
         return {"batch_id": None, "games": 0}
     requests, index = [], {}
     for game in games:
-        mode, params = params_for(game)
+        mode, params = params_for(game, model)
         cid = custom_id(game["platform_id"], game["normalized_title"])
         requests.append(Request(custom_id=cid, params=params))
         index[cid] = {**game, "mode": mode}
     batch = client.messages.batches.create(requests=requests)
     state = load_state()
     state.append({"batch_id": batch.id, "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                  "games": index, "imported": False})
+                  "provider": "anthropic", "model": model, "games": index, "imported": False})
     _save_state(state)
     return {"batch_id": batch.id, "games": len(games)}
 
@@ -258,10 +265,100 @@ def import_results(s: Session, client: anthropic.Anthropic, batch_id: str) -> di
         if data is None:
             counts["refused" if message.stop_reason == "refusal" else "unreadable"] += 1
             continue
-        written = store(s, game, game["mode"], data)
+        written = store(s, game, game["mode"], data, entry.get("model", MODEL))
         counts["texts"] += written
         counts["games"] += written > 0
     entry["imported"] = True
     entry["result"] = counts
     _save_state(state)
     return counts
+
+
+# ---------- sans lot (autres fournisseurs, modèle local) ----------
+
+MAX_FAILURES = 5
+_RUNNING: set[str] = set()
+_LOCK = threading.Lock()
+
+
+def is_direct(entry: dict) -> bool:
+    return entry["batch_id"].startswith("direct-")
+
+
+def running(batch_id: str) -> bool:
+    return batch_id in _RUNNING
+
+
+def close_interrupted() -> None:
+    """Une génération sans lot coupée (application arrêtée) est close avec ce qu'elle a déjà écrit."""
+    with _LOCK:
+        state = load_state()
+        changed = False
+        for e in state:
+            if is_direct(e) and not e.get("imported") and e["batch_id"] not in _RUNNING:
+                e["imported"], e["result"] = True, {**e.get("counts", {}), "interrupted": True}
+                changed = True
+        if changed:
+            _save_state(state)
+
+
+def _update(batch_id: str, **fields) -> None:
+    with _LOCK:
+        state = load_state()
+        entry = next((e for e in state if e["batch_id"] == batch_id), None)
+        if entry is not None:
+            entry.update(fields)
+            _save_state(state)
+
+
+def start_direct(sessions, llm: LLM, limit: int | None = None) -> dict:
+    """Décrit les jeux un par un avec `llm`, dans un fil à part. Renvoie {batch_id, games}."""
+    with sessions() as s:
+        games = pending_games(s, limit)
+    if not games:
+        return {"batch_id": None, "games": 0}
+    batch_id = f"direct-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+    index = {custom_id(g["platform_id"], g["normalized_title"]): g for g in games}
+    counts = {"texts": 0, "games": 0, "refused": 0, "errored": 0, "unreadable": 0, "done": 0}
+    with _LOCK:
+        state = load_state()
+        state.append({"batch_id": batch_id, "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                      "provider": llm.provider.id, "model": llm.model, "games": index, "imported": False,
+                      "counts": counts})
+        _save_state(state)
+        _RUNNING.add(batch_id)
+
+    def work() -> None:
+        failures = 0
+        try:
+            for game in games:
+                mode, prompt, schema = request_for(game)
+                try:
+                    data = llm.complete_json(SYSTEM, prompt, schema, max_tokens=MAX_TOKENS, effort=EFFORT,
+                                             name="description")
+                    failures = 0
+                except Exception as exc:  # noqa: BLE001 — réseau, quota, modèle arrêté : on passe au jeu suivant
+                    log.warning("description de %s impossible", game["title"], exc_info=True)
+                    counts["errored"] += 1
+                    failures += 1
+                    data = None
+                    if failures >= MAX_FAILURES:  # le modèle ne répond plus : inutile d'insister sur tous les jeux
+                        counts["stopped"] = str(getattr(exc, "message", exc))[:300]
+                        break
+                else:
+                    if data is None:
+                        counts["unreadable"] += 1
+                if data is not None:
+                    with sessions.begin() as s:
+                        written = store(s, game, mode, data, llm.model)
+                    counts["texts"] += written
+                    counts["games"] += written > 0
+                counts["done"] += 1
+                _update(batch_id, counts=dict(counts))
+        finally:
+            _RUNNING.discard(batch_id)
+            _update(batch_id, imported=True, result=dict(counts), counts=dict(counts))
+
+    threading.Thread(target=work, name=f"descriptions-{batch_id}", daemon=True).start()
+    return {"batch_id": batch_id, "games": len(games)}
+

@@ -5,9 +5,10 @@ import { Link, NavLink, useParams } from "react-router-dom";
 
 import { api, ApiError, type Capabilities, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
 import {
-  useAiSettings, useDetectSystem, useDeviceStatus, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
+  useDetectSystem, useDeviceStatus, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
 import { GitHubStar } from "../components/GitHubStar";
+import { LlmPanel } from "../components/LlmPanel";
 import { ErrorNotice, hintFor, Meter, PageHeader, Spinner } from "../components/ui";
 import { CREDITS } from "../lib/credits";
 import { dateTime } from "../lib/format";
@@ -61,7 +62,7 @@ export function SettingsPage() {
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}
       {current === "videos" && <YouTubePanel />}
-      {current === "ia" && <AiKeyPanel />}
+      {current === "ia" && <LlmPanel />}
       {current === "descriptions" && <DescriptionsPanel />}
       {current === "credits" && <CreditsPanel />}
     </div>
@@ -494,19 +495,26 @@ function DescriptionsPanel() {
             {running ? (
               <p className="desc-run" role="status">
                 <Loader2 size={16} aria-hidden className="spin" />{" "}
-                {t("settings.desc.running", { done: running.succeeded + running.errored, total: running.games })}
+                {t(running.batch_id.startsWith("direct-") ? "settings.desc.runningDirect" : "settings.desc.running",
+                  { done: running.succeeded + running.errored, total: running.games })}
               </p>
             ) : st.pending > 0 && (
               <div className="form__actions">
                 <button type="button" className="button button--primary" disabled={!st.credentials || start.isPending}
                   onClick={() => start.mutate()}>
                   {start.isPending ? <Loader2 size={16} aria-hidden className="spin" /> : <Sparkles size={16} aria-hidden />}
-                  {t("settings.desc.start", { count: st.pending, cost: st.estimate_usd.toFixed(0) })}
+                  {st.estimate_usd != null
+                    ? t("settings.desc.start", { count: st.pending, cost: st.estimate_usd.toFixed(0) })
+                    : t("settings.desc.startFree", { count: st.pending })}
                 </button>
                 {!st.credentials && <Link to="/parametres/ia" className="muted">{t("settings.desc.needKey")}</Link>}
               </div>
             )}
-            <p className="muted">{t("settings.desc.model", { model: st.model })}</p>
+            <p className="muted">
+              {t(st.batch ? "settings.desc.modelBatch" : st.local ? "settings.desc.modelLocal" : "settings.desc.modelDirect",
+                { provider: st.provider_label, model: st.model ?? "?" })}{" "}
+              <Link to="/parametres/ia">{t("settings.desc.changeAi")}</Link>
+            </p>
             {start.isError && <ErrorNotice error={start.error} />}
             {st.batches.length > 0 && (
               <ul className="desc-batches">
@@ -526,58 +534,6 @@ function DescriptionsPanel() {
       </section>
 
     </>
-  );
-}
-
-/**
- * Clé d'API IA (Anthropic), comme la clé YouTube : une seule clé, dans le trousseau macOS, pour tout ce qui
- * utilise Claude (descriptions des jeux, commandes des jeux). Sans clé, les identifiants du SDK sur ce Mac
- * (variable ANTHROPIC_API_KEY ou profil) sont utilisés s'ils existent.
- */
-function AiKeyPanel() {
-  const t = useT();
-  const qc = useQueryClient();
-  const ai = useAiSettings();
-  const [key, setKey] = useState("");
-  const done = () => {
-    setKey("");
-    for (const k of ["ai-settings", "descriptions", "game-controls"]) qc.invalidateQueries({ queryKey: [k] });
-  };
-  const save = useMutation({ mutationFn: api.saveAnthropicKey, onSuccess: done });
-  const remove = useMutation({ mutationFn: api.deleteAnthropicKey, onSuccess: done });
-  const source = ai.data?.source;
-  return (
-    <form className="block form" aria-labelledby="ai-h" onSubmit={(e) => { e.preventDefault(); if (key.trim()) save.mutate(key.trim()); }}>
-      <h2 id="ai-h"><Bot size={18} aria-hidden /> {t("settings.ai.title")}</h2>
-      <p className="muted block__lead">
-        {t("settings.ai.leadBefore")}{" "}
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer noopener">console.anthropic.com</a>
-        {t("settings.ai.leadAfter")}
-      </p>
-      <div>
-        <p>{t("settings.ai.usesTitle")}</p>
-        <ul className="ai-uses">
-          <li><Link to="/parametres/descriptions">{t("settings.ai.useDescriptions")}</Link></li>
-          <li>{t("settings.ai.useControls")}</li>
-        </ul>
-      </div>
-      <p className="muted">
-        {ai.isPending ? " " : source === "keychain" ? t("settings.ai.saved") : source === "environment" ? t("settings.ai.env") : t("settings.ai.none")}
-      </p>
-      <div className="field">
-        <label htmlFor="aikey">{source === "keychain" ? t("settings.yt.replace") : t("settings.ai.label")}</label>
-        <input id="aikey" type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
-      </div>
-      <div className="form__actions">
-        <button type="submit" className="button" disabled={!key.trim() || save.isPending}>{t("settings.saveKeychain")}</button>
-        {source === "keychain" && (
-          <button type="button" className="link-button" onClick={() => remove.mutate()} disabled={remove.isPending}>{t("settings.yt.remove")}</button>
-        )}
-        {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.savedF")}</span>}
-      </div>
-      <p className="muted">{t("settings.ai.cost")}</p>
-      {(save.isError || remove.isError) && <ErrorNotice error={save.error ?? remove.error} />}
-    </form>
   );
 }
 

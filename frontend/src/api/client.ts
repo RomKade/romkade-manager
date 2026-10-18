@@ -34,6 +34,9 @@ export type Volume = S["VolumeOut"];
 export type Diagnose = S["DiagnoseOut"];
 export type Clock = S["ClockOut"];
 export type DescriptionsStatus = S["DescriptionsStatusOut"];
+export type LlmSettings = S["LlmSettingsOut"];
+export type LlmProvider = S["ProviderOut"];
+export type LlmTest = S["LlmTestOut"];
 export type PlayState = S["PlayStateOut"];
 export type GameControls = S["GameControlsOut"];
 export type GameControlsIn = S["GameControlsIn"];
@@ -130,9 +133,14 @@ export const api = {
   deleteYoutubeKey: () => request<void>("DELETE", "/settings/youtube"),
   descriptions: () => request<DescriptionsStatus>("GET", "/descriptions"),
   startDescriptions: () => request<DescriptionsStatus>("POST", "/descriptions/start"),
-  aiSettings: () => request<{ configured: boolean; source: "keychain" | "environment" | null }>("GET", "/settings/anthropic"),
-  saveAnthropicKey: (api_key: string) => request<void>("PUT", "/settings/anthropic", { api_key }),
-  deleteAnthropicKey: () => request<void>("DELETE", "/settings/anthropic"),
+  llmSettings: () => request<LlmSettings>("GET", "/settings/llm"),
+  saveLlmSettings: (b: { provider: string; model?: string | null; base_url?: string | null }) =>
+    request<LlmSettings>("PUT", "/settings/llm", b),
+  saveLlmKey: (provider: string, api_key: string) => request<void>("PUT", "/settings/llm/key", { provider, api_key }),
+  deleteLlmKey: (provider: string) => request<void>("DELETE", `/settings/llm/key/${encodeURIComponent(provider)}`),
+  llmModels: (provider: string, base_url?: string | null) =>
+    request<string[]>("GET", `/settings/llm/models?${new URLSearchParams({ provider, ...(base_url ? { base_url } : {}) })}`),
+  testLlm: () => request<LlmTest>("POST", "/settings/llm/test"),
   launchGame: (id: number, slot?: string | null) =>
     request<{ status: string; rom_path: string }>("POST", `/games/${id}/launch`, slot ? { slot } : {}),
   playState: () => request<PlayState>("GET", "/play/state"),
