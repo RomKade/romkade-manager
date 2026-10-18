@@ -1,12 +1,15 @@
 """Réglages non sensibles, stockés hors du dépôt Git.
 
-Emplacement par défaut : ~/Library/Application Support/AnbernicGameManager/
-Surcharge possible avec la variable d'environnement ANBERNIC_DATA_DIR.
+Emplacement par défaut, selon le système : ~/Library/Application Support/AnbernicGameManager/ (macOS),
+%APPDATA%\AnbernicGameManager (Windows), $XDG_DATA_HOME/AnbernicGameManager ou ~/.local/share/… (Linux).
+Surcharge : variable d'environnement ROMKADE_DATA_DIR (ou ANBERNIC_DATA_DIR, l'ancien nom) ; l'image Docker
+utilise /data, monté sur un volume.
 """
 
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Literal
 
@@ -15,9 +18,20 @@ from pydantic import BaseModel, Field, field_validator
 SAFE_REMOTE_PATH = re.compile(r"^/[A-Za-z0-9._/-]*$")
 
 
+APP_DIR = "AnbernicGameManager"  # nom historique du dossier : ne pas le changer sans migration
+
+
+def default_data_dir() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / APP_DIR
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / APP_DIR
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / APP_DIR
+
+
 def data_dir() -> Path:
-    env = os.environ.get("ANBERNIC_DATA_DIR")
-    base = Path(env) if env else Path.home() / "Library" / "Application Support" / "AnbernicGameManager"
+    env = os.environ.get("ROMKADE_DATA_DIR") or os.environ.get("ANBERNIC_DATA_DIR")
+    base = Path(env) if env else default_data_dir()
     base.mkdir(parents=True, exist_ok=True)
     return base
 

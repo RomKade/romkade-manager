@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import DeviceSettings, SettingsStore, data_dir  # noqa: E402
-from app.credentials import KeyringStore  # noqa: E402
+from app.credentials import default_store  # noqa: E402
 from app.db.session import init_db  # noqa: E402
 from app.device.ssh_client import DeviceClient, HostKeyStore, fetch_host_key, fingerprint  # noqa: E402
 from app.errors import AppError  # noqa: E402
@@ -55,7 +55,7 @@ async def main() -> int:
             return 1
         host_keys.trust(settings.host, settings.port, key)
 
-    creds = KeyringStore()
+    creds = default_store()
     if not creds.get_password(settings.host, settings.username):
         creds.set_password(settings.host, settings.username,
                            getpass.getpass(f"Mot de passe {settings.username}@{settings.host} (rangé dans le trousseau) : "))

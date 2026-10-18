@@ -13,6 +13,27 @@ Site du projet : **[romkade.com](https://romkade.com)**.
 
 Architecture, modèle de données et choix techniques : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Installer avec Docker (macOS, Windows, Linux)
+
+1. Installe Docker : [Docker Desktop](https://docs.docker.com/desktop/) sur macOS et Windows, ou
+   [Docker Engine](https://docs.docker.com/engine/install/) avec le plugin Compose sur Linux.
+2. Place [`compose.yaml`](compose.yaml) dans un dossier (par exemple `romkade`), puis dans ce dossier :
+
+```bash
+docker compose up -d
+```
+
+3. Ouvre http://localhost:8765, puis Paramètres > Connexion : adresse IP de la console, utilisateur et mot de passe SSH.
+
+La même image tourne sur Intel/AMD et ARM (Apple Silicon, Raspberry Pi). Le volume `romkade-data` garde le
+catalogue, les réglages, les copies de sauvegardes et les secrets (`secrets.json`, lisible par son seul
+propriétaire), et survit aux mises à jour : `docker compose pull && docker compose up -d`. La recherche
+(Typesense) est un second service du même fichier, sans port publié. L'interface n'écoute que sur cet ordinateur
+(`127.0.0.1`) : ne l'expose pas sur Internet, elle pilote ta console. Le conteneur joint la console sur le réseau
+local par SSH : ordinateur et console sur le même réseau. Dossier de données hors Docker : `ROMKADE_DATA_DIR`
+(par défaut selon le système : `~/Library/Application Support/AnbernicGameManager`,
+`%APPDATA%\AnbernicGameManager`, `~/.local/share/AnbernicGameManager`).
+
 ## Démarrage rapide
 
 ```bash

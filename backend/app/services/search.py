@@ -248,6 +248,11 @@ class SearchService:
             log.warning("Typesense : clé refusée, conteneur %s recréé", CONTAINER)
             await self._docker("rm", "-f", CONTAINER)
         if not self.managed:
+            # Serveur externe (service Typesense du compose.yaml) : il peut démarrer après l'application.
+            for _ in range(30):
+                await asyncio.sleep(1)
+                if await self.healthy():
+                    return await self.authorized()
             return False
         code, out = await self._docker("inspect", "-f", "{{.State.Running}}", CONTAINER)
         if code == 0 and out != "true":

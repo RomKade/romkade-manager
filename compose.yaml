@@ -1,0 +1,37 @@
+# ROMKADE Manager avec Docker : macOS, Windows (Docker Desktop) et Linux (Docker Engine + Compose).
+#
+#   docker compose up -d        démarre (ou met à jour après « docker compose pull »)
+#   http://localhost:8765       l'interface
+#   docker compose down         arrête ; les données (volume romkade-data) sont conservées
+#
+# L'interface n'est ouverte qu'à cet ordinateur (127.0.0.1) : elle pilote la console, ne l'exposez pas sur Internet.
+# Le conteneur joint la console sur le réseau local (SSH) : console et ordinateur sur le même réseau.
+name: romkade
+
+services:
+  romkade:
+    image: ghcr.io/arnoweb/romkade-manager:${ROMKADE_VERSION:-latest}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ROMKADE_PORT:-8765}:8765"
+    environment:
+      AGM_TYPESENSE_URL: http://typesense:8108
+      AGM_TYPESENSE_KEY: ${ROMKADE_TYPESENSE_KEY:-romkade-local-search}
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - romkade-data:/data
+    depends_on:
+      - typesense
+
+  # Moteur de recherche (fautes de frappe tolérées). Joignable seulement depuis ROMKADE Manager : aucun port publié.
+  typesense:
+    image: typesense/typesense:27.1
+    restart: unless-stopped
+    command: ["--data-dir", "/data", "--api-key", "${ROMKADE_TYPESENSE_KEY:-romkade-local-search}"]
+    volumes:
+      - typesense-data:/data
+
+volumes:
+  romkade-data:
+  typesense-data:

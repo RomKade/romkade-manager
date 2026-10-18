@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import bluetooth, catalog, controls, descriptions, llm, play, players, playtime, saves, system, transfers, videos, volume
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
-from app.credentials import CredentialStore, KeyringStore
+from app.credentials import CredentialStore, default_store
 from app.db.session import init_db
 from app.device import launcher
 from app.device.pool import DevicePool
@@ -65,7 +65,7 @@ def create_app(
     )
     base = data_dir()
     app.state.settings_store = settings_store or SettingsStore()
-    app.state.credentials = credentials or KeyringStore()
+    app.state.credentials = credentials or default_store()
     app.state.host_keys = HostKeyStore(known_hosts or base / "known_hosts")
     app.state.sessions = init_db(db_path or base / "catalog.sqlite3")
     # Table de genres embarquée : recalcul complet à chaque démarrage (quelques dixièmes de seconde),

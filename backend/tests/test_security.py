@@ -40,3 +40,33 @@ async def test_foreign_origin_can_not_read_either_via_cors(local):
     # Lecture GET autorisée côté serveur, mais aucun en-tête CORS : le navigateur la cache au site étranger.
     r = await local.get("/api/settings", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in {k.lower() for k in r.headers}
+
+
+def test_file_secrets_store(tmp_path, monkeypatch):
+    """Conteneur Docker (ROMKADE_SECRETS=file) : secrets dans un fichier du dossier de données, 0600."""
+    import os
+
+    from app.credentials import FileStore, default_store
+
+    monkeypatch.setenv("ROMKADE_SECRETS", "file")
+    monkeypatch.setenv("ROMKADE_DATA_DIR", str(tmp_path))
+    store = default_store()
+    assert isinstance(store, FileStore)
+    store.set_password("192.168.1.10", "root", "secret")
+    assert store.get_password("192.168.1.10", "root") == "secret"
+    assert oct(os.stat(tmp_path / "secrets.json").st_mode & 0o777) == "0o600"
+    store.delete_password("192.168.1.10", "root")
+    assert store.get_password("192.168.1.10", "root") is None
+
+
+def test_data_dir_per_system(monkeypatch, tmp_path):
+    from app import config
+
+    monkeypatch.delenv("ROMKADE_DATA_DIR", raising=False)
+    monkeypatch.delenv("ANBERNIC_DATA_DIR", raising=False)
+    monkeypatch.setattr(config.sys, "platform", "linux")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    assert config.default_data_dir() == tmp_path / "AnbernicGameManager"
+    monkeypatch.setattr(config.sys, "platform", "win32")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
+    assert config.default_data_dir() == tmp_path / "Roaming" / "AnbernicGameManager"

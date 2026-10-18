@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import data_dir  # noqa: E402
-from app.credentials import KeyringStore  # noqa: E402
+from app.credentials import default_store  # noqa: E402
 from app.db.session import init_db  # noqa: E402
 from app.services import descriptions as d  # noqa: E402
 
@@ -26,7 +26,7 @@ def main() -> int:
         print(__doc__)
         return 1
     sessions = init_db(data_dir() / "catalog.sqlite3")
-    client = d.make_client(KeyringStore())
+    client = d.make_client(default_store())
     cmd = sys.argv[1]
     if cmd == "essai":
         n = int(sys.argv[2]) if len(sys.argv) > 2 else 3
