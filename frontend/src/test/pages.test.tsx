@@ -586,7 +586,7 @@ describe("Connexion à une IA", () => {
     renderAt("/parametres/ia");
     await userEvent.click(await screen.findByRole("radio", { name: /Ollama, LM Studio, autre/ }));
     expect(await screen.findByRole("link", { name: /Guide : installer un LLM local/ }))
-      .toHaveAttribute("href", "https://github.com/arnoweb/romkade-manager/blob/main/docs/local-llm.fr.md");
+      .toHaveAttribute("href", "https://github.com/RomKade/romkade-manager/blob/main/docs/local-llm.fr.md");
     await userEvent.click(screen.getByRole("button", { name: "LM Studio" }));
     await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "local", base_url: "http://localhost:1234/v1", model: null }));
     await userEvent.click(await screen.findByRole("option", { name: "qwen2.5:7b" }));
@@ -644,7 +644,7 @@ describe("Barre latérale", () => {
     await userEvent.click(retry);
     expect(calls.filter((c) => c.startsWith("/api/device/status")).length).toBeGreaterThan(1);
     expect(screen.getByRole("link", { name: /Documentation/ }))
-      .toHaveAttribute("href", "https://github.com/arnoweb/romkade-manager/blob/main/README.fr.md");
+      .toHaveAttribute("href", "https://romkade.com/docs/fr/");
   });
 });
 
@@ -655,7 +655,7 @@ describe("Sources et crédits", () => {
     expect(within(panel).getByRole("link", { name: /libretro-thumbnails/ })).toHaveAttribute("href", "https://github.com/libretro-thumbnails/libretro-thumbnails");
     expect(within(panel).getByRole("link", { name: /OpenVGDB/ })).toHaveAttribute("rel", expect.stringContaining("noopener"));
     expect(within(panel).getByText("CC BY 4.0")).toBeInTheDocument();
-    expect(within(panel).getByRole("link", { name: /sur GitHub/ })).toHaveAttribute("href", "https://github.com/arnoweb/romkade-manager");
+    expect(within(panel).getByRole("link", { name: /sur GitHub/ })).toHaveAttribute("href", "https://github.com/RomKade/romkade-manager");
   });
 });
 

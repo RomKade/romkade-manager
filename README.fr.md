@@ -538,5 +538,5 @@ ROMKADE Manager ne fournit aucun jeu. Ce qu'il reprend d'ailleurs est cité dans
 Toute nouvelle source (script `backend/scripts/build_*.py`, service en ligne, illustration) s'ajoute à
 `CREDITS` dans `frontend/src/lib/credits.ts`.
 
-Si l'outil vous plaît, une étoile sur [GitHub](https://github.com/arnoweb/romkade-manager) aide le projet.
+Si l'outil vous plaît, une étoile sur [GitHub](https://github.com/RomKade/romkade-manager) aide le projet.
 

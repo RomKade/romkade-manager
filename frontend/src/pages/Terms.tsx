@@ -18,7 +18,7 @@ export function TermsPage() {
           <p>{t(`legal.${k}.body`)}</p>
           {k === "source" && (
             <a href={REPO_URL} target="_blank" rel="noreferrer noopener" className="link">
-              github.com/arnoweb/romkade-manager <ExternalLink size={12} aria-hidden />
+              github.com/RomKade/romkade-manager <ExternalLink size={12} aria-hidden />
             </a>
           )}
         </section>

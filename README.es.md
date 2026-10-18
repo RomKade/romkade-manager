@@ -537,5 +537,5 @@ ROMKADE Manager no proporciona ningún juego. Lo que toma de otras fuentes se ci
 Cualquier fuente nueva (script `backend/scripts/build_*.py`, servicio en línea, ilustración) se añade a
 `CREDITS` en `frontend/src/lib/credits.ts`.
 
-Si te gusta la herramienta, una estrella en [GitHub](https://github.com/arnoweb/romkade-manager) ayuda al proyecto.
+Si te gusta la herramienta, una estrella en [GitHub](https://github.com/RomKade/romkade-manager) ayuda al proyecto.
 

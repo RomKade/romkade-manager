@@ -1,4 +1,4 @@
-# Image Docker de ROMKADE Manager sur ghcr.io/arnoweb/romkade-manager (amd64 + arm64).
+# Image Docker de ROMKADE Manager sur ghcr.io/romkade/romkade-manager (amd64 + arm64).
 # À chaque push sur main : « edge » ; à chaque tag vX.Y.Z : « X.Y.Z », « X.Y » et « latest ».
 name: Image Docker
 

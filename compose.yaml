@@ -10,7 +10,7 @@ name: romkade
 
 services:
   romkade:
-    image: ghcr.io/arnoweb/romkade-manager:${ROMKADE_VERSION:-latest}
+    image: ghcr.io/romkade/romkade-manager:${ROMKADE_VERSION:-latest}
     build: .
     restart: unless-stopped
     ports:
