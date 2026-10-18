@@ -527,7 +527,7 @@ describe("Sauvegardes", () => {
     expect(screen.getAllByText("R1")[0]!.tagName).toBe("KBD");
     await userEvent.click(screen.getByRole("button", { name: "Supprimer" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/Une copie est gardée sur le Mac/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Une copie est gardée sur l'ordinateur/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Supprimer" }));
     await waitFor(() => expect(bodies.some((b) => b.url === "/api/saves/delete")).toBe(true));
   });
@@ -645,11 +645,11 @@ describe("Sources et crédits", () => {
 });
 
 describe("Date et heure", () => {
-  it("montre le retard de la console et la met à l'heure du Mac", async () => {
+  it("montre le retard de la console et la met à l'heure de l'ordinateur", async () => {
     renderAt("/parametres/systeme");
     const panel = (await screen.findByRole("heading", { name: "Date et heure de la console" })).closest("section")!;
     expect(await within(panel).findByText("En retard de 4 ans")).toBeInTheDocument();
-    await userEvent.click(within(panel).getByRole("button", { name: /Mettre à l'heure du Mac/ }));
+    await userEvent.click(within(panel).getByRole("button", { name: /Mettre à l'heure de l'ordinateur/ }));
     expect(await within(panel).findByText("La console est à l'heure.")).toBeInTheDocument();
     expect(bodies.at(-1)).toMatchObject({ url: "/api/device/clock/sync" });
   });

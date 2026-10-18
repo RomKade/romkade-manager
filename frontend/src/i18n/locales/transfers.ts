@@ -4,13 +4,13 @@ import type { Messages } from "../core";
 const messages: Messages = {
   fr: {
     "title": "Ajouter des jeux",
-    "lead": "Copie des jeux de ce Mac vers la console. Chaque fichier est vérifié avant d'apparaître sur la carte, et rien n'est remplacé sans ton accord.",
+    "lead": "Copie des jeux de cet ordinateur vers la console. Chaque fichier est vérifié avant d'apparaître sur la carte, et rien n'est remplacé sans ton accord.",
 
     "drop.title": "Glisse des fichiers ici",
     "drop.lead": "ROM, image disque, archive : la console de destination est proposée d'après le format.",
     "drop.choose": "Choisir des fichiers",
 
-    "sending.title": "Préparation sur le Mac",
+    "sending.title": "Préparation sur l'ordinateur",
     "sending.failed": "Envoi impossible",
     "sending.meter": "Préparation de {name}",
     "percent": "{pct} %",
@@ -84,13 +84,13 @@ const messages: Messages = {
   },
   en: {
     "title": "Add games",
-    "lead": "Copy games from this Mac to the console. Each file is verified before it appears on the card, and nothing is replaced without your consent.",
+    "lead": "Copy games from this computer to the console. Each file is verified before it appears on the card, and nothing is replaced without your consent.",
 
     "drop.title": "Drop files here",
     "drop.lead": "ROM, disc image, archive: the target console is suggested from the format.",
     "drop.choose": "Choose files",
 
-    "sending.title": "Preparing on the Mac",
+    "sending.title": "Preparing on the computer",
     "sending.failed": "Upload failed",
     "sending.meter": "Preparing {name}",
     "percent": "{pct}%",
@@ -164,13 +164,13 @@ const messages: Messages = {
   },
   es: {
     "title": "Añadir juegos",
-    "lead": "Copia juegos de este Mac a la consola. Cada archivo se verifica antes de aparecer en la tarjeta, y nada se reemplaza sin tu permiso.",
+    "lead": "Copia juegos de este ordenador a la consola. Cada archivo se verifica antes de aparecer en la tarjeta, y nada se reemplaza sin tu permiso.",
 
     "drop.title": "Arrastra archivos aquí",
     "drop.lead": "ROM, imagen de disco, archivo comprimido: la consola de destino se propone según el formato.",
     "drop.choose": "Elegir archivos",
 
-    "sending.title": "Preparación en el Mac",
+    "sending.title": "Preparación en el ordenador",
     "sending.failed": "No se pudo enviar",
     "sending.meter": "Preparando {name}",
     "percent": "{pct} %",
