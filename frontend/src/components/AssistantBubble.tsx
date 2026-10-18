@@ -51,7 +51,9 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
-  useEffect(() => endRef.current?.scrollIntoView?.({ block: "end" }), [messages.length, messages.at(-1)]);
+  // Accolades : scrollIntoView renvoie une promesse dans les navigateurs récents, et React prendrait une valeur
+  // renvoyée par un effet pour sa fonction de nettoyage (plantage de toute la page).
+  useEffect(() => { endRef.current?.scrollIntoView?.({ block: "end" }); }, [messages.length, messages.at(-1)]);
   useEffect(() => () => abort.current?.abort(), []);
 
   const offer = detected && !(scope.kind === "game" && scope.game.id === detected.id) ? detected : null;
@@ -130,21 +132,21 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
         </button>
       </header>
 
-      <div className="assistant__body">
-        {offer && (
-          <div className="assistant__offer">
-            <p>{t("assistant.offer", { title: offer.title })}</p>
-            <div className="assistant__offer-actions">
-              <button type="button" className="button button--primary button--small"
-                onClick={() => assistant.setScope({ kind: "game", game: offer })}>{t("assistant.offerYes")}</button>
-              {scope.kind === "game" && (
-                <button type="button" className="button button--small" onClick={() => assistant.setScope({ kind: "library" })}>
-                  {t("assistant.library")}
-                </button>
-              )}
-            </div>
+      {offer && (
+        <div className="assistant__offer">
+          <p>{t("assistant.offer", { title: offer.title })}</p>
+          <div className="assistant__offer-actions">
+            <button type="button" className="button button--primary button--small"
+              onClick={() => assistant.setScope({ kind: "game", game: offer })}>{t("assistant.offerYes")}</button>
+            {scope.kind === "game" && (
+              <button type="button" className="button button--small" onClick={() => assistant.setScope({ kind: "library" })}>
+                {t("assistant.library")}
+              </button>
+            )}
           </div>
-        )}
+        </div>
+      )}
+      <div className="assistant__body">
         {!ready && (
           <p className="assistant__note">{t("assistant.noAi")} <Link to="/parametres/ia" onClick={() => assistant.setOpen(false)}>{t("assistant.connectAi")}</Link></p>
         )}

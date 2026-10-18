@@ -252,6 +252,8 @@ beforeEach(() => {
   playAlerts = [];
   vi.stubGlobal("fetch", mockFetch());
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} unobserve() {} });
+  // Comme Chrome : scrollIntoView renvoie une promesse (un effet qui la renvoyait faisait planter toute la page).
+  Element.prototype.scrollIntoView = function () { return Promise.resolve() as unknown as void; };
   Element.prototype.getBoundingClientRect = function () {
     return { width: 1000, height: 800, top: 0, left: 0, right: 1000, bottom: 800, x: 0, y: 0, toJSON() {} } as DOMRect;
   };
