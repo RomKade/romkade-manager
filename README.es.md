@@ -22,7 +22,7 @@ Guía de uso: **[romkade.com/docs](https://romkade.com/docs/es/)**. Arquitectura
   - [Instalar con Docker (macOS, Windows, Linux)](#instalar-con-docker-macos-windows-linux) — [Actualizar, hacer copia, desinstalar](#actualizar-hacer-copia-desinstalar) · [Clave SSH e IA local con Docker](#clave-ssh-e-ia-local-con-docker) · [Publicar una versión](#publicar-una-versión)
   - [Ejecutar desde el código fuente (macOS)](#ejecutar-desde-el-código-fuente-macos)
 - **Desarrollo**: [1. Diagnóstico de la consola real (recomendado primero)](#1-diagnóstico-de-la-consola-real-recomendado-primero) · [2. Sincronizar el catálogo (fase 2)](#2-sincronizar-el-catálogo-fase-2) · [3. Lanzar la aplicación](#3-lanzar-la-aplicación) · [Modificar la interfaz (Node 20 o superior: brew install node)](#modificar-la-interfaz-node-20-o-superior-brew-install-node) · [4. Primera conexión mediante la API (innecesario si se ha lanzado catalog_report.py)](#4-primera-conexión-mediante-la-api-innecesario-si-se-ha-lanzado-catalog_reportpy) · [5. Uso](#5-uso)
-- **Funciones**: [Añadir juegos](#añadir-juegos) · [Géneros](#géneros) · [Ilustraciones de las consolas](#ilustraciones-de-las-consolas) · [Tráileres](#tráileres) · [Carátulas](#carátulas) · [Jugar en la consola desde la interfaz](#jugar-en-la-consola-desde-la-interfaz) · [Idiomas](#idiomas) · [Partidas guardadas](#partidas-guardadas) · [Retomar una partida desde un guardado](#retomar-una-partida-desde-un-guardado) · [Bluetooth](#bluetooth) · [Mandos](#mandos) · [Volumen](#volumen) · [Desde el móvil (ngrok)](#desde-el-móvil-ngrok) · [Información sobre los juegos](#información-sobre-los-juegos) · [Controles de los juegos](#controles-de-los-juegos) · [Conexión a una IA (LLM)](#conexión-a-una-ia-llm) · [Favoritos](#favoritos) · [Tiempo de juego](#tiempo-de-juego) · [Panel](#panel)
+- **Funciones**: [Añadir juegos](#añadir-juegos) · [Géneros](#géneros) · [Ilustraciones de las consolas](#ilustraciones-de-las-consolas) · [Tráileres](#tráileres) · [Carátulas](#carátulas) · [Jugar en la consola desde la interfaz](#jugar-en-la-consola-desde-la-interfaz) · [Idiomas](#idiomas) · [Partidas guardadas](#partidas-guardadas) · [Retomar una partida desde un guardado](#retomar-una-partida-desde-un-guardado) · [Bluetooth](#bluetooth) · [Mandos](#mandos) · [Volumen](#volumen) · [Desde el móvil (ngrok)](#desde-el-móvil-ngrok) · [Información sobre los juegos](#información-sobre-los-juegos) · [Controles de los juegos](#controles-de-los-juegos) · [Conexión a una IA (LLM)](#conexión-a-una-ia-llm) · [Asistente de juego](#asistente-de-juego) · [Favoritos](#favoritos) · [Tiempo de juego](#tiempo-de-juego) · [Panel](#panel)
 - **Funcionamiento**: [Garantías](#garantías) · [Búsqueda (Typesense)](#búsqueda-typesense) · [Conexión a la consola](#conexión-a-la-consola) · [Otras consolas y sistemas](#otras-consolas-y-sistemas)
 - **Proyecto**: [Versión, condiciones de uso](#versión-condiciones-de-uso) · [Fuentes y créditos](#fuentes-y-créditos)
 
@@ -452,6 +452,25 @@ Ajustes > IA: una sola IA para todo lo que la usa (descripciones y controles de 
 - Respuestas en JSON: salidas estructuradas (`json_schema`); si no, JSON simple con el esquema en la consigna
   (modelos locales que no las admiten).
 - Descripciones sin Claude: juego a juego en segundo plano (se detiene tras 5 fallos seguidos, se puede reanudar).
+
+## Asistente de juego
+
+Una burbuja abajo a la derecha en todas las páginas: un asistente de IA para **tu biblioteca** (encontrar un juego,
+comparar dos, usar la aplicación). En la ficha de un juego, o mientras un juego funciona en la consola, propone hablar
+solo de **ese juego** (controles, objetivos, una parte difícil, secretos: primero una pista, la solución si se pide).
+Usa la IA configurada en Ajustes > IA, en línea o local (Ollama, LM Studio; a los modelos de razonamiento se les pide
+responder sin reflexión previa, lo que deja un modelo local de 12B en unos 10 s por respuesta). Cada pregunta pasa
+por dos llamadas: una clasificación estructurada (dentro del tema o no, intención, género, consola) y luego la
+respuesta en flujo, construida con la ficha del juego y los pasajes de **conocimientos**. Las preguntas fuera de tema,
+las peticiones de ROM o BIOS y los intentos de cambiar sus instrucciones reciben el rechazo de la aplicación, nunca
+el texto del modelo. Las conversaciones se quedan en el navegador.
+
+**Conocimientos** (Ajustes > Contenido IA): para cada juego, sus páginas de Wikipedia (en, fr, es) y su guía de
+StrategyWiki, obtenidas sin IA mediante las API de MediaWiki una vez identificado el juego en Wikidata (videojuego +
+consola correcta), divididas en pasajes con su fuente y su licencia (CC BY-SA 4.0, citada en las respuestas) e
+indexadas en Typesense. Obtención para un juego (prueba, con una pregunta de prueba que muestra los pasajes
+encontrados) o para todos; opción de obtención automática de los juegos nuevos tras cada sincronización. Diseño:
+[docs/STRATEGIE-IA.md](docs/STRATEGIE-IA.md).
 
 ## Favoritos
 

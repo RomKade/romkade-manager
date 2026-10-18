@@ -4,6 +4,8 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 
 import { ApiError } from "./api/client";
 import { useStatus, useTransfersLive } from "./api/queries";
+import { AssistantBubble } from "./components/AssistantBubble";
+import { GameSheet } from "./components/GameSheet";
 import { Sidebar } from "./components/Sidebar";
 import { PlayAlerts } from "./components/PlayAlerts";
 import { TermsNotice } from "./components/TermsNotice";
@@ -57,6 +59,8 @@ function SyncWatcher() {
 
 function Layout() {
   useTransfersLive();
+  // Jeu ouvert depuis l'assistant (pastille d'une réponse) : la fiche s'ouvre par-dessus la page en cours.
+  const [assistantGame, setAssistantGame] = useState<number | null>(null);
   return (
     <div className="app">
       <a href="#main" className="skip-link">{t("common.nav.skip")}</a>
@@ -70,6 +74,8 @@ function Layout() {
         </div>
       </main>
       <SyncWatcher />
+      <AssistantBubble placement="page" onOpenGame={setAssistantGame} />
+      <GameSheet id={assistantGame} onClose={() => setAssistantGame(null)} onOpen={setAssistantGame} />
     </div>
   );
 }

@@ -6,6 +6,7 @@
  * Variables : « {name} ». Pluriels : clés `x_one` / `x_other`, choisies avec la variable `count`.
  * Une clé absente dans une langue retombe sur le français, puis sur la clé elle-même.
  */
+import assistant from "./locales/assistant";
 import bluetooth from "./locales/bluetooth";
 import common from "./locales/common";
 import dashboard from "./locales/dashboard";
@@ -29,7 +30,7 @@ export const LANGS: { code: Lang; label: string }[] = [
 const LOCALES: Record<Lang, string> = { fr: "fr-FR", en: "en-GB", es: "es-ES" };
 const STORAGE_KEY = "agm-lang";
 
-export const NAMESPACES: Record<string, Messages> = { bluetooth, common, dashboard, legal, library, players, playtime, saves, settings, sheet, sync, transfers };
+export const NAMESPACES: Record<string, Messages> = { assistant, bluetooth, common, dashboard, legal, library, players, playtime, saves, settings, sheet, sync, transfers };
 
 const catalogs: Record<Lang, Record<string, string>> = { fr: {}, en: {}, es: {} };
 for (const [ns, messages] of Object.entries(NAMESPACES)) {

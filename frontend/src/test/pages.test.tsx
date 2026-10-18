@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppRoutes, makeQueryClient } from "../App";
+import { assistant } from "../lib/assistant";
 
 // jsdom ne fait pas de mise en page : la virtualisation est remplacée par un rendu de toutes les lignes.
 vi.mock("@tanstack/react-virtual", () => ({
@@ -35,6 +36,7 @@ let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
+let assistantBodies: Record<string, unknown>[] = [];
 let knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null as string | null, stopping: false };
 type FakeLlm = { provider: string | null; model: string | null; base_url: string | null; key: boolean; tested: boolean };
 const NO_LLM: FakeLlm = { provider: null, model: null, base_url: null, key: false, tested: false };
@@ -157,6 +159,17 @@ function mockFetch() {
         source: "retroarch", kind: "sram", slot: null, platform: "SFC", name: "Super Mario World (USA)", size: 2048,
         modified_at: "2026-10-16T10:00:00Z", game: null },
     ]);
+    if (url === "/api/assistant") {
+      assistantBodies.push(JSON.parse(String(init?.body)));
+      const sse = [
+        `event: meta\ndata: ${JSON.stringify({ in_scope: true, reason: null, intent: "game_help", games: [], provider: "local", local: true,
+          sources: [{ source: "strategywiki", page: "Super Mario World/Vanilla Dome", url: "https://strategywiki.org/wiki/Super_Mario_World/Vanilla_Dome", license: "CC BY-SA 4.0" }] })}\n\n`,
+        `event: delta\ndata: ${JSON.stringify({ text: "Indice : utilise " })}\n\n`,
+        `event: delta\ndata: ${JSON.stringify({ text: "la cape." })}\n\n`,
+        "event: done\ndata: {}\n\n",
+      ].join("");
+      return new Response(sse, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+    }
     if (url.startsWith("/api/knowledge")) {
       if (url === "/api/knowledge/start") knowledgeJob = { running: true, total: 1, done: 0, found: 0, current: "zelda", stopping: false };
       return json({ games: 2, found: 1, not_found: 0, errors: 0, pending: knowledgeJob.running ? 1 : 1, chunks: 30,
@@ -230,6 +243,9 @@ beforeEach(() => {
   playingId = null;
   favoriteIds = [];
   hostKeyTrusted = true;
+  assistantBodies = [];
+  sessionStorage.clear();
+  assistant.reset();
   knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null, stopping: false };
   llm = { ...NO_LLM };
   volume = { percent: 60, muted: false };
@@ -437,6 +453,27 @@ describe("Contenu IA : connaissances", () => {
     await userEvent.type(within(panel).getByRole("textbox", { name: "Question de test" }), "castle");
     await userEvent.click(within(panel).getByRole("button", { name: /Voir les passages trouvés/ }));
     expect(await within(panel).findByText(/Use the cape to fly/)).toBeInTheDocument();
+  });
+});
+
+describe("Assistant de jeu", () => {
+  it("propose de discuter du jeu ouvert, puis répond en direct avec ses sources", async () => {
+    llm = { ...llm, provider: "local", model: "qwen2.5:7b", base_url: "http://localhost:11434/v1" };
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /^Assistant$/ }));
+    const panel = within(dialog).getByRole("region", { name: "Assistant" });
+    expect(within(panel).getByText("Tu regardes Super Mario World. Discuter de ce jeu ?")).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Oui, ce jeu" }));
+    expect(within(panel).getByRole("button", { name: "Super Mario World" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.type(within(panel).getByRole("textbox", { name: "Ta question" }), "Je bloque au château");
+    await userEvent.click(within(panel).getByRole("button", { name: "Envoyer" }));
+    expect(await within(panel).findByText(/Indice : utilise la cape\./)).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: /StrategyWiki · CC BY-SA 4.0/ })).toHaveAttribute("href", "https://strategywiki.org/wiki/Super_Mario_World/Vanilla_Dome");
+    expect(within(panel).getByText(/modèle local : rien ne quitte cet ordinateur/)).toBeInTheDocument();
+    expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr",
+      messages: [{ role: "user", content: "Je bloque au château" }] });
   });
 });
 

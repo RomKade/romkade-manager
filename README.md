@@ -21,7 +21,7 @@ User guide: **[romkade.com/docs](https://romkade.com/docs/)**. Architecture, dat
   - [Install with Docker (macOS, Windows, Linux)](#install-with-docker-macos-windows-linux) — [Update, back up, uninstall](#update-back-up-uninstall) · [SSH key and local AI with Docker](#ssh-key-and-local-ai-with-docker) · [Publishing a version](#publishing-a-version)
   - [Run from the source code (macOS)](#run-from-the-source-code-macos)
 - **Development**: [1. Diagnose the real console (recommended first)](#1-diagnose-the-real-console-recommended-first) · [2. Sync the catalog (phase 2)](#2-sync-the-catalog-phase-2) · [3. Start the application](#3-start-the-application) · [Modifying the interface (Node 20 or later: brew install node)](#modifying-the-interface-node-20-or-later-brew-install-node) · [4. First connection through the API (not needed if catalog_report.py was run)](#4-first-connection-through-the-api-not-needed-if-catalog_reportpy-was-run) · [5. Usage](#5-usage)
-- **Features**: [Adding games](#adding-games) · [Genres](#genres) · [Console illustrations](#console-illustrations) · [Trailers](#trailers) · [Box art](#box-art) · [Playing on the console from the interface](#playing-on-the-console-from-the-interface) · [Languages](#languages) · [Saves](#saves) · [Resuming a game from a save](#resuming-a-game-from-a-save) · [Bluetooth](#bluetooth) · [Controllers](#controllers) · [Volume](#volume) · [From your phone (ngrok)](#from-your-phone-ngrok) · [Game information](#game-information) · [Game controls](#game-controls) · [Connecting to an AI (LLM)](#connecting-to-an-ai-llm) · [Favorites](#favorites) · [Play time](#play-time) · [Dashboard](#dashboard)
+- **Features**: [Adding games](#adding-games) · [Genres](#genres) · [Console illustrations](#console-illustrations) · [Trailers](#trailers) · [Box art](#box-art) · [Playing on the console from the interface](#playing-on-the-console-from-the-interface) · [Languages](#languages) · [Saves](#saves) · [Resuming a game from a save](#resuming-a-game-from-a-save) · [Bluetooth](#bluetooth) · [Controllers](#controllers) · [Volume](#volume) · [From your phone (ngrok)](#from-your-phone-ngrok) · [Game information](#game-information) · [Game controls](#game-controls) · [Connecting to an AI (LLM)](#connecting-to-an-ai-llm) · [Game assistant](#game-assistant) · [Favorites](#favorites) · [Play time](#play-time) · [Dashboard](#dashboard)
 - **How it works**: [Guarantees](#guarantees) · [Search (Typesense)](#search-typesense) · [Connecting to the console](#connecting-to-the-console) · [Other consoles and systems](#other-consoles-and-systems)
 - **Project**: [Version, terms of use](#version-terms-of-use) · [Sources and credits](#sources-and-credits)
 
@@ -451,6 +451,23 @@ Settings > AI: a single AI for everything that uses one (game descriptions, game
 - JSON responses: structured outputs (`json_schema`), otherwise plain JSON with the schema in the prompt
   (local models that do not support them).
 - Descriptions without Claude: game by game in the background (stops after 5 failures in a row, can be resumed).
+
+## Game assistant
+
+A bubble at the bottom right of every page: an AI assistant for **your library** (find a game, compare two, how to
+use the app). On a game page, or while a game runs on the console, it offers to talk about **that game** only
+(controls, goals, a hard part, secrets: a hint first, the full solution on request). It uses the AI set in Settings >
+AI, online or local (Ollama, LM Studio; reasoning models are asked to answer without thinking first, which keeps a
+12B local model around 10 s per answer). Each question goes through two calls: a structured routing call (in scope
+or not, intent, genre, console) then the streamed answer, built from the game page and from **knowledge** passages.
+Off-topic questions, ROM/BIOS download requests and attempts to change its instructions get the app's own refusal,
+never the model's text. Conversations stay in the browser.
+
+**Knowledge** (Settings > AI content): for each game, its Wikipedia pages (en, fr, es) and its StrategyWiki guide,
+fetched without AI through the MediaWiki APIs once Wikidata has identified the game (video game + matching console),
+split into passages with source and license (CC BY-SA 4.0, cited in answers), indexed in Typesense. Fetch one game (to
+test, with a test question that shows the passages found) or all; option to fetch automatically for new games after
+each sync. Design: [docs/STRATEGIE-IA.md](docs/STRATEGIE-IA.md).
 
 ## Favorites
 

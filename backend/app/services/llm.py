@@ -209,12 +209,12 @@ class LLM:
         return anthropic.Anthropic(**kwargs)
 
     def complete_json(self, system: str, prompt: str, schema: dict, *, max_tokens: int,
-                      effort: str | None = None, name: str = "answer") -> dict | None:
+                      effort: str | None = None, name: str = "answer", reasoning: str | None = None) -> dict | None:
         """Réponse JSON conforme à `schema`, ou None (refus, réponse tronquée ou illisible).
         Lève AppError (llm_unreachable, llm_rejected) si le fournisseur ne répond pas ou refuse la demande."""
         if self.provider.protocol == "anthropic":
             return self._anthropic_json(system, prompt, schema, max_tokens, effort)
-        return self._openai_json(system, prompt, schema, max_tokens, name)
+        return self._openai_json(system, prompt, schema, max_tokens, name, reasoning)
 
     def _anthropic_json(self, system, prompt, schema, max_tokens, effort) -> dict | None:
         import anthropic
@@ -233,13 +233,18 @@ class LLM:
                                   {"status": exc.status_code}) from exc
         return parse_anthropic(message)
 
-    def _openai_json(self, system, prompt, schema, max_tokens, name) -> dict | None:
+    def _openai_json(self, system, prompt, schema, max_tokens, name, reasoning=None) -> dict | None:
         tokens = "max_completion_tokens" if self.provider.id == "openai" else "max_tokens"
         body = {"model": self.model, tokens: max_tokens,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                 "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}}}
+        if reasoning:
+            body["reasoning_effort"] = reasoning
         with self._client() as http:
             r = self._post(http, "/chat/completions", body)
+            if r.status_code == 400 and "reasoning_effort" in body and re.search(r"reasoning", r.text, re.I):
+                body.pop("reasoning_effort")  # serveur qui ne connaît pas ce réglage
+                r = self._post(http, "/chat/completions", body)
             if r.status_code == 400 and re.search(r"response_format|json_schema|schema", r.text, re.I):
                 # Modèle ou serveur sans sorties structurées : JSON simple, schéma donné dans la consigne.
                 body["response_format"] = {"type": "json_object"}
@@ -257,6 +262,79 @@ class LLM:
         if choice.get("finish_reason") == "length" or msg.get("refusal"):
             return None
         return parse_json_text(msg.get("content") or "")
+
+    def stream_chat(self, system: str, messages: list[dict], *, max_tokens: int = 800, reasoning: str | None = None):
+        """Réponse en texte libre, morceau par morceau (générateur). `messages` : [{role: user|assistant, content}].
+        Serveur compatible OpenAI qui refuse le flux : une seule réponse entière. Lève AppError (llm_unreachable,
+        llm_rejected) avant le premier morceau si le fournisseur ne répond pas ou refuse la demande.
+        `reasoning` (compatible OpenAI) : « none » coupe la réflexion préalable des modèles à raisonnement (Gemma 4,
+        Qwen 3… : sans lui, LM Studio peut épuiser les jetons à réfléchir et ne rien répondre) ; retiré si refusé."""
+        if self.provider.protocol == "anthropic":
+            yield from self._anthropic_stream(system, messages, max_tokens)
+        else:
+            yield from self._openai_stream(system, messages, max_tokens, reasoning)
+
+    def _anthropic_stream(self, system, messages, max_tokens):
+        import anthropic
+
+        try:
+            with self.anthropic_client().messages.stream(model=self.model, max_tokens=max_tokens, system=system,
+                                                         messages=messages) as stream:
+                yield from stream.text_stream
+        except anthropic.APIConnectionError as exc:
+            raise errors.AppError("llm_unreachable", f"Anthropic ne répond pas : {exc}", 502) from exc
+        except anthropic.APIStatusError as exc:
+            raise errors.AppError("llm_rejected", _status_message(self.provider, exc.status_code, str(exc)), 502,
+                                  {"status": exc.status_code}) from exc
+
+    def _openai_stream(self, system, messages, max_tokens, reasoning=None):
+        tokens = "max_completion_tokens" if self.provider.id == "openai" else "max_tokens"
+        body = {"model": self.model, tokens: max_tokens, "stream": True,
+                "messages": [{"role": "system", "content": system}, *messages]}
+        if reasoning:
+            body["reasoning_effort"] = reasoning
+        url = self.base_url.rstrip("/") + "/chat/completions"
+        with self._client() as http:
+            try:
+                with http.stream("POST", url, json=body, headers=self._headers()) as r:
+                    if r.status_code >= 400:
+                        text = r.read().decode(errors="replace")
+                        if r.status_code == 400 and reasoning and re.search(r"reasoning", text, re.I):
+                            fallback = "no-reasoning"  # serveur qui ne connaît pas ce réglage : sans lui
+                        elif r.status_code == 400 and re.search(r"stream", text, re.I):
+                            fallback = True
+                        else:
+                            raise errors.AppError("llm_rejected", _status_message(self.provider, r.status_code, text),
+                                                  502, {"status": r.status_code})
+                    else:
+                        fallback = False
+                        for line in r.iter_lines():
+                            if not line.startswith("data:"):
+                                continue
+                            data = line[5:].strip()
+                            if data == "[DONE]":
+                                break
+                            try:
+                                delta = json.loads(data)["choices"][0].get("delta") or {}
+                            except (ValueError, KeyError, IndexError, TypeError):
+                                continue
+                            if delta.get("content"):
+                                yield delta["content"]
+            except httpx.HTTPError as exc:
+                raise errors.AppError("llm_unreachable", _unreachable(self.provider, self.base_url, exc), 502) from exc
+            if fallback == "no-reasoning":
+                yield from self._openai_stream(system, messages, max_tokens, None)
+                return
+            if fallback:  # serveur sans flux : réponse entière
+                body["stream"] = False
+                r = self._post(http, "/chat/completions", body)
+                if r.status_code >= 400:
+                    raise errors.AppError("llm_rejected", _status_message(self.provider, r.status_code, r.text), 502,
+                                          {"status": r.status_code})
+                try:
+                    yield r.json()["choices"][0]["message"].get("content") or ""
+                except (ValueError, KeyError, IndexError, TypeError):
+                    return
 
     def _headers(self) -> dict:
         if self.provider.protocol == "anthropic":
@@ -314,8 +392,9 @@ def _status_message(provider: Provider, status: int, text: str) -> str:
 
 
 def parse_json_text(text: str) -> dict | None:
-    """JSON d'une réponse, y compris entouré de ```json … ``` (modèles locaux)."""
-    text = text.strip()
+    """JSON d'une réponse, y compris entouré de ```json … ``` ou précédé d'un raisonnement <think>…</think>
+    (modèles locaux)."""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", text, re.S)
     if fenced:
         text = fenced.group(1)

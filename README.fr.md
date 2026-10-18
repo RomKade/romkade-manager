@@ -22,7 +22,7 @@ techniques : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
   - [Installer avec Docker (macOS, Windows, Linux)](#installer-avec-docker-macos-windows-linux) — [Mettre à jour, sauvegarder, désinstaller](#mettre-à-jour-sauvegarder-désinstaller) · [Clé SSH et IA locale avec Docker](#clé-ssh-et-ia-locale-avec-docker) · [Publier une version](#publier-une-version)
   - [Lancer depuis le code source (macOS)](#lancer-depuis-le-code-source-macos)
 - **Développement** : [1. Diagnostic de la vraie console (recommandé d'abord)](#1-diagnostic-de-la-vraie-console-recommandé-dabord) · [2. Synchroniser le catalogue (phase 2)](#2-synchroniser-le-catalogue-phase-2) · [3. Lancer l'application](#3-lancer-lapplication) · [Modifier l'interface (Node 20 ou plus : brew install node)](#modifier-linterface-node-20-ou-plus--brew-install-node) · [4. Premier branchement via l'API (inutile si catalog_report.py a été lancé)](#4-premier-branchement-via-lapi-inutile-si-catalog_reportpy-a-été-lancé) · [5. Utilisation](#5-utilisation)
-- **Fonctions** : [Ajouter des jeux](#ajouter-des-jeux) · [Genres](#genres) · [Illustrations des consoles](#illustrations-des-consoles) · [Bandes-annonces](#bandes-annonces) · [Jaquettes](#jaquettes) · [Jouer sur la console depuis l'interface](#jouer-sur-la-console-depuis-linterface) · [Langues](#langues) · [Sauvegardes](#sauvegardes) · [Reprendre une partie depuis une sauvegarde](#reprendre-une-partie-depuis-une-sauvegarde) · [Bluetooth](#bluetooth) · [Manettes](#manettes) · [Volume](#volume) · [Depuis le téléphone (ngrok)](#depuis-le-téléphone-ngrok) · [Informations sur les jeux](#informations-sur-les-jeux) · [Commandes des jeux](#commandes-des-jeux) · [Connexion à une IA (LLM)](#connexion-à-une-ia-llm) · [Favoris](#favoris) · [Temps de jeu](#temps-de-jeu) · [Tableau de bord](#tableau-de-bord)
+- **Fonctions** : [Ajouter des jeux](#ajouter-des-jeux) · [Genres](#genres) · [Illustrations des consoles](#illustrations-des-consoles) · [Bandes-annonces](#bandes-annonces) · [Jaquettes](#jaquettes) · [Jouer sur la console depuis l'interface](#jouer-sur-la-console-depuis-linterface) · [Langues](#langues) · [Sauvegardes](#sauvegardes) · [Reprendre une partie depuis une sauvegarde](#reprendre-une-partie-depuis-une-sauvegarde) · [Bluetooth](#bluetooth) · [Manettes](#manettes) · [Volume](#volume) · [Depuis le téléphone (ngrok)](#depuis-le-téléphone-ngrok) · [Informations sur les jeux](#informations-sur-les-jeux) · [Commandes des jeux](#commandes-des-jeux) · [Connexion à une IA (LLM)](#connexion-à-une-ia-llm) · [Assistant de jeu](#assistant-de-jeu) · [Favoris](#favoris) · [Temps de jeu](#temps-de-jeu) · [Tableau de bord](#tableau-de-bord)
 - **Fonctionnement** : [Garanties](#garanties) · [Recherche (Typesense)](#recherche-typesense) · [Connexion à la console](#connexion-à-la-console) · [Autres consoles et systèmes](#autres-consoles-et-systèmes)
 - **Projet** : [Version, conditions d'utilisation](#version-conditions-dutilisation) · [Sources et crédits](#sources-et-crédits)
 
@@ -455,6 +455,25 @@ Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions et com
 - Réponses en JSON : sorties structurées (`json_schema`), sinon JSON simple avec le schéma dans la consigne
   (modèles locaux qui ne les gèrent pas).
 - Descriptions sans Claude : jeu par jeu en arrière-plan (arrêt après 5 échecs d'affilée, reprise possible).
+
+## Assistant de jeu
+
+Une bulle en bas à droite de toutes les pages : un assistant IA pour **ta bibliothèque** (trouver un jeu, en
+comparer deux, se servir de l'application). Sur la fiche d'un jeu, ou pendant qu'un jeu tourne sur la console, il
+propose de discuter de **ce jeu** seulement (commandes, objectifs, passage difficile, secrets : un indice d'abord, la
+solution sur demande). Il utilise l'IA réglée dans Paramètres > IA, en ligne ou locale (Ollama, LM Studio ; on demande
+aux modèles à raisonnement de répondre sans réflexion préalable, ce qui garde un modèle local de 12B autour de 10 s par
+réponse). Chaque question passe par deux appels : un aiguillage structuré (dans le sujet ou non, intention, genre,
+console), puis la réponse en flux, construite à partir de la fiche du jeu et des passages de **connaissances**. Les
+questions hors sujet, les demandes de ROM ou de BIOS et les tentatives de changer ses consignes reçoivent le refus de
+l'application, jamais le texte du modèle. Les conversations restent dans le navigateur.
+
+**Connaissances** (Paramètres > Contenu IA) : pour chaque jeu, ses pages Wikipédia (en, fr, es) et sa soluce
+StrategyWiki, récupérées sans IA par les API MediaWiki une fois le jeu identifié par Wikidata (jeu vidéo + bonne
+console), découpées en passages avec leur source et leur licence (CC BY-SA 4.0, citée dans les réponses), indexées
+dans Typesense. Récupération pour un jeu (test, avec une question de test qui montre les passages trouvés) ou pour
+tous ; option de récupération automatique des nouveaux jeux après chaque synchronisation. Conception :
+[docs/STRATEGIE-IA.md](docs/STRATEGIE-IA.md).
 
 ## Favoris
 

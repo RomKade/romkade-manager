@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, Gamepad2, Loader2, Save, Square, Star, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { saveFileUrl, type GameDetail } from "../api/client";
@@ -12,6 +12,8 @@ import { bytes, date, dateTime } from "../lib/format";
 import { assignPlayer, completePlayers } from "../lib/players";
 import { saveLabel } from "../lib/saves";
 import { ConsoleBadge } from "./ConsoleBadge";
+import { assistant } from "../lib/assistant";
+import { AssistantBubble } from "./AssistantBubble";
 import { GameControlsSection } from "./GameControls";
 import { GameInfo } from "./GameInfo";
 import { Cover } from "./Cover";
@@ -38,6 +40,19 @@ export function GameSheet({ id, onClose, onOpen, onVideo }: {
 }) {
   const t = useT();
   const q = useGame(id);
+  // L'assistant sait quel jeu est ouvert (il propose d'en discuter) ; seule la fiche qui l'a annoncé l'efface.
+  const announced = useRef(false);
+  const g = id != null ? q.data : undefined;
+  useEffect(() => {
+    if (g) {
+      assistant.setSheet({ id: g.id, title: g.title, platform: g.platform.label ?? g.platform.directory });
+      announced.current = true;
+    } else if (announced.current) {
+      assistant.setSheet(null);
+      announced.current = false;
+    }
+  }, [g]);
+  useEffect(() => () => { if (announced.current) assistant.setSheet(null); }, []);
   return (
     <Dialog.Root open={id != null} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
@@ -54,6 +69,7 @@ export function GameSheet({ id, onClose, onOpen, onVideo }: {
             </>
           )}
           {q.data && <SheetBody game={q.data} onOpen={onOpen} onVideo={onVideo} />}
+          {id != null && <AssistantBubble placement="sheet" onOpenGame={onOpen} />}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
