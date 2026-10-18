@@ -71,4 +71,4 @@ async def test_generate_needs_key(app_factory, no_llm_env):
         await sync(c)
         game = (await c.get("/api/games")).json()["items"][0]
         r = await c.post(f"/api/games/{game['id']}/controls")
-        assert r.status_code == 409 and r.json()["error"]["code"] == "llm_key_missing"
+        assert r.status_code == 409 and r.json()["error"]["code"] == "llm_none"

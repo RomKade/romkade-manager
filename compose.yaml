@@ -21,6 +21,10 @@ services:
       TZ: ${TZ:-Europe/Paris}
     volumes:
       - romkade-data:/data
+    # IA locale (Ollama, LM Studio) sur cet ordinateur : http://host.docker.internal:11434/v1 dans Paramètres > IA.
+    # Docker Desktop (macOS, Windows) fournit ce nom ; cette ligne le crée aussi sous Linux. Voir docs/local-llm.md.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - typesense
 

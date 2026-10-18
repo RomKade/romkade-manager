@@ -35,7 +35,23 @@ let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
-let llm: { provider: string; model: string | null; base_url: string | null } = { provider: "anthropic", model: "claude-opus-5-5", base_url: null };
+type FakeLlm = { provider: string | null; model: string | null; base_url: string | null; key: boolean; tested: boolean };
+const NO_LLM: FakeLlm = { provider: null, model: null, base_url: null, key: false, tested: false };
+let llm: FakeLlm = { ...NO_LLM };
+function llmStatus() {
+  const local = llm.provider === "local";
+  const model = llm.model ?? (llm.provider === "anthropic" ? "claude-opus-5-5" : null);
+  const problem = !llm.provider ? "llm_none" : !local && !llm.key ? "llm_key_missing" : !model ? "llm_no_model" : null;
+  const state = !llm.provider ? "none" : problem ? "incomplete" : llm.tested ? "connected" : "untested";
+  const p = (id: string, kind: string, key: string, base_url: string, default_model: string | null) =>
+    ({ id, label: id, kind, key, keys_url: null, base_url, default_model, batch: id === "anthropic",
+       key_source: id === llm.provider && llm.key ? "keychain" : null });
+  return { provider: llm.provider, model, base_url: llm.base_url, ready: !problem, problem, state, last_error: null,
+    tested_at: llm.tested ? "2026-10-18T10:00:00Z" : null, local,
+    local_presets: { Ollama: "http://localhost:11434/v1", "LM Studio": "http://localhost:1234/v1", "Ollama (Docker)": "http://host.docker.internal:11434/v1" },
+    providers: [p("anthropic", "cloud", "required", "https://api.anthropic.com/v1", "claude-opus-5-5"),
+      p("openai", "cloud", "required", "https://api.openai.com/v1", null), p("local", "local", "optional", "http://localhost:11434/v1", null)] };
+}
 let systemCaps: Record<string, boolean> | null = null; // null : système inconnu (tout reste affiché)
 let volume = { percent: 60, muted: false };
 let playAlerts: { id: number; created_at: string; minutes: number; scope: string; game_title: string }[] = [];
@@ -58,21 +74,11 @@ function mockFetch() {
     if (url === "/api/device/host-key/trust") { hostKeyTrusted = true; return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: true }); }
     if (url === "/api/device/host-key") return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: false });
     if (url.startsWith("/api/settings/llm/models")) return json(["llama3.2:3b", "qwen2.5:7b"]);
-    if (url === "/api/settings/llm/test") return json({ ok: true, provider: "local", model: "qwen2.5:7b", seconds: 2.4 });
-    if (url.startsWith("/api/settings/llm/key")) return new Response(null, { status: 204 });
+    if (url === "/api/settings/llm/test") { llm.tested = true; return json({ ok: true, provider: llm.provider, model: "x", seconds: 2.4 }); }
+    if (url.startsWith("/api/settings/llm/key")) { llm = { ...llm, key: init?.method === "PUT", tested: false }; return json(llmStatus()); }
     if (url === "/api/settings/llm") {
-      if (init?.body) llm = { ...llm, ...(JSON.parse(String(init.body)) as object) };
-      const local = llm.provider === "local";
-      return json({ ...llm, ready: local ? !!llm.model : true, problem: local && !llm.model ? "llm_no_model" : null,
-        local_presets: { Ollama: "http://localhost:11434/v1", "LM Studio": "http://localhost:1234/v1" },
-        providers: [
-          { id: "anthropic", label: "Claude (Anthropic)", kind: "cloud", key: "required", keys_url: "https://console.anthropic.com/settings/keys",
-            base_url: "https://api.anthropic.com/v1", default_model: "claude-opus-5-5", batch: true, key_source: "keychain" },
-          { id: "openai", label: "ChatGPT (OpenAI)", kind: "cloud", key: "required", keys_url: null, base_url: "https://api.openai.com/v1",
-            default_model: null, batch: false, key_source: null },
-          { id: "local", label: "Modèle local", kind: "local", key: "none", keys_url: null, base_url: "http://localhost:11434/v1",
-            default_model: null, batch: false, key_source: null },
-        ] });
+      if (init?.body) llm = { ...llm, model: null, base_url: null, ...(JSON.parse(String(init.body)) as object), tested: false };
+      return json(llmStatus());
     }    if (url.startsWith("/api/settings")) return json({ host: "192.168.86.242", port: 22, username: "root", auth_method: "password", key_path: null, roms_root: "/mnt/mmc/Roms", connect_timeout: 8, has_password: true, host_key_trusted: hostKeyTrusted });
     if (url.startsWith("/api/platforms")) return json([{ ...platform, label_status: "confirmed", kind: "emulated", present: true, image_dir_present: true, last_scanned_at: null, game_count: 2, file_count: 2, total_bytes: 1048576, image_count: 0, images_matched: 0 }]);
     if (url.startsWith("/api/catalog/facets")) return json({
@@ -211,7 +217,7 @@ beforeEach(() => {
   playingId = null;
   favoriteIds = [];
   hostKeyTrusted = true;
-  llm = { provider: "anthropic", model: "claude-opus-5-5", base_url: null };
+  llm = { ...NO_LLM };
   volume = { percent: 60, muted: false };
   playAlerts = [];
   vi.stubGlobal("fetch", mockFetch());
@@ -559,31 +565,48 @@ describe("Paramètres", () => {
 });
 
 describe("Connexion à une IA", () => {
-  it("passe de Claude à un modèle local : liste des modèles, enregistrement, test", async () => {
+  it("sans IA : Claude se connecte avec la seule clé, vérifiée automatiquement", async () => {
     renderAt("/parametres/ia");
-    expect(await screen.findByText(/Prête : Claude \(Anthropic\) · claude-opus-5-5/)).toBeInTheDocument();
-    const form = screen.getByRole("heading", { name: /Choisir l'IA/ }).closest("form")!;
-    expect(within(form).getByText("Une clé est enregistrée dans le trousseau macOS.")).toBeInTheDocument();
-    await userEvent.click(within(form).getByRole("radio", { name: /Ollama, LM Studio/ }));
-    expect(within(form).queryByLabelText(/Clé d'API/)).not.toBeInTheDocument();
-    await userEvent.click(within(form).getByRole("button", { name: "LM Studio" }));
-    await userEvent.click(await within(form).findByRole("option", { name: "qwen2.5:7b" }));
-    await userEvent.click(within(form).getByRole("button", { name: "Enregistrer" }));
-    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "local", model: "qwen2.5:7b",
-      base_url: "http://localhost:1234/v1" }));
-    expect(await screen.findByText(/Prête : Ollama, LM Studio… · qwen2.5:7b/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Tester/ }));
-    expect(await screen.findByText(/qwen2.5:7b répond/)).toBeInTheDocument();
+    expect(await screen.findByText("Aucune IA connectée")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: /Claude \(Anthropic\)/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "anthropic" }));
+    expect(await screen.findByText("Ajoute la clé d'API de Claude (Anthropic) ci-dessous.")).toBeInTheDocument();
+    const key = screen.getByLabelText("Clé d'API Claude (Anthropic)");
+    await userEvent.type(key, "sk-ant-test");
+    expect(key).toHaveAttribute("type", "password");
+    await userEvent.click(screen.getByRole("button", { name: "Afficher" }));
+    expect(key).toHaveAttribute("type", "text");
+    await userEvent.click(screen.getByRole("button", { name: /trousseau/ }));
+    await waitFor(() => expect(bodies.some((b) => b.url === "/api/settings/llm/key" && b.api_key === "sk-ant-test")).toBe(true));
+    expect(await screen.findByText("Connectée : Claude (Anthropic) · claude-opus-5-5")).toBeInTheDocument();
+    expect(calls).toContain("/api/settings/llm/test");
   });
 
-  it("demande une clé pour un service en ligne et l'enregistre dans le trousseau", async () => {
+  it("modèle local : adresse LM Studio, modèle de la liste, guide d'installation", async () => {
     renderAt("/parametres/ia");
-    const form = (await screen.findByRole("heading", { name: /Choisir l'IA/ })).closest("form")!;
-    await userEvent.click(within(form).getByRole("radio", { name: /ChatGPT/ }));
-    expect(within(form).getByText(/Enregistre d'abord la clé/)).toBeInTheDocument();
-    await userEvent.type(within(form).getByLabelText("Clé d'API ChatGPT (OpenAI)"), "sk-proj-test");
-    await userEvent.click(within(form).getByRole("button", { name: /trousseau/ }));
-    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm/key", provider: "openai", api_key: "sk-proj-test" }));
+    await userEvent.click(await screen.findByRole("radio", { name: /Ollama, LM Studio, autre/ }));
+    expect(await screen.findByRole("link", { name: /Guide : installer un LLM local/ }))
+      .toHaveAttribute("href", "https://github.com/arnoweb/romkade-manager/blob/main/docs/local-llm.fr.md");
+    await userEvent.click(screen.getByRole("button", { name: "LM Studio" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "local", base_url: "http://localhost:1234/v1", model: null }));
+    await userEvent.click(await screen.findByRole("option", { name: "qwen2.5:7b" }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "local", model: "qwen2.5:7b", base_url: "http://localhost:1234/v1" }));
+    expect(await screen.findByText(/Connectée : Ollama, LM Studio, autre… · qwen2.5:7b/)).toBeInTheDocument();
+  });
+});
+
+describe("Système de la console", () => {
+  it("met en avant ce que la console sait faire, regroupé, avant le choix du système et l'horloge", async () => {
+    systemCaps = { launch: true, resume_slot: false, quit: true, save_state: true, now_playing: true, saves: true,
+      retroarch_logs: true, bluetooth: false, bluetooth_audio: false, players: true, volume: true };
+    renderAt("/parametres/systeme");
+    const panel = (await screen.findByRole("heading", { name: "Ce que tu peux faire avec cette console" })).closest("section")!;
+    expect(within(panel).getByRole("heading", { name: /Jeux/ })).toBeInTheDocument();
+    expect(within(panel).getByRole("heading", { name: /Son/ })).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: "Choisir la manette de chaque joueur" })).toHaveAttribute("href", "/manettes");
+    expect(within(panel).getByText("Bluetooth").closest("li")).toHaveClass("caps__no");
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings.indexOf("Ce que tu peux faire avec cette console")).toBeLessThan(headings.findIndex((h) => /Date et heure/.test(h ?? "")));
   });
 });
 

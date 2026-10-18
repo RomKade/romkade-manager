@@ -4,12 +4,13 @@ commandes des jeux).
 Fournisseurs :
 - Claude (Anthropic) : API Messages, sorties structurées, et lots à moitié prix pour les descriptions ;
 - ChatGPT (OpenAI), Mistral, Gemini (Google), ou tout autre service compatible OpenAI (adresse au choix) ;
-- un modèle local à poids ouverts servi sur ce Mac par Ollama ou LM Studio (protocole OpenAI, sans clé ni coût).
+- un modèle local à poids ouverts (Ollama, LM Studio, sur cet ordinateur ou un autre du réseau) ou tout autre service
+  compatible OpenAI, à l'adresse choisie (« local », clé facultative).
 Tous sauf Claude passent par le protocole « chat completions » d'OpenAI (httpx, sans SDK de plus).
 
-Les clés vont dans le trousseau macOS ; le fournisseur, le modèle et l'adresse dans llm.json (dossier de données).
-Le modèle n'est jamais deviné : il est choisi dans la liste renvoyée par le fournisseur (GET /models), sauf
-Claude Opus 5.5 par défaut pour Anthropic (réglage historique des descriptions).
+Les clés vont dans le trousseau du système (ou secrets.json dans Docker) ; le fournisseur, le modèle, l'adresse et le
+dernier test dans llm.json (dossier de données). Le modèle n'est jamais inventé : à défaut de choix, il est pris dans
+la liste renvoyée par le fournisseur (GET /models, suggest_model), sauf Claude Opus 5.5 par défaut pour Anthropic.
 """
 
 import json
@@ -55,20 +56,66 @@ PROVIDERS: dict[str, Provider] = {p.id: p for p in (
              r"[A-Za-z0-9]{20,}", "https://console.mistral.ai/api-keys", "MISTRAL_API_KEY"),
     Provider("gemini", "Gemini (Google)", "cloud", "openai", "https://generativelanguage.googleapis.com/v1beta/openai",
              "required", r"AIza[0-9A-Za-z_\-]{30,}", "https://aistudio.google.com/apikey", "GEMINI_API_KEY"),
-    Provider("local", "Modèle local (Ollama, LM Studio…)", "local", "openai", "http://localhost:11434/v1", "none"),
-    Provider("custom", "Autre service compatible OpenAI", "cloud", "openai", None, "optional"),
+    Provider("local", "Modèle local ou service compatible OpenAI", "local", "openai", "http://localhost:11434/v1",
+             "optional"),
 )}
-# Adresses habituelles des serveurs locaux (protocole OpenAI).
-LOCAL_PRESETS = {"Ollama": "http://localhost:11434/v1", "LM Studio": "http://localhost:1234/v1"}
+# Adresses habituelles des serveurs locaux (protocole OpenAI). Dans Docker, « localhost » est le conteneur :
+# host.docker.internal joint l'ordinateur hôte (Docker Desktop ; compose.yaml l'ajoute aussi sous Linux).
+LOCAL_PRESETS = {"Ollama": "http://localhost:11434/v1", "LM Studio": "http://localhost:1234/v1",
+                 "Ollama (Docker)": "http://host.docker.internal:11434/v1"}
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]", "host.docker.internal"}
+
+# Modèle proposé quand l'utilisateur n'en choisit pas : premier motif qui correspond, version la plus récente.
+SUGGEST: dict[str, list[str]] = {
+    "openai": [r"gpt-\d+(\.\d+)?", r"gpt-\d+(\.\d+)?-mini", r"gpt-4o"],
+    "mistral": [r"mistral-large-latest", r"mistral-medium-latest", r"mistral-small-latest"],
+    "gemini": [r"gemini-\d+(\.\d+)?-pro", r"gemini-\d+(\.\d+)?-flash", r"gemini-[\w.-]*pro[\w.-]*",
+               r"gemini-[\w.-]*flash[\w.-]*"],
+}
+_NOT_CHAT = re.compile(r"embed|whisper|tts|dall-e|image|audio|realtime|moderation|transcribe|search|vision-preview|"
+                       r"rerank|ocr|guard", re.I)
+
+
+def _version_key(model_id: str) -> tuple:
+    return tuple(int(n) for n in re.findall(r"\d+", model_id))
+
+
+def suggest_model(provider_id: str, ids: list[str]) -> str | None:
+    """Modèle à proposer parmi ceux du fournisseur : jamais un nom inventé, seulement un de la liste."""
+    chat = [i for i in ids if not _NOT_CHAT.search(i)]
+    for pattern in SUGGEST.get(provider_id, []):
+        found = [i for i in chat if re.fullmatch(pattern, i)]
+        if found:
+            return max(found, key=_version_key)
+    return chat[0] if chat and provider_id == "local" else None
+
+
+def is_local_url(url: str | None) -> bool:
+    from urllib.parse import urlparse
+
+    host = (urlparse(url or "").hostname or "").lower()
+    return host in _LOCAL_HOSTS or host.endswith(".local") or host.startswith("192.168.") or host.startswith("10.")
+
 
 # Clé Anthropic : même entrée du trousseau qu'avant (Paramètres > Descriptions), pour ne rien perdre.
 ANTHROPIC_KEY = ("api.anthropic.com", "game-descriptions")
 
 
+class LlmTest(BaseModel):
+    """Dernière vérification (bouton Vérifier, ou automatique après l'enregistrement), pour le voyant d'état."""
+    provider: str
+    model: str
+    base_url: str
+    ok: bool
+    at: str
+    error: str | None = None
+
+
 class LlmConfig(BaseModel):
-    provider: str = "anthropic"
+    provider: str | None = None  # None : aucune IA choisie
     model: str | None = None  # None : modèle par défaut du fournisseur, s'il en a un
-    base_url: str | None = None  # None : adresse du fournisseur (obligatoire pour « custom »)
+    base_url: str | None = None  # None : adresse du fournisseur
+    last_test: LlmTest | None = None
 
 
 class LlmConfigStore:
@@ -80,7 +127,9 @@ class LlmConfigStore:
             cfg = LlmConfig.model_validate_json(self.path.read_text())
         except (OSError, ValueError):
             return LlmConfig()
-        return cfg if cfg.provider in PROVIDERS else LlmConfig()
+        if cfg.provider == "custom":  # ancien choix « autre service compatible OpenAI », fusionné avec « local »
+            cfg.provider = "local"
+        return cfg if cfg.provider is None or cfg.provider in PROVIDERS else LlmConfig()
 
     def save(self, cfg: LlmConfig) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -143,8 +192,12 @@ class LLM:
     def label(self) -> str:
         return f"{self.provider.label} · {self.model}"
 
+    @property
+    def local(self) -> bool:
+        return self.provider.id == "local" and is_local_url(self.base_url)
+
     def _client(self) -> httpx.Client:
-        timeout = TIMEOUT_LOCAL if self.provider.kind == "local" else TIMEOUT_CLOUD
+        timeout = TIMEOUT_LOCAL if self.provider.id == "local" else TIMEOUT_CLOUD
         return httpx.Client(transport=self.transport, timeout=httpx.Timeout(timeout, connect=10.0))
 
     def anthropic_client(self):
@@ -244,9 +297,9 @@ class LLM:
 
 
 def _unreachable(provider: Provider, base_url: str, exc: Exception) -> str:
-    if provider.kind == "local":
-        return (f"Aucun modèle local ne répond sur {base_url} : lance Ollama ou LM Studio (serveur démarré) et "
-                f"vérifie l'adresse.")
+    if provider.id == "local":
+        return (f"Aucun service ne répond sur {base_url} : lance Ollama ou LM Studio (serveur démarré) et vérifie "
+                f"l'adresse (dans Docker, utilise http://host.docker.internal:11434/v1).")
     return f"{provider.label} ne répond pas ({type(exc).__name__}) : vérifie la connexion à Internet et l'adresse."
 
 
@@ -286,10 +339,20 @@ def parse_anthropic(message) -> dict | None:
     return parse_json_text(next((b.text for b in message.content if b.type == "text"), ""))
 
 
+def effective_provider(cfg: LlmConfig, credentials) -> str | None:
+    """Fournisseur choisi ; sans choix enregistré, Claude si une clé Anthropic existe déjà (réglage d'avant)."""
+    if cfg.provider:
+        return cfg.provider
+    return "anthropic" if key_source(credentials, PROVIDERS["anthropic"]) else None
+
+
 def build(cfg: LlmConfig, credentials, transport: httpx.BaseTransport | None = None, *,
           require_model: bool = True) -> LLM:
     """Modèle prêt à l'emploi d'après les réglages, ou AppError expliquant ce qui manque."""
-    provider = PROVIDERS[cfg.provider]
+    pid = effective_provider(cfg, credentials)
+    if pid is None:
+        raise errors.AppError("llm_none", "Aucune IA n'est connectée : choisis-en une dans Paramètres > IA.", 409)
+    provider = PROVIDERS[pid]
     base_url = (cfg.base_url or provider.base_url or "").strip()
     if not base_url:
         raise errors.AppError("llm_no_url", "Indique l'adresse du service (Paramètres > IA).", 409)
@@ -308,16 +371,56 @@ def resolve(state) -> LLM:
     return build(state.llm_config.load(), state.credentials, getattr(state, "llm_transport", None))
 
 
+def autofill_model(state) -> None:
+    """Sans modèle choisi, prend celui que suggère la liste du fournisseur (si la clé ou l'adresse le permettent)."""
+    store = state.llm_config
+    cfg = store.load()
+    pid = effective_provider(cfg, state.credentials)
+    if pid is None or cfg.model or PROVIDERS[pid].default_model:
+        return
+    try:
+        llm = build(cfg, state.credentials, getattr(state, "llm_transport", None), require_model=False)
+        model = suggest_model(pid, llm.list_models())
+    except errors.AppError:
+        return
+    if model:
+        cfg.provider, cfg.model = pid, model
+        store.save(cfg)
+
+
+def record_test(state, llm: LLM, ok: bool, error: str | None = None) -> None:
+    from datetime import UTC, datetime
+
+    store = state.llm_config
+    cfg = store.load()
+    cfg.last_test = LlmTest(provider=llm.provider.id, model=llm.model, base_url=llm.base_url, ok=ok, error=error,
+                            at=datetime.now(UTC).isoformat(timespec="seconds"))
+    store.save(cfg)
+
+
 def status(state) -> dict:
-    """Réglages et état de la connexion, pour Paramètres > IA (sans jamais renvoyer de clé)."""
+    """Réglages et état de la connexion, pour Paramètres > IA (sans jamais renvoyer de clé).
+
+    `state` : none (aucune IA), incomplete (clé, modèle ou adresse manquants), untested (prête, pas encore vérifiée
+    avec ces réglages), connected (dernière vérification réussie), error (dernière vérification en échec)."""
     cfg = state.llm_config.load()
+    pid = effective_provider(cfg, state.credentials)
+    llm = None
     try:
         llm = resolve(state)
-        ready, problem, model = True, None, llm.model
+        ready, problem, model, base_url = True, None, llm.model, llm.base_url
     except errors.AppError as exc:
-        ready, problem, model = False, exc.code, cfg.model or PROVIDERS[cfg.provider].default_model
+        ready, problem = False, exc.code
+        model = cfg.model or (PROVIDERS[pid].default_model if pid else None)
+        base_url = cfg.base_url
+    test = cfg.last_test
+    same = bool(llm and test and (test.provider, test.model, test.base_url) == (llm.provider.id, llm.model, llm.base_url))
+    conn = ("none" if pid is None else "incomplete" if not ready else
+            ("connected" if test.ok else "error") if same else "untested")
     return {
-        "provider": cfg.provider, "model": model, "base_url": cfg.base_url, "ready": ready, "problem": problem,
+        "provider": pid, "model": model, "base_url": cfg.base_url, "ready": ready, "problem": problem,
+        "state": conn, "last_error": test.error if same and not test.ok else None,
+        "tested_at": test.at if same else None, "local": bool(llm and llm.local) or (pid == "local" and is_local_url(base_url or PROVIDERS["local"].base_url)),
         "local_presets": LOCAL_PRESETS,
         "providers": [{"id": p.id, "label": p.label, "kind": p.kind, "key": p.key, "keys_url": p.keys_url,
                        "base_url": p.base_url, "default_model": p.default_model, "batch": p.batch,

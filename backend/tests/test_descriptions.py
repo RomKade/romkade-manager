@@ -55,9 +55,10 @@ async def test_api_key_and_start(app_factory, monkeypatch, no_llm_env):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         assert (await c.put("/api/settings/llm/key", json={"provider": "anthropic", "api_key": "pas-une-cle"})).status_code == 422
         r = await c.post("/api/descriptions/start")
-        assert r.status_code == 409 and r.json()["error"]["code"] == "llm_key_missing"
+        assert r.status_code == 409 and r.json()["error"]["code"] == "llm_none"
+        # Une clé Anthropic suffit (réglage d'avant le choix du fournisseur) : Claude devient l'IA par défaut.
         key = {"provider": "anthropic", "api_key": "sk-ant-api03-" + "x" * 40}
-        assert (await c.put("/api/settings/llm/key", json=key)).status_code == 204
+        assert (await c.put("/api/settings/llm/key", json=key)).json()["provider"] == "anthropic"
         st = (await c.get("/api/descriptions")).json()
         assert st["credentials"] and st["model"] == "claude-opus-5-5" and st["batch"] and st["batches"] == []
         assert st["estimate_usd"] is not None

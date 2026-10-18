@@ -26,9 +26,9 @@ class BatchOut(BaseModel):
 
 class DescriptionsStatusOut(BaseModel):
     credentials: bool  # LLM prêt (fournisseur, clé et modèle) : voir GET /api/settings/llm
-    problem: str | None  # llm_key_missing, llm_no_model, llm_no_url
-    provider: str
-    provider_label: str
+    problem: str | None  # llm_none, llm_key_missing, llm_no_model, llm_no_url
+    provider: str | None
+    provider_label: str | None
     model: str | None
     batch: bool  # lot à moitié prix (Claude) ; sinon jeu par jeu
     local: bool  # modèle local : gratuit
@@ -73,15 +73,18 @@ def _status(request: Request) -> dict:
         batches.append(out)
     pending = cov["games"] - cov["complete"]
     cfg = st.llm_config.load()
-    provider = llm_mod.PROVIDERS[cfg.provider]
+    pid = llm_mod.effective_provider(cfg, st.credentials)
+    provider = llm_mod.PROVIDERS[pid] if pid else None
+    local = False
     try:
         llm = llm_mod.resolve(st)
-        ready, problem, model = True, None, llm.model
+        ready, problem, model, local = True, None, llm.model, llm.local
     except errors.AppError as exc:
-        ready, problem, model = False, exc.code, cfg.model or provider.default_model
-    return {"credentials": ready, "problem": problem, "provider": provider.id, "provider_label": provider.label,
-            "model": model, "batch": provider.batch, "local": provider.kind == "local", **cov, "pending": pending,
-            "estimate_usd": round(pending * d.COST_PER_GAME_USD, 2) if provider.batch else None, "batches": batches}
+        ready, problem, model = False, exc.code, cfg.model or (provider.default_model if provider else None)
+    batch = bool(provider and provider.batch)
+    return {"credentials": ready, "problem": problem, "provider": pid, "provider_label": provider.label if provider else None,
+            "model": model, "batch": batch, "local": local, **cov, "pending": pending,
+            "estimate_usd": round(pending * d.COST_PER_GAME_USD, 2) if batch else None, "batches": batches}
 
 
 @router.get("/descriptions", response_model=DescriptionsStatusOut)

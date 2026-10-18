@@ -40,33 +40,50 @@ def test_parse_json_text():
     assert llm.parse_json_text("[1, 2]") is None and llm.parse_json_text("pas du json") is None
 
 
+def test_suggest_model_and_local_urls():
+    assert llm.suggest_model("openai", ["gpt-4o", "gpt-5", "gpt-5.1", "gpt-5.1-mini", "text-embedding-3-large"]) == "gpt-5.1"
+    assert llm.suggest_model("mistral", ["codestral-latest", "mistral-large-latest"]) == "mistral-large-latest"
+    assert llm.suggest_model("gemini", ["gemini-2.5-flash", "gemini-2.5-pro", "text-embedding-004"]) == "gemini-2.5-pro"
+    assert llm.suggest_model("local", ["nomic-embed-text", "gemma4:12b"]) == "gemma4:12b"
+    assert llm.suggest_model("openai", ["whisper-1"]) is None  # jamais un nom inventé
+    assert llm.is_local_url("http://host.docker.internal:11434/v1") and llm.is_local_url("http://localhost:1234/v1")
+    assert not llm.is_local_url("https://api.groq.com/openai/v1")
+
+
+def test_old_custom_provider_becomes_local(tmp_path):
+    path = tmp_path / "llm.json"
+    path.write_text(json.dumps({"provider": "custom", "model": "m", "base_url": "https://x.example/v1"}))
+    assert llm.LlmConfigStore(path).load().provider == "local"
+
+
 async def test_status_keys_and_providers(app_factory):
     app = app_factory()
+    transport, _ = fake_server(lambda body: "{}", models=("gpt-4o", "gpt-5", "text-embedding-3-small"))
+    app.state.llm_transport = transport
     async with client(app) as c:
         st = (await c.get("/api/settings/llm")).json()
-        assert st["provider"] == "anthropic" and st["model"] == "claude-opus-5-5"
-        assert not st["ready"] and st["problem"] == "llm_key_missing"
-        assert {p["id"] for p in st["providers"]} == {"anthropic", "openai", "mistral", "gemini", "local", "custom"}
-        assert st["local_presets"]["Ollama"] == "http://localhost:11434/v1"
+        assert st["provider"] is None and st["state"] == "none" and st["problem"] == "llm_none"
+        assert {p["id"] for p in st["providers"]} == {"anthropic", "openai", "mistral", "gemini", "local"}
+        assert st["local_presets"]["Ollama (Docker)"] == "http://host.docker.internal:11434/v1"
 
         bad = await c.put("/api/settings/llm/key", json={"provider": "openai", "api_key": "sk-ant-pas-openai"})
         assert bad.status_code == 422 and bad.json()["error"]["code"] == "llm_key_format"
-        none = await c.put("/api/settings/llm/key", json={"provider": "local", "api_key": "x" * 30})
-        assert none.status_code == 422 and none.json()["error"]["code"] == "llm_key_unused"
-        assert (await c.put("/api/settings/llm/key", json={"provider": "openai", "api_key": "sk-proj-" + "a" * 40})).status_code == 204
 
         st = (await c.put("/api/settings/llm", json={"provider": "openai"})).json()
-        assert st["problem"] == "llm_no_model"  # jamais de modèle deviné hors Anthropic
+        assert st["state"] == "incomplete" and st["problem"] == "llm_key_missing"
+        # La clé suffit : le modèle est pris dans la liste du fournisseur.
+        st = (await c.put("/api/settings/llm/key", json={"provider": "openai", "api_key": "sk-proj-" + "a" * 40})).json()
+        assert st["ready"] and st["model"] == "gpt-5" and st["state"] == "untested"
         assert next(p for p in st["providers"] if p["id"] == "openai")["key_source"] == "keychain"
-        st = (await c.put("/api/settings/llm", json={"provider": "openai", "model": "gpt-test"})).json()
-        assert st["ready"] and st["model"] == "gpt-test"
-        assert (await c.delete("/api/settings/llm/key/openai")).status_code == 204
-        assert (await c.get("/api/settings/llm")).json()["problem"] == "llm_key_missing"
+        st = (await c.put("/api/settings/llm", json={"provider": "openai", "model": "gpt-4o"})).json()
+        assert st["model"] == "gpt-4o"
+        st = (await c.delete("/api/settings/llm/key/openai")).json()
+        assert st["state"] == "incomplete" and st["problem"] == "llm_key_missing"
 
-        assert (await c.put("/api/settings/llm", json={"provider": "custom"})).json()["problem"] == "llm_no_url"
-        r = await c.put("/api/settings/llm", json={"provider": "custom", "base_url": "ftp://x"})
+        r = await c.put("/api/settings/llm", json={"provider": "local", "base_url": "ftp://x"})
         assert r.status_code == 422
         assert (await c.put("/api/settings/llm", json={"provider": "nimporte"})).status_code == 422
+        assert (await c.put("/api/settings/llm", json={"provider": None})).json()["state"] == "none"
 
 
 async def test_local_model_list_test_and_fallback(app_factory):
@@ -80,8 +97,15 @@ async def test_local_model_list_test_and_fallback(app_factory):
         st = (await c.put("/api/settings/llm", json={"provider": "local", "model": "qwen2.5:7b",
                                                       "base_url": "http://localhost:1234/v1"})).json()
         assert st["ready"] and st["base_url"] == "http://localhost:1234/v1"
+        assert (await c.get("/api/settings/llm")).json()["state"] == "untested"
         r = await c.post("/api/settings/llm/test")
         assert r.status_code == 200 and r.json()["ok"] and r.json()["model"] == "qwen2.5:7b"
+        st = (await c.get("/api/settings/llm")).json()
+        assert st["state"] == "connected" and st["tested_at"] and st["local"]
+        # Changer de modèle : la vérification ne vaut plus.
+        st = (await c.put("/api/settings/llm", json={"provider": "local", "model": "llama3.2:3b",
+                                                      "base_url": "http://localhost:1234/v1"})).json()
+        assert st["state"] == "untested"
         # Sans sorties structurées : nouvel essai en JSON simple, schéma dans la consigne, sans clé.
         assert [b["response_format"]["type"] for b in seen] == ["json_schema", "json_object"]
         assert seen[-1]["url"] == "http://localhost:1234/v1/chat/completions" and seen[-1]["auth"] is None
@@ -99,7 +123,9 @@ async def test_local_model_unreachable(app_factory):
         await c.put("/api/settings/llm", json={"provider": "local", "model": "llama3.2:3b"})
         r = await c.post("/api/settings/llm/test")
         assert r.status_code == 502 and r.json()["error"]["code"] == "llm_unreachable"
-        assert "Ollama ou LM Studio" in r.json()["error"]["message"]
+        assert "Ollama ou LM Studio" in r.json()["error"]["message"] and "host.docker.internal" in r.json()["error"]["message"]
+        st = (await c.get("/api/settings/llm")).json()
+        assert st["state"] == "error" and "Ollama" in st["last_error"]
 
 
 async def test_openai_controls_end_to_end(app_factory):

@@ -134,10 +134,10 @@ export const api = {
   descriptions: () => request<DescriptionsStatus>("GET", "/descriptions"),
   startDescriptions: () => request<DescriptionsStatus>("POST", "/descriptions/start"),
   llmSettings: () => request<LlmSettings>("GET", "/settings/llm"),
-  saveLlmSettings: (b: { provider: string; model?: string | null; base_url?: string | null }) =>
+  saveLlmSettings: (b: { provider: string | null; model?: string | null; base_url?: string | null }) =>
     request<LlmSettings>("PUT", "/settings/llm", b),
-  saveLlmKey: (provider: string, api_key: string) => request<void>("PUT", "/settings/llm/key", { provider, api_key }),
-  deleteLlmKey: (provider: string) => request<void>("DELETE", `/settings/llm/key/${encodeURIComponent(provider)}`),
+  saveLlmKey: (provider: string, api_key: string) => request<LlmSettings>("PUT", "/settings/llm/key", { provider, api_key }),
+  deleteLlmKey: (provider: string) => request<LlmSettings>("DELETE", `/settings/llm/key/${encodeURIComponent(provider)}`),
   llmModels: (provider: string, base_url?: string | null) =>
     request<string[]>("GET", `/settings/llm/models?${new URLSearchParams({ provider, ...(base_url ? { base_url } : {}) })}`),
   testLlm: () => request<LlmTest>("POST", "/settings/llm/test"),

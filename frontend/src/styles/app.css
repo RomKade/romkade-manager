@@ -1260,3 +1260,37 @@ kbd {
   .brand__icon { display: block; }
   .terms-notice { margin: 10px 16px 0; }
 }
+
+/* ---------- Voyants d'état (IA, console) ---------- */
+.status-dot { width: 12px; height: 12px; flex: none; border-radius: 50%; background: var(--line-strong); box-shadow: 0 0 0 3px color-mix(in srgb, var(--line-strong) 25%, transparent); }
+.is-connected .status-dot, .is-online .status-dot { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent), 0 0 10px var(--ok); }
+.is-untested .status-dot, .is-checking .status-dot { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 25%, transparent); }
+.is-checking .status-dot { animation: dot-pulse 1.1s ease-in-out infinite; }
+.is-error .status-dot, .is-offline .status-dot { background: var(--err); box-shadow: 0 0 0 3px color-mix(in srgb, var(--err) 25%, transparent); }
+@keyframes dot-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .is-checking .status-dot { animation: none; } }
+.llm-status__line { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 14px; border-radius: var(--r-control);
+  background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); }
+.llm-status__line > div:nth-child(2) { flex: 1; min-width: 220px; }
+.llm-status__line p { margin: 0; }
+.llm-status__title { font-weight: 700; color: var(--ink); }
+.llm-status__actions { display: flex; align-items: center; gap: 12px; }
+.llm__keytag { font-size: var(--fs-xs); color: var(--ok); font-weight: 600; }
+.llm__model { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin: 0; }
+.llm__optional summary { cursor: pointer; color: var(--ink-2); font-size: var(--fs-sm); }
+.llm__optional[open] summary { margin-bottom: 8px; }
+.llm__doc { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-weight: 600; }
+.secret { position: relative; display: flex; flex: 1; min-width: 0; }
+.secret input { flex: 1; min-width: 0; padding-right: 40px; }
+.secret__toggle { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px;
+  display: grid; place-items: center; border: none; border-radius: 6px; background: none; color: var(--ink-2); cursor: pointer; }
+.secret__toggle:hover, .secret__toggle:focus-visible { color: var(--ink); background: var(--panel-2); }
+/* Capacités de la console (Paramètres > Système) */
+.caps-panel__state { display: flex; align-items: center; gap: 10px; margin: 0; font-weight: 600; }
+.caps-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px 24px; }
+.caps-group h3 { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); margin: 0 0 8px; }
+.caps-group .caps { grid-template-columns: 1fr; gap: 6px; }
+.caps li { align-items: center; }
+.caps__yes svg { color: var(--ok); flex: none; }
+.caps__no svg { color: var(--ink-3); flex: none; }
+.caps__no span:not(.visually-hidden) { text-decoration: line-through; text-decoration-color: var(--ink-3); }

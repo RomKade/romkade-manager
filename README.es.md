@@ -367,21 +367,24 @@ de API de IA que las descripciones (Ajustes > IA).
 
 ## Conexión a una IA (LLM)
 
-Ajustes > IA: una sola IA para todo lo que la usa (descripciones de los juegos, controles de los juegos).
-`backend/app/services/llm.py`:
+Ajustes > IA: una sola IA para todo lo que la usa (descripciones y controles de los juegos), con un indicador de estado
+(gris: ninguna, naranja: comprobando, verde: conectada, rojo: error). `backend/app/services/llm.py`:
 
-| Proveedor | Clave | Observaciones |
+| Opción | Clave | Notas |
 |---|---|---|
-| Claude (Anthropic) | `sk-ant-…` | Claude Opus 5.5 por defecto; descripciones por lotes (a mitad de precio) |
+| Claude (Anthropic) | `sk-ant-…` | Claude Opus 5.5 por defecto; descripciones por lotes (mitad de precio) |
 | ChatGPT (OpenAI), Mistral, Gemini | clave del proveedor | protocolo OpenAI (chat completions) |
-| Otro servicio compatible con OpenAI | opcional | dirección a elegir (`…/v1`) |
-| Modelo local (Ollama, LM Studio) | ninguna | pesos abiertos en el Mac, gratis y sin conexión; `ollama pull qwen2.5:7b` |
+| Modelo local o servicio compatible con OpenAI | opcional | Ollama, LM Studio (Mac, Windows, Linux) o cualquier dirección `…/v1`; gratis y sin conexión en local |
 
-- Claves en el llavero de macOS, una por proveedor (la clave de Anthropic conserva su entrada anterior); en su defecto, la
-  variable de entorno del proveedor (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
-- Proveedor, modelo y dirección en `llm.json` (carpeta de datos). El modelo nunca se adivina: la lista
-  viene del proveedor (`GET /api/settings/llm/models`); «Probar» hace una pequeña petición real.
-- Respuestas en JSON: salidas estructuradas (`json_schema`) o, si no, JSON simple con el esquema en las instrucciones
+- Servicio en línea: elegirlo y pegar la clave, nada más. El modelo se toma de la lista del proveedor
+  (`suggest_model`, nunca un nombre inventado) y se puede cambiar; la conexión se comprueba sola (una petición real
+  muy pequeña) y el resultado enciende el indicador (`last_test` en `llm.json`).
+- Ninguna IA por defecto (una clave de Anthropic ya guardada mantiene Claude, como antes).
+- Claves en el llavero del sistema (o `secrets.json` en Docker), una por proveedor, con un ojo para mostrarlas; si no,
+  la variable de entorno del proveedor (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
+- Modelo local: direcciones listas Ollama, LM Studio y Ollama (Docker) (`host.docker.internal`, declarado en
+  `compose.yaml` para Linux). Guía paso a paso: [docs/local-llm.es.md](docs/local-llm.es.md).
+- Respuestas en JSON: salidas estructuradas (`json_schema`); si no, JSON simple con el esquema en la consigna
   (modelos locales que no las admiten).
 - Descripciones sin Claude: juego a juego en segundo plano (se detiene tras 5 fallos seguidos, se puede reanudar).
 
@@ -465,6 +468,9 @@ de conexión. Las incorporaciones de juegos y la prueba de conexión de los Ajus
 Ajustes > Conexión guía la puesta en marcha en tres pasos numerados y marcados: 1. la consola (dirección,
 usuario, y contraseña o clave SSH según la autenticación elegida, en el mismo bloque); 2. identificar la consola
 (comparar y aprobar la huella de su clave, una vez por consola); 3. probar la conexión.
+Los campos secretos (contraseña, claves de API) tienen un ojo para mostrar u ocultar lo que se escribe. Ajustes >
+Sistema muestra primero lo que la consola puede hacer con su sistema, por temas (juegos, sonido, mandos y Bluetooth,
+tiempo de juego; lo que no es posible aparece tachado), luego la elección del sistema y luego la fecha y la hora.
 
 ## Otras consolas y sistemas
 

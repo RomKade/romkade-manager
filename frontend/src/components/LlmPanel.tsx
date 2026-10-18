@@ -1,17 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, CheckCircle2, Cloud, ExternalLink, HardDrive, KeyRound, Loader2, PlugZap, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookOpen, Bot, Cloud, ExternalLink, HardDrive, Loader2, PlugZap, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, type LlmProvider, type LlmSettings } from "../api/client";
 import { useLlmSettings } from "../api/queries";
-import { useT } from "../i18n";
+import { dateTime } from "../lib/format";
+import { REPO_URL } from "../lib/credits";
+import { getLang, useT } from "../i18n";
+import { SecretInput } from "./SecretInput";
 import { ErrorNotice, Spinner } from "./ui";
+
+/** Guide d'installation d'un LLM local (Ollama, LM Studio) et de sa connexion, dans la langue de l'interface. */
+export const localLlmDoc = () => `${REPO_URL}/blob/main/docs/local-llm${getLang() === "en" ? "" : `.${getLang()}`}.md`;
 
 /**
  * Paramètres > IA : la connexion à un modèle de langage, partagée par tout ce qui utilise l'IA (descriptions et
- * commandes des jeux). Service en ligne avec une clé d'API (Claude, ChatGPT, Mistral, Gemini, autre service
- * compatible OpenAI), ou modèle à poids ouverts sur ce Mac (Ollama, LM Studio). Voir backend app/services/llm.py.
+ * commandes des jeux). Service en ligne : choisir le fournisseur, coller la clé, c'est tout (modèle proposé d'après
+ * la liste du fournisseur, connexion vérifiée d'elle-même). Modèle local ou service compatible OpenAI : adresse
+ * (Ollama, LM Studio, Docker) et modèle. Voir backend app/services/llm.py.
  */
 export function LlmPanel() {
   const t = useT();
@@ -24,204 +31,233 @@ export function LlmPanel() {
 function LlmForm({ settings }: { settings: LlmSettings }) {
   const t = useT();
   const qc = useQueryClient();
-  const [provider, setProvider] = useState(settings.provider);
-  const [model, setModel] = useState(settings.model ?? "");
-  const [baseUrl, setBaseUrl] = useState(settings.base_url ?? "");
-  useEffect(() => {
-    setProvider(settings.provider);
-    setModel(settings.model ?? "");
-    setBaseUrl(settings.base_url ?? "");
-  }, [settings]);
-
-  const p = settings.providers.find((x) => x.id === provider)!;
-  const pick = (id: string) => {
-    const next = settings.providers.find((x) => x.id === id)!;
-    setProvider(id);
-    setModel(id === settings.provider ? settings.model ?? "" : next.default_model ?? "");
-    setBaseUrl(id === settings.provider ? settings.base_url ?? "" : "");
+  const apply = (s: LlmSettings) => {
+    qc.setQueryData(["llm-settings"], s);
+    for (const k of ["descriptions", "game-controls"]) qc.invalidateQueries({ queryKey: [k] });
   };
-  const refresh = () => {
-    for (const k of ["llm-settings", "descriptions", "game-controls", "llm-models"]) qc.invalidateQueries({ queryKey: [k] });
-  };
-  const save = useMutation({
-    mutationFn: () => api.saveLlmSettings({ provider, model: model.trim() || null, base_url: baseUrl.trim() || null }),
-    onSuccess: (s) => { qc.setQueryData(["llm-settings"], s); refresh(); },
+  const save = useMutation({ mutationFn: api.saveLlmSettings, onSuccess: apply });
+  const test = useMutation({
+    mutationFn: api.testLlm,
+    onSettled: () => qc.invalidateQueries({ queryKey: ["llm-settings"] }),
   });
-  const test = useMutation({ mutationFn: api.testLlm });
-  const dirty = provider !== settings.provider || (model.trim() || null) !== (settings.model ?? null)
-    || (baseUrl.trim() || null) !== (settings.base_url ?? null);
-  const groups: { kind: "cloud" | "local"; icon: typeof Cloud }[] = [{ kind: "cloud", icon: Cloud }, { kind: "local", icon: HardDrive }];
+
+  // Prête mais pas encore vérifiée avec ces réglages : on vérifie tout de suite (une fois par réglage).
+  const checked = useRef("");
+  const signature = `${settings.provider}|${settings.model}|${settings.base_url}`;
+  useEffect(() => {
+    if (settings.state === "untested" && checked.current !== signature && !test.isPending) {
+      checked.current = signature;
+      test.mutate();
+    }
+  }, [settings.state, signature, test]);
+
+  const p = settings.providers.find((x) => x.id === settings.provider);
+  const choose = (id: string) => {
+    if (id !== settings.provider) save.mutate({ provider: id });
+  };
+  const cloud = settings.providers.filter((x) => x.kind === "cloud");
+  const local = settings.providers.find((x) => x.kind === "local")!;
 
   return (
     <>
-      <section className="block llm" aria-labelledby="llm-h">
-        <h2 id="llm-h"><Bot size={18} aria-hidden /> {t("settings.ai.title")}</h2>
-        <p className="muted block__lead">{t("settings.ai.lead")}</p>
-        <div>
-          <p>{t("settings.ai.usesTitle")}</p>
-          <ul className="ai-uses">
-            <li><Link to="/parametres/descriptions">{t("settings.ai.useDescriptions")}</Link></li>
-            <li>{t("settings.ai.useControls")}</li>
-          </ul>
-        </div>
-        <ReadyLine settings={settings} />
-      </section>
+      <StatusCard settings={settings} checking={test.isPending} onCheck={() => test.mutate()}
+        onDisconnect={() => save.mutate({ provider: null })} />
+      {test.isError && settings.state !== "error" && <ErrorNotice error={test.error} />}
 
-      <form className="block form llm" aria-labelledby="llm-p-h" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-        <h2 id="llm-p-h"><span className="step-badge" aria-hidden>1</span> {t("settings.ai.providerTitle")}</h2>
-        {groups.map(({ kind, icon: Icon }) => (
-          <fieldset key={kind} className="llm__group">
-            <legend><Icon size={16} aria-hidden /> {t(`settings.ai.kind.${kind}`)}</legend>
-            <p className="muted">{t(`settings.ai.kind.${kind}Hint`)}</p>
-            <div className="auth-choice__options" role="radiogroup">
-              {settings.providers.filter((x) => x.kind === kind).map((x) => (
-                <label key={x.id} className={`auth-choice__option ${provider === x.id ? "is-on" : ""}`}>
-                  <input type="radio" name="llm-provider" value={x.id} checked={provider === x.id} onChange={() => pick(x.id)} />
-                  {t(`settings.ai.provider.${x.id}`)}
-                  {x.key_source && <KeyRound size={13} aria-label={t("settings.ai.keySaved")} />}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        ))}
-
-        <div className="auth-choice__panel llm__panel">
-          {p.key !== "none" && <KeyField provider={p} onChange={refresh} />}
-          {(p.kind === "local" || p.id === "custom") && (
-            <AddressField provider={p} value={baseUrl} onChange={setBaseUrl} presets={settings.local_presets} />
-          )}
-          <ModelField provider={p} baseUrl={baseUrl} value={model} onChange={setModel} />
-          {p.kind === "local" && <LocalHelp />}
-        </div>
-
-        <div className="form__actions">
-          <button type="submit" className="button button--primary" disabled={!dirty || save.isPending}>{t("settings.save")}</button>
-          {save.isSuccess && !dirty && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.saved")}</span>}
-        </div>
+      <section className="block llm" aria-labelledby="llm-p-h">
+        <h2 id="llm-p-h">{t("settings.ai.providerTitle")}</h2>
+        <fieldset className="llm__group">
+          <legend><Cloud size={16} aria-hidden /> {t("settings.ai.kind.cloud")}</legend>
+          <p className="muted">{t("settings.ai.kind.cloudHint")}</p>
+          <div className="auth-choice__options" role="radiogroup">
+            {cloud.map((x) => <ProviderOption key={x.id} provider={x} on={settings.provider === x.id} onPick={choose} />)}
+          </div>
+        </fieldset>
+        <fieldset className="llm__group">
+          <legend><HardDrive size={16} aria-hidden /> {t("settings.ai.kind.local")}</legend>
+          <p className="muted">{t("settings.ai.kind.localHint")}</p>
+          <div className="auth-choice__options" role="radiogroup">
+            <ProviderOption provider={local} on={settings.provider === local.id} onPick={choose} />
+          </div>
+        </fieldset>
         {save.isError && <ErrorNotice error={save.error} />}
-        <p className="muted">{t(p.kind === "local" ? "settings.ai.costLocal" : p.batch ? "settings.ai.costBatch" : "settings.ai.cost")}</p>
-      </form>
 
-      <section className="block llm" aria-labelledby="llm-t-h">
-        <h2 id="llm-t-h"><span className="step-badge" aria-hidden>2</span> {t("settings.ai.testTitle")}</h2>
-        <p className="muted">{t("settings.ai.testLead")}</p>
-        <div className="form__actions">
-          <button type="button" className="button" onClick={() => test.mutate()} disabled={!settings.ready || dirty || test.isPending}>
-            {test.isPending ? <Loader2 size={16} aria-hidden className="spin" /> : <PlugZap size={16} aria-hidden />} {t("settings.ai.test")}
-          </button>
-          {dirty && <span className="muted">{t("settings.ai.saveFirst")}</span>}
-          {test.data && (test.data.ok
-            ? <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.ai.testOk", { model: test.data.model, seconds: test.data.seconds.toLocaleString() })}</span>
-            : <span className="text-error" role="status">{t("settings.ai.testBad")}</span>)}
-        </div>
-        {test.isError && <ErrorNotice error={test.error} />}
+        {p && (
+          <div className="auth-choice__panel llm__panel">
+            {p.kind === "cloud" ? (
+              <>
+                <KeyField provider={p} onSaved={apply} />
+                <ModelField settings={settings} provider={p} onPick={(m) => save.mutate({ provider: p.id, model: m })} />
+              </>
+            ) : (
+              <>
+                <LocalHelp />
+                <AddressField settings={settings} provider={p}
+                  onPick={(url) => save.mutate({ provider: p.id, base_url: url, model: null })} />
+                <ModelField settings={settings} provider={p}
+                  onPick={(m) => save.mutate({ provider: p.id, model: m, base_url: settings.base_url })} />
+                <details className="llm__optional">
+                  <summary>{t("settings.ai.keyOptionalTitle")}</summary>
+                  <KeyField provider={p} onSaved={apply} />
+                </details>
+              </>
+            )}
+            <p className="muted">{t(settings.local ? "settings.ai.costLocal" : p.batch ? "settings.ai.costBatch" : "settings.ai.cost")}</p>
+          </div>
+        )}
       </section>
     </>
   );
 }
 
-function ReadyLine({ settings }: { settings: LlmSettings }) {
+/** Voyant d'état : aucune IA, incomplète, vérification, connectée, erreur ; et les deux actions utiles. */
+function StatusCard({ settings, checking, onCheck, onDisconnect }: {
+  settings: LlmSettings; checking: boolean; onCheck: () => void; onDisconnect: () => void;
+}) {
   const t = useT();
-  const label = t(`settings.ai.provider.${settings.provider}`);
-  return settings.ready
-    ? <p className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.ai.ready", { provider: label, model: settings.model ?? "" })}</p>
-    : <p className="text-warning" role="status">{t(`settings.ai.problem.${settings.problem ?? "llm_no_model"}`, { provider: label })}</p>;
+  const provider = settings.provider ? t(`settings.ai.provider.${settings.provider}`) : "";
+  const state = checking ? "checking" : settings.state;
+  const title = t(`settings.ai.state.${state}`, { provider, model: settings.model ?? "" });
+  const detail = checking ? null
+    : state === "connected" && settings.tested_at ? t("settings.ai.checkedAt", { date: dateTime(settings.tested_at) })
+    : state === "error" ? settings.last_error
+    : state === "incomplete" ? t(`settings.ai.problem.${settings.problem ?? "llm_no_model"}`, { provider })
+    : state === "none" ? t("settings.ai.noneHint") : null;
+  return (
+    <section className="block llm llm-status" aria-labelledby="llm-h">
+      <h2 id="llm-h"><Bot size={18} aria-hidden /> {t("settings.ai.title")}</h2>
+      <div className={`llm-status__line is-${state}`} role="status">
+        <span className="status-dot" aria-hidden />
+        <div>
+          <p className="llm-status__title">{title}</p>
+          {detail && <p className="muted">{detail}</p>}
+        </div>
+        <div className="llm-status__actions">
+          {settings.ready && (
+            <button type="button" className="button" onClick={onCheck} disabled={checking}>
+              {checking ? <Loader2 size={16} aria-hidden className="spin" /> : <PlugZap size={16} aria-hidden />} {t("settings.ai.test")}
+            </button>
+          )}
+          {settings.provider && (
+            <button type="button" className="link-button" onClick={onDisconnect}>{t("settings.ai.disconnect")}</button>
+          )}
+        </div>
+      </div>
+      <p className="muted">
+        {t("settings.ai.usesTitle")} <Link to="/parametres/descriptions">{t("settings.ai.useDescriptions")}</Link>
+        {" · "}{t("settings.ai.useControls")}.
+      </p>
+    </section>
+  );
 }
 
-/** Clé d'API du fournisseur choisi, gardée dans le trousseau macOS (une par fournisseur). */
-function KeyField({ provider, onChange }: { provider: LlmProvider; onChange: () => void }) {
+function ProviderOption({ provider, on, onPick }: { provider: LlmProvider; on: boolean; onPick: (id: string) => void }) {
+  const t = useT();
+  return (
+    <label className={`auth-choice__option ${on ? "is-on" : ""}`}>
+      <input type="radio" name="llm-provider" value={provider.id} checked={on} onChange={() => onPick(provider.id)} />
+      {t(`settings.ai.provider.${provider.id}`)}
+      {provider.key_source && <span className="llm__keytag">{t("settings.ai.keySaved")}</span>}
+    </label>
+  );
+}
+
+/** Clé d'API du fournisseur choisi, gardée dans le trousseau du système (une par fournisseur). */
+function KeyField({ provider, onSaved }: { provider: LlmProvider; onSaved: (s: LlmSettings) => void }) {
   const t = useT();
   const [key, setKey] = useState("");
   useEffect(() => setKey(""), [provider.id]);
-  const done = () => { setKey(""); onChange(); };
-  const save = useMutation({ mutationFn: () => api.saveLlmKey(provider.id, key.trim()), onSuccess: done });
-  const remove = useMutation({ mutationFn: () => api.deleteLlmKey(provider.id), onSuccess: done });
+  const save = useMutation({ mutationFn: () => api.saveLlmKey(provider.id, key.trim()), onSuccess: (s) => { setKey(""); onSaved(s); } });
+  const remove = useMutation({ mutationFn: () => api.deleteLlmKey(provider.id), onSuccess: onSaved });
   const src = provider.key_source;
   const id = `llm-key-${provider.id}`;
+  const name = t(`settings.ai.provider.${provider.id}`);
   return (
-    <div className="llm__key">
+    <form className="llm__key" onSubmit={(e) => { e.preventDefault(); if (key.trim()) save.mutate(); }}>
       <p className="muted">
         {src === "keychain" ? t("settings.ai.keyKeychain") : src === "environment" ? t("settings.ai.keyEnv")
-          : provider.key === "optional" ? t("settings.ai.keyOptional") : t("settings.ai.keyNone")}
+          : provider.key === "optional" ? t("settings.ai.keyOptional") : t("settings.ai.keyNone", { provider: name })}
         {provider.keys_url && <> {" "}<a href={provider.keys_url} target="_blank" rel="noreferrer noopener" className="link">
-          {t("settings.ai.keyCreate")} <ExternalLink size={12} aria-hidden /></a></>}
+          {t("settings.ai.keyCreate", { provider: name })} <ExternalLink size={12} aria-hidden /></a></>}
       </p>
       <div className="field">
-        <label htmlFor={id}>{src === "keychain" ? t("settings.yt.replace") : t("settings.ai.keyLabel", { provider: t(`settings.ai.provider.${provider.id}`) })}</label>
+        <label htmlFor={id}>{src === "keychain" ? t("settings.yt.replace") : t("settings.ai.keyLabel", { provider: name })}</label>
         <div className="llm__inline">
-          <input id={id} type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
-          <button type="button" className="button" disabled={!key.trim() || save.isPending} onClick={() => save.mutate()}>{t("settings.saveKeychain")}</button>
+          <SecretInput id={id} value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
+          <button type="submit" className="button button--primary" disabled={!key.trim() || save.isPending}>
+            {save.isPending ? <Loader2 size={16} aria-hidden className="spin" /> : null} {t("settings.saveKeychain")}
+          </button>
         </div>
       </div>
       {src === "keychain" && (
         <button type="button" className="link-button" onClick={() => remove.mutate()} disabled={remove.isPending}>{t("settings.yt.remove")}</button>
       )}
-      {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.savedF")}</span>}
       {(save.isError || remove.isError) && <ErrorNotice error={save.error ?? remove.error} />}
-    </div>
+    </form>
   );
 }
 
-function AddressField({ provider, value, onChange, presets }: {
-  provider: LlmProvider; value: string; onChange: (v: string) => void; presets: Record<string, string>;
-}) {
+function AddressField({ settings, provider, onPick }: { settings: LlmSettings; provider: LlmProvider; onPick: (url: string | null) => void }) {
   const t = useT();
-  const current = value || provider.base_url || "";
+  const current = settings.base_url || provider.base_url || "";
+  const [url, setUrl] = useState(current);
+  useEffect(() => setUrl(current), [current]);
   return (
     <div className="field">
       <label htmlFor="llm-url">{t("settings.ai.address")}</label>
-      {provider.kind === "local" && (
-        <div className="auth-choice__options llm__presets">
-          {Object.entries(presets).map(([name, url]) => (
-            <button key={name} type="button" className={`chip ${current === url ? "is-on" : ""}`} aria-pressed={current === url}
-              onClick={() => onChange(url === provider.base_url ? "" : url)}>{name}</button>
-          ))}
-        </div>
-      )}
-      <input id="llm-url" value={value} placeholder={provider.base_url ?? "https://…/v1"} onChange={(e) => onChange(e.target.value)} spellCheck={false} />
-      <p className="field__hint">{t(provider.kind === "local" ? "settings.ai.addressLocalHint" : "settings.ai.addressHint")}</p>
+      <div className="auth-choice__options llm__presets">
+        {Object.entries(settings.local_presets).map(([name, u]) => (
+          <button key={name} type="button" className={`chip ${current === u ? "is-on" : ""}`} aria-pressed={current === u}
+            onClick={() => onPick(u === provider.base_url ? null : u)}>{name}</button>
+        ))}
+      </div>
+      <form className="llm__inline" onSubmit={(e) => { e.preventDefault(); onPick(url.trim() || null); }}>
+        <input id="llm-url" value={url} placeholder={provider.base_url ?? "https://…/v1"} onChange={(e) => setUrl(e.target.value)} spellCheck={false} />
+        <button type="submit" className="button" disabled={url.trim() === current}>{t("settings.ai.useAddress")}</button>
+      </form>
+      <p className="field__hint">{t("settings.ai.addressHint")}</p>
     </div>
   );
 }
 
-/** Modèle : choisi dans la liste du fournisseur (jamais deviné), ou saisi à la main. */
-function ModelField({ provider, baseUrl, value, onChange }: {
-  provider: LlmProvider; baseUrl: string; value: string; onChange: (v: string) => void;
-}) {
+/** Modèle : proposé d'après la liste du fournisseur (jamais inventé), modifiable d'un clic. */
+function ModelField({ settings, provider, onPick }: { settings: LlmSettings; provider: LlmProvider; onPick: (m: string) => void }) {
   const t = useT();
   const canList = provider.key === "required" ? !!provider.key_source : true;
+  const [open, setOpen] = useState(provider.kind === "local" || !settings.model);
   const models = useQuery({
-    queryKey: ["llm-models", provider.id, baseUrl.trim()],
-    queryFn: () => api.llmModels(provider.id, baseUrl.trim() || null),
-    enabled: canList && (provider.id !== "custom" || !!baseUrl.trim()),
-    retry: false, staleTime: 5 * 60_000,
+    queryKey: ["llm-models", provider.id, settings.base_url ?? ""],
+    queryFn: () => api.llmModels(provider.id, settings.base_url),
+    enabled: canList && open, retry: false, staleTime: 5 * 60_000,
   });
   const list = models.data ?? [];
+  if (!canList) return <p className="field__hint">{t("settings.ai.modelsNeedKey")}</p>;
   return (
     <div className="field">
-      <label htmlFor="llm-model">{t("settings.ai.model")}</label>
-      <div className="llm__inline">
-        <input id="llm-model" list="llm-models" value={value} onChange={(e) => onChange(e.target.value)}
-          placeholder={provider.default_model ?? t("settings.ai.modelPlaceholder")} spellCheck={false} autoComplete="off" />
-        <button type="button" className="button" onClick={() => models.refetch()} disabled={!canList || models.isFetching}
-          title={t("settings.ai.modelsReload")} aria-label={t("settings.ai.modelsReload")}>
-          {models.isFetching ? <Loader2 size={16} aria-hidden className="spin" /> : <RefreshCw size={16} aria-hidden />}
-        </button>
-      </div>
-      <datalist id="llm-models">{list.map((m) => <option key={m} value={m} />)}</datalist>
-      {list.length > 0 && (
-        <div className="llm__models" role="listbox" aria-label={t("settings.ai.modelsList")}>
-          {list.slice(0, 40).map((m) => (
-            <button key={m} type="button" role="option" aria-selected={m === value} className={`chip ${m === value ? "is-on" : ""}`}
-              onClick={() => onChange(m)}>{m}</button>
-          ))}
-        </div>
-      )}
-      <p className="field__hint">
-        {!canList ? t("settings.ai.modelsNeedKey") : models.isError ? "" : list.length ? t("settings.ai.modelsHint", { count: list.length })
-          : models.isFetching ? t("common.loading") : t("settings.ai.modelsNone")}
+      <p className="llm__model">
+        <span>{t("settings.ai.model")} : </span>
+        {settings.model ? <strong>{settings.model}</strong> : <span className="muted">{t("settings.ai.modelNone")}</span>}
+        {!open && <button type="button" className="link-button" onClick={() => setOpen(true)}>{t("settings.ai.modelChange")}</button>}
       </p>
-      {models.isError && <ErrorNotice error={models.error} />}
+      {open && (
+        <>
+          <div className="llm__models" role="listbox" aria-label={t("settings.ai.modelsList")}>
+            {list.slice(0, 60).map((m) => (
+              <button key={m} type="button" role="option" aria-selected={m === settings.model} className={`chip ${m === settings.model ? "is-on" : ""}`}
+                onClick={() => onPick(m)}>{m}</button>
+            ))}
+            <button type="button" className="chip" onClick={() => models.refetch()} disabled={models.isFetching}
+              aria-label={t("settings.ai.modelsReload")} title={t("settings.ai.modelsReload")}>
+              {models.isFetching ? <Loader2 size={14} aria-hidden className="spin" /> : <RefreshCw size={14} aria-hidden />}
+            </button>
+          </div>
+          <p className="field__hint">
+            {models.isError ? "" : list.length ? t("settings.ai.modelsHint", { count: list.length })
+              : models.isFetching ? t("common.loading") : t("settings.ai.modelsNone")}
+          </p>
+          {models.isError && <ErrorNotice error={models.error} />}
+        </>
+      )}
     </div>
   );
 }
@@ -233,10 +269,14 @@ function LocalHelp() {
       <p>{t("settings.ai.localHelp")}</p>
       <ol>
         <li>{t("settings.ai.localStep1Before")} <a href="https://ollama.com/download" target="_blank" rel="noreferrer noopener" className="link">Ollama</a>{" "}
-          {t("settings.ai.localStep1Or")} <a href="https://lmstudio.ai/" target="_blank" rel="noreferrer noopener" className="link">LM Studio</a>.</li>
+          {t("settings.ai.localStep1Or")} <a href="https://lmstudio.ai/" target="_blank" rel="noreferrer noopener" className="link">LM Studio</a>{" "}
+          {t("settings.ai.localStep1After")}</li>
         <li>{t("settings.ai.localStep2")} <code>ollama pull qwen2.5:7b</code></li>
         <li>{t("settings.ai.localStep3")}</li>
       </ol>
+      <a href={localLlmDoc()} target="_blank" rel="noreferrer noopener" className="link llm__doc">
+        <BookOpen size={14} aria-hidden /> {t("settings.ai.localDoc")} <ExternalLink size={12} aria-hidden />
+      </a>
     </div>
   );
 }

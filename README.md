@@ -366,20 +366,23 @@ API key as the descriptions (Settings > AI).
 
 ## Connecting to an AI (LLM)
 
-Settings > AI: a single AI for everything that uses one (game descriptions, game controls).
-`backend/app/services/llm.py`:
+Settings > AI: a single AI for everything that uses one (game descriptions, game controls), with a status light
+(grey: none, orange: being checked, green: connected, red: error). `backend/app/services/llm.py`:
 
-| Provider | Key | Notes |
+| Choice | Key | Notes |
 |---|---|---|
 | Claude (Anthropic) | `sk-ant-…` | Claude Opus 5.5 by default; batch descriptions (half price) |
 | ChatGPT (OpenAI), Mistral, Gemini | provider key | OpenAI protocol (chat completions) |
-| Other OpenAI-compatible service | optional | address of your choice (`…/v1`) |
-| Local model (Ollama, LM Studio) | none | open weights on the Mac, free and offline; `ollama pull qwen2.5:7b` |
+| Local model or OpenAI-compatible service | optional | Ollama, LM Studio (Mac, Windows, Linux) or any `…/v1` address; free and offline when local |
 
-- Keys in the macOS keychain, one per provider (the Anthropic key keeps its old entry); otherwise the
+- Online service: choose it and paste the key, nothing else. The model is picked from the provider's own list
+  (`suggest_model`, never an invented name) and stays changeable; the connection is checked automatically (a tiny
+  real request) and the result drives the status light (`last_test` in `llm.json`).
+- No AI by default (an existing Anthropic key keeps Claude, as before).
+- Keys in the system keychain (or `secrets.json` in Docker), one per provider, with a show/hide eye; otherwise the
   provider's environment variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
-- Provider, model and address in `llm.json` (data folder). The model is never guessed: the list
-  comes from the provider (`GET /api/settings/llm/models`); "Test" makes a small real request.
+- Local model: address presets Ollama, LM Studio and Ollama (Docker) (`host.docker.internal`, declared in
+  `compose.yaml` for Linux). Step-by-step guide: [docs/local-llm.md](docs/local-llm.md).
 - JSON responses: structured outputs (`json_schema`), otherwise plain JSON with the schema in the prompt
   (local models that do not support them).
 - Descriptions without Claude: game by game in the background (stops after 5 failures in a row, can be resumed).
@@ -464,6 +467,9 @@ timeout. Game additions and the connection test in Settings keep their own conne
 Settings > Connection guides the setup in three numbered, checked steps: 1. the console (address, user,
 then password or SSH key, depending on the chosen authentication, in the same block); 2. identify the console
 (compare and approve its key fingerprint, once per console); 3. test the connection.
+Secret fields (password, API keys) have an eye to show or hide what you type. Settings > System first shows what
+the console can do with its system, grouped (games, sound, controllers and Bluetooth, play time; unavailable features
+crossed out), then the choice of system, then the console's date and time.
 
 ## Other consoles and systems
 

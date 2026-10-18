@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpen, Bot, Info, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
@@ -9,6 +9,7 @@ import {
 } from "../api/queries";
 import { GitHubStar } from "../components/GitHubStar";
 import { LlmPanel } from "../components/LlmPanel";
+import { SecretInput } from "../components/SecretInput";
 import { ErrorNotice, hintFor, Meter, PageHeader, Spinner } from "../components/ui";
 import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
 import { CREDITS } from "../lib/credits";
@@ -59,8 +60,9 @@ export function SettingsPage() {
       {current === "test" && <TestPanel />}
       {current === "systeme" && (
         <>
-          <ClockPanel />
+          <CapabilitiesPanel />
           <SystemPanel settings={settings.data} />
+          <ClockPanel />
         </>
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}
@@ -180,7 +182,7 @@ function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; has
               <p className="muted">{hasPassword ? t("settings.pw.saved") : t("settings.pw.none")}</p>
               <div className="field">
                 <label htmlFor="pw">{hasPassword ? t("settings.pw.replace") : t("settings.pw.label")}</label>
-                <input id="pw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+                <SecretInput id="pw" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
                 <p className="field__hint">{t("settings.pw.hint")}</p>
               </div>
             </>
@@ -201,7 +203,63 @@ function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; has
   );
 }
 
-const CAPS: (keyof Capabilities)[] = ["launch", "resume_slot", "quit", "save_state", "retroarch_logs", "bluetooth", "bluetooth_audio", "players", "volume"];
+/** Capacités du système, regroupées par usage ; chacune mène à la page où elle sert. */
+const CAP_GROUPS: { id: string; icon: typeof Gamepad2; caps: { key: keyof Capabilities; to?: string }[] }[] = [
+  { id: "games", icon: Play, caps: [{ key: "launch", to: "/bibliotheque" }, { key: "quit" }, { key: "resume_slot", to: "/sauvegardes" },
+    { key: "save_state", to: "/sauvegardes" }] },
+  { id: "sound", icon: Volume2, caps: [{ key: "volume" }, { key: "bluetooth_audio", to: "/bluetooth" }] },
+  { id: "players", icon: Gamepad2, caps: [{ key: "players", to: "/manettes" }, { key: "bluetooth", to: "/bluetooth" }] },
+  { id: "playtime", icon: Hourglass, caps: [{ key: "retroarch_logs", to: "/temps-de-jeu" }] },
+];
+
+function CapsGroups({ caps }: { caps: Capabilities }) {
+  const t = useT();
+  return (
+    <div className="caps-groups">
+      {CAP_GROUPS.map(({ id, icon: Icon, caps: items }) => (
+        <div key={id} className="caps-group">
+          <h3><Icon size={16} aria-hidden /> {t(`settings.system.group.${id}`)}</h3>
+          <ul className="caps">
+            {items.map(({ key, to }) => {
+              const on = caps[key];
+              const label = t(`settings.system.cap.${key}`);
+              return (
+                <li key={key} className={on ? "caps__yes" : "caps__no"}>
+                  {on ? <CheckCircle2 size={16} aria-hidden /> : <MinusCircle size={16} aria-hidden />}
+                  {on && to ? <Link to={to}>{label}</Link> : <span>{label}</span>}
+                  <span className="visually-hidden"> : {on ? t("settings.system.yes") : t("settings.system.no")}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Ce que l'application sait faire avec la console branchée : mis en avant en haut de l'onglet Système. */
+function CapabilitiesPanel() {
+  const t = useT();
+  const system = useSystem();
+  const online = useDeviceStatus().data?.connected === true;
+  const info = system.data;
+  return (
+    <section className="block caps-panel" aria-labelledby="caps-h">
+      <h2 id="caps-h">{t("settings.system.capsPanelTitle")}</h2>
+      {info ? (
+        <>
+          <p className={`caps-panel__state ${online ? "is-online" : "is-offline"}`}>
+            <span className="status-dot" aria-hidden />
+            <span>{t(online ? "settings.system.capsOnline" : "settings.system.capsOffline", { name: info.profile.label })}</span>
+          </p>
+          <CapsGroups caps={info.capabilities} />
+          <p className="muted">{t("settings.system.capsMissing")}</p>
+        </>
+      ) : system.isPending ? <Spinner label={t("common.loading")} /> : <p className="muted">{t("settings.system.notDetected")}</p>}
+    </section>
+  );
+}
 
 /** Firmware de la console : détecté par SSH (lecture seule) ou choisi ; ce que Game Manager sait y faire. */
 function SystemPanel({ settings }: { settings: Settings }) {
@@ -257,17 +315,10 @@ function SystemPanel({ settings }: { settings: Settings }) {
           </button>
         </p>
       )}
-      {caps && (
+      {caps && choice !== settings.system && shown && (
         <>
-          <h3>{t("settings.system.capsTitle")}</h3>
-          <ul className="caps">
-            {CAPS.map((k) => (
-              <li key={k} className={caps[k] ? "caps__yes" : "caps__no"}>
-                <span aria-hidden>{caps[k] ? "✓" : "–"}</span> {t(`settings.system.cap.${k}`)}
-                <span className="visually-hidden"> : {caps[k] ? t("settings.system.yes") : t("settings.system.no")}</span>
-              </li>
-            ))}
-          </ul>
+          <h3>{t("settings.system.capsPreview", { name: shown.label })}</h3>
+          <CapsGroups caps={caps} />
         </>
       )}
       <div className="form__actions">
@@ -514,9 +565,11 @@ function DescriptionsPanel() {
               </div>
             )}
             <p className="muted">
-              {t(st.batch ? "settings.desc.modelBatch" : st.local ? "settings.desc.modelLocal" : "settings.desc.modelDirect",
-                { provider: st.provider_label, model: st.model ?? "?" })}{" "}
-              <Link to="/parametres/ia">{t("settings.desc.changeAi")}</Link>
+              {st.provider
+                ? t(st.batch ? "settings.desc.modelBatch" : st.local ? "settings.desc.modelLocal" : "settings.desc.modelDirect",
+                  { provider: t(`settings.ai.provider.${st.provider}`), model: st.model ?? "?" })
+                : t("settings.desc.noAi")}{" "}
+              <Link to="/parametres/ia">{t(st.provider ? "settings.desc.changeAi" : "settings.desc.connectAi")}</Link>
             </p>
             {start.isError && <ErrorNotice error={start.error} />}
             {st.batches.length > 0 && (
@@ -567,7 +620,7 @@ function YouTubePanel() {
       </p>
       <div className="field">
         <label htmlFor="ytkey">{configured ? t("settings.yt.replace") : t("settings.yt.label")}</label>
-        <input id="ytkey" type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
+        <SecretInput id="ytkey" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
       </div>
       <div className="form__actions">
         <button type="submit" className="button" disabled={!key.trim() || save.isPending}>{t("settings.saveKeychain")}</button>

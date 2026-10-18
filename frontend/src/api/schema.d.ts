@@ -1287,7 +1287,7 @@ export interface paths {
         put?: never;
         /**
          * Llm Test
-         * @description Petite demande réelle au modèle configuré (quelques jetons).
+         * @description Petite demande réelle au modèle configuré (quelques jetons) ; le résultat allume le voyant d'état.
          */
         post: operations["llm_test_api_settings_llm_test_post"];
         delete?: never;
@@ -1911,9 +1911,9 @@ export interface components {
             /** Problem */
             problem: string | null;
             /** Provider */
-            provider: string;
+            provider: string | null;
             /** Provider Label */
-            provider_label: string;
+            provider_label: string | null;
             /** Model */
             model: string | null;
             /** Batch */
@@ -2364,7 +2364,7 @@ export interface components {
         /** LlmSettingsIn */
         LlmSettingsIn: {
             /** Provider */
-            provider: string;
+            provider: string | null;
             /** Model */
             model?: string | null;
             /** Base Url */
@@ -2373,7 +2373,7 @@ export interface components {
         /** LlmSettingsOut */
         LlmSettingsOut: {
             /** Provider */
-            provider: string;
+            provider: string | null;
             /** Model */
             model: string | null;
             /** Base Url */
@@ -2382,6 +2382,14 @@ export interface components {
             ready: boolean;
             /** Problem */
             problem: string | null;
+            /** State */
+            state: string;
+            /** Last Error */
+            last_error: string | null;
+            /** Tested At */
+            tested_at: string | null;
+            /** Local */
+            local: boolean;
             /** Local Presets */
             local_presets: {
                 [key: string]: string;
@@ -2399,6 +2407,8 @@ export interface components {
             model: string;
             /** Seconds */
             seconds: number;
+            /** Error */
+            error?: string | null;
         };
         /** NowPlayingOut */
         NowPlayingOut: {
@@ -5288,11 +5298,13 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -5317,11 +5329,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -367,20 +367,24 @@ d'API IA que les descriptions (Paramètres > IA).
 
 ## Connexion à une IA (LLM)
 
-Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions des jeux, commandes des jeux).
-`backend/app/services/llm.py` :
+Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions et commandes des jeux), avec un voyant d'état
+(gris : aucune, orange : vérification, vert : connectée, rouge : erreur). `backend/app/services/llm.py` :
 
-| Fournisseur | Clé | Remarques |
+| Choix | Clé | Remarques |
 |---|---|---|
 | Claude (Anthropic) | `sk-ant-…` | Claude Opus 5.5 par défaut ; descriptions en lot (moitié prix) |
 | ChatGPT (OpenAI), Mistral, Gemini | clé du fournisseur | protocole OpenAI (chat completions) |
-| Autre service compatible OpenAI | facultative | adresse au choix (`…/v1`) |
-| Modèle local (Ollama, LM Studio) | aucune | poids ouverts sur le Mac, gratuit et hors ligne ; `ollama pull qwen2.5:7b` |
+| Modèle local ou service compatible OpenAI | facultative | Ollama, LM Studio (Mac, Windows, Linux) ou toute adresse `…/v1` ; gratuit et hors ligne en local |
 
-- Clés dans le trousseau macOS, une par fournisseur (la clé Anthropic garde son ancienne entrée) ; à défaut la
-  variable d'environnement du fournisseur (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
-- Fournisseur, modèle et adresse dans `llm.json` (dossier de données). Le modèle n'est jamais deviné : la liste
-  vient du fournisseur (`GET /api/settings/llm/models`) ; « Tester » fait une petite demande réelle.
+- Service en ligne : le choisir et coller la clé, rien d'autre. Le modèle est pris dans la liste du fournisseur
+  (`suggest_model`, jamais un nom inventé) et reste modifiable ; la connexion est vérifiée toute seule (une toute
+  petite demande réelle) et le résultat allume le voyant (`last_test` dans `llm.json`).
+- Aucune IA par défaut (une clé Anthropic déjà enregistrée garde Claude, comme avant).
+- Clés dans le trousseau du système (ou `secrets.json` dans Docker), une par fournisseur, avec un œil pour les
+  afficher ; à défaut la variable d'environnement du fournisseur (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+  `MISTRAL_API_KEY`, `GEMINI_API_KEY`).
+- Modèle local : adresses prêtes Ollama, LM Studio et Ollama (Docker) (`host.docker.internal`, déclaré dans
+  `compose.yaml` pour Linux). Guide pas à pas : [docs/local-llm.fr.md](docs/local-llm.fr.md).
 - Réponses en JSON : sorties structurées (`json_schema`), sinon JSON simple avec le schéma dans la consigne
   (modèles locaux qui ne les gèrent pas).
 - Descriptions sans Claude : jeu par jeu en arrière-plan (arrêt après 5 échecs d'affilée, reprise possible).
@@ -465,6 +469,9 @@ de connexion. Les ajouts de jeux et le test de connexion des Paramètres gardent
 Paramètres > Connexion guide la mise en route en trois étapes numérotées et cochées : 1. la console (adresse,
 utilisateur, puis mot de passe ou clé SSH selon l'authentification choisie, dans le même bloc) ; 2. identifier la
 console (comparer puis approuver l'empreinte de sa clé, une fois par console) ; 3. tester la connexion.
+Les champs secrets (mot de passe, clés d'API) ont un œil pour afficher ou masquer la saisie. Paramètres > Système
+montre d'abord ce que la console sait faire avec son système, par thème (jeux, son, manettes et Bluetooth, temps de
+jeu ; ce qui n'est pas possible est barré), puis le choix du système, puis la date et l'heure de la console.
 
 ## Autres consoles et systèmes
 
