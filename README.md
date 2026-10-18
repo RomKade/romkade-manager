@@ -569,7 +569,7 @@ the ROMs and saves are, how to launch and quit a game, and what is available; th
 | ROCKNIX / JELOS | Anbernic, Powkiddy, Retroid, AYN | `/storage/roms` | quit; launch if the ES web server responds | experimental |
 | muOS | Anbernic, TrimUI | `/mnt/mmc/ROMS` | quit | experimental |
 | ArkOS / dArkOS | R36S and clones, RG351, RG353 | `/roms` | quit | experimental |
-| Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | yes (like Onion's menu), quit | experimental |
+| Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | yes (like Onion's menu), quit | tested |
 | spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | quit | experimental |
 | MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | no | experimental |
 | Other (Linux + SSH) | — | to configure | quit (RetroArch) | experimental |

@@ -572,7 +572,7 @@ las ROMs y las partidas guardadas, cómo lanzar y salir de un juego, y qué est�
 | ROCKNIX / JELOS | Anbernic, Powkiddy, Retroid, AYN | `/storage/roms` | salir; lanzar si responde el servidor web de ES | experimental |
 | muOS | Anbernic, TrimUI | `/mnt/mmc/ROMS` | salir | experimental |
 | ArkOS / dArkOS | R36S y clones, RG351, RG353 | `/roms` | salir | experimental |
-| Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | sí (como el menú de Onion), salir | experimental |
+| Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | sí (como el menú de Onion), salir | probado |
 | spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | salir | experimental |
 | MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | no | experimental |
 | Otro (Linux + SSH) | — | por configurar | salir (RetroArch) | experimental |

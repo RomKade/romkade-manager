@@ -108,7 +108,7 @@ PROFILES: dict[str, SystemProfile] = {p.id: p for p in [
         ra_history="/home/ark/.config/retroarch/content_history.lpl",
         notes="R36S et clones, RG351, RG353 (sous ArkOS).", makers=("Anbernic", "R36S", "Powkiddy")),
     SystemProfile(
-        "onion", "Onion OS", "experimental", ("/mnt/SDCARD/Roms",), "onion", "generic",
+        "onion", "Onion OS", "tested", ("/mnt/SDCARD/Roms",), "onion", "generic",
         (("Saves/CurrentProfile/saves", "retroarch", 3), ("Saves/CurrentProfile/states", "retroarch", 3)),
         ra_config="/mnt/SDCARD/RetroArch/.retroarch/retroarch.cfg",
         ra_history="/mnt/SDCARD/Saves/CurrentProfile/lists/content_history.lpl",

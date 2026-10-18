@@ -59,7 +59,7 @@ def test_capabilities():
     assert not knulli.capabilities(True)["resume_slot"] and not knulli.capabilities(True)["bluetooth_audio"]
     muos = PROFILES["muos"].capabilities()
     assert not muos["launch"] and not muos["bluetooth"] and muos["quit"]
-    assert all(p.status == "experimental" for p in PROFILES.values() if p.id != "anbernic-stock-mod")
+    assert {p.id for p in PROFILES.values() if p.status == "tested"} == {"anbernic-stock-mod", "onion"}  # essayés sur une vraie console
 
 
 def test_es_status_parsing():
