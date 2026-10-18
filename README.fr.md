@@ -370,6 +370,10 @@ Paramètres > IA : une seule IA pour tout ce qui en utilise (descriptions des je
 tableau de bord (le dernier ajouté en premier, avec « Rejouer ») et dans la bibliothèque : bouton « Favoris » des
 filtres, ou `/bibliotheque?fav=1` (lien « Tous mes favoris »). Rangés dans la base du Mac (table `favorite`).
 
+Les favoris appartiennent à une console : chacun garde l'empreinte SHA-256 de la clé SSH approuvée de la console
+(stable, contrairement à son adresse IP). Brancher une autre console (celle d'un ami, un autre firmware) n'affiche que
+ses propres favoris, limités aux jeux présents sur sa carte ; les autres restent en base et reviennent avec leur console.
+
 ## Temps de jeu
 
 Page « Temps de jeu » : temps du jour, des 7 derniers jours et total, histogramme sur 14 jours, temps par jeu,
@@ -437,6 +441,10 @@ ouvrir une connexion coûte ~0,5 s sur la console, une commande sur la connexion
 console ne répond pas, les appels suivants échouent aussitôt pendant 15 s au lieu d'attendre chacun le délai
 de connexion. Les ajouts de jeux et le test de connexion des Paramètres gardent leur propre connexion.
 
+Paramètres > Connexion guide la mise en route en trois étapes numérotées et cochées : 1. la console (adresse,
+utilisateur, puis mot de passe ou clé SSH selon l'authentification choisie, dans le même bloc) ; 2. identifier la
+console (comparer puis approuver l'empreinte de sa clé, une fois par console) ; 3. tester la connexion.
+
 ## Autres consoles et systèmes
 
 Game Manager reconnaît le firmware de la console par SSH (quelques `test -d`, lecture seule) ; on peut aussi le
@@ -472,10 +480,21 @@ coupe SSH au lancement des jeux, sauf avec « Keep services alive » (Tweaks > N
 (`.tmp_update/config/.keepServicesAlive_` renommé en `.keepServicesAlive`, comme le fait Tweaks), seule écriture
 sur la carte, pour garder la console joignable pendant la partie (jeu en cours, Quitter).
 
+## Version, conditions d'utilisation
+
+- Un seul numéro de version, dans `backend/pyproject.toml` et `frontend/package.json` (vérifié par
+  `backend/tests/test_version.py`), affiché dans la barre latérale et dans Paramètres > À propos.
+- Conditions d'utilisation sur `/conditions` (lien dans la barre latérale) : ROMKADE ne fournit aucun jeu et ne répond
+  pas des manipulations de l'utilisateur sur la console ou sa carte mémoire (perte de données, carte corrompue,
+  sauvegardes perdues). Un bandeau les rappelle au premier lancement, jusqu'à « J'ai compris » (`romkade-terms-v1`
+  dans le navigateur). Texte à faire relire par un juriste avant une diffusion publique.
+- Logo et icônes ROMKADE Manager (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), tirés des fichiers de
+  marque du dépôt romkade-website.
+
 ## Sources et crédits
 
 ROMKADE Manager ne fournit aucun jeu. Ce qu'il reprend d'ailleurs est cité dans l'interface
-(Paramètres > Sources et crédits, liste dans `frontend/src/lib/credits.ts`, et sous chaque fiche de jeu) :
+(Paramètres > À propos, liste dans `frontend/src/lib/credits.ts`, et sous chaque fiche de jeu) :
 
 | Source | Usage | Licence |
 |---|---|---|
@@ -485,7 +504,7 @@ ROMKADE Manager ne fournit aucun jeu. Ce qu'il reprend d'ailleurs est cité dans
 | [OpenVGDB](https://github.com/OpenVGDB/OpenVGDB) | Résumés, dates, lien GameFAQs, genres | MIT |
 | [catver.ini (progettoSNAPS)](https://www.progettosnaps.net/catver/) | Catégories arcade | — |
 | MAME, FBNeo, HBMAME | Titres complets, année, fabricant (via libretro-database) | — |
-| Wikipédia, GameFAQs, YouTube, Claude (Anthropic) | Liens, bandes-annonces et descriptions IA (clés de l'utilisateur) | — |
+| Wikipédia, GameFAQs, YouTube, l'IA choisie (Claude, ChatGPT, Mistral, Gemini, modèle local) | Liens, bandes-annonces, descriptions et commandes par IA (clés de l'utilisateur) | — |
 | [Lucide](https://lucide.dev/), Archivo, Atkinson Hyperlegible Next | Pictogrammes, polices | ISC, SIL OFL 1.1 |
 
 Toute nouvelle source (script `backend/scripts/build_*.py`, service en ligne, illustration) s'ajoute à

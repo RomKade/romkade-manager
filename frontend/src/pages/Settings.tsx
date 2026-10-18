@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpen, Bot, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpen, Bot, Info, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
@@ -10,7 +10,9 @@ import {
 import { GitHubStar } from "../components/GitHubStar";
 import { LlmPanel } from "../components/LlmPanel";
 import { ErrorNotice, hintFor, Meter, PageHeader, Spinner } from "../components/ui";
+import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
 import { CREDITS } from "../lib/credits";
+import { APP_VERSION } from "../version";
 import { dateTime } from "../lib/format";
 import { getLang, locale, t, useT } from "../i18n";
 import { has } from "../i18n/core";
@@ -24,13 +26,14 @@ const TABS = [
   { slug: "videos", label: "settings.tab.videos", icon: Video },
   { slug: "ia", label: "settings.tab.ai", icon: Bot },
   { slug: "descriptions", label: "settings.tab.descriptions", icon: Languages },
-  { slug: "credits", label: "settings.tab.credits", icon: BookOpen },
+  { slug: "a-propos", label: "legal.about.title", icon: Info },
 ] as const;
 
 export function SettingsPage() {
   const t = useT();
   const settings = useSettings();
-  const { tab = "" } = useParams();
+  const { tab: raw = "" } = useParams();
+  const tab = raw === "credits" ? "a-propos" : raw;  // ancienne adresse de Sources et crédits
   const current = TABS.find((x) => x.slug === tab) ? tab : "";
   if (settings.isPending) return <div className="page"><Spinner label={t("common.loading")} /></div>;
   if (settings.isError) return <div className="page"><ErrorNotice error={settings.error} /></div>;
@@ -64,7 +67,7 @@ export function SettingsPage() {
       {current === "videos" && <YouTubePanel />}
       {current === "ia" && <LlmPanel />}
       {current === "descriptions" && <DescriptionsPanel />}
-      {current === "credits" && <CreditsPanel />}
+      {current === "a-propos" && <><AboutPanel /><CreditsPanel /></>}
     </div>
   );
 }
@@ -644,6 +647,20 @@ function PlaytimePanel() {
       {save.isError && <ErrorNotice error={save.error} />}
       <p className="muted">{t("settings.playtime.note")}</p>
     </form>
+  );
+}
+
+/** À propos : logo, version, rappel des conditions d'utilisation. */
+function AboutPanel() {
+  const t = useT();
+  return (
+    <section className="block about" aria-labelledby="about-h">
+      <h2 id="about-h" className="visually-hidden">{t("legal.about.title")}</h2>
+      <img className="about__logo" src={logo480} width={320} height={71} alt="ROMKADE Manager" />
+      <p className="about__version num">{t("legal.version", { version: APP_VERSION })}</p>
+      <p>{t("legal.about.lead")}</p>
+      <p className="muted">{t("legal.about.legal")} <Link to="/conditions" className="link">{t("legal.link")}</Link></p>
+    </section>
   );
 }
 

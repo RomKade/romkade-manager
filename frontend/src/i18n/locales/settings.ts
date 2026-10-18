@@ -136,7 +136,7 @@ const messages: Messages = {
     "ai.costLocal": "Gratuit : le modèle tourne sur ce Mac.",
     "ai.saveFirst": "Enregistre d'abord ton choix.",
     "ai.testTitle": "Tester la connexion",
-    "ai.testLead": "Une toute petite demande au modèle choisi, pour vérifier qu'il répond (quelques centimes de centime en ligne).",
+    "ai.testLead": "Une toute petite demande au modèle choisi, pour vérifier qu'il répond (une fraction de centime en ligne).",
     "ai.test": "Tester",
     "ai.testOk": "{model} répond ({seconds} s).",
     "ai.testBad": "Le modèle répond, mais pas dans le format attendu : essaie un modèle plus grand.",

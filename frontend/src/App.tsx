@@ -6,6 +6,7 @@ import { ApiError } from "./api/client";
 import { useStatus, useTransfersLive } from "./api/queries";
 import { Sidebar } from "./components/Sidebar";
 import { PlayAlerts } from "./components/PlayAlerts";
+import { TermsNotice } from "./components/TermsNotice";
 import { TopBar } from "./components/TopBar";
 import { t, useLang } from "./i18n";
 import { Empty } from "./components/ui";
@@ -17,6 +18,7 @@ import { PlaytimePage } from "./pages/Playtime";
 import { SavesPage } from "./pages/Saves";
 import { SettingsPage } from "./pages/Settings";
 import { SyncPage } from "./pages/Sync";
+import { TermsPage } from "./pages/Terms";
 import { TransfersPage } from "./pages/Transfers";
 
 export function makeQueryClient() {
@@ -62,6 +64,7 @@ function Layout() {
       <main id="main" className="main" tabIndex={-1}>
         <TopBar />
         <PlayAlerts />
+        <TermsNotice />
         <div className="main__content">
           <Outlet />
         </div>
@@ -88,6 +91,7 @@ export function AppRoutes() {
         <Route path="temps-de-jeu" element={<PlaytimePage />} />
         <Route path="parametres" element={<SettingsPage />} />
         <Route path="parametres/:tab" element={<SettingsPage />} />
+        <Route path="conditions" element={<TermsPage />} />
         <Route path="*" element={<div className="page"><Empty title={t("common.nav.notFound")} /></div>} />
       </Route>
     </Routes>

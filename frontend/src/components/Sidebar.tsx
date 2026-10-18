@@ -1,10 +1,14 @@
 import { Bluetooth, Gamepad2, Gauge, HardDriveUpload, Hourglass, Library, RefreshCw, Save, Settings as SettingsIcon } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
 import { isActive, useCaps, useDeviceStatus, useSettings, useStatus, useSystem, useTransfers } from "../api/queries";
 import { getLang, useT } from "../i18n";
 import { has } from "../i18n/core";
 import { gb } from "../lib/format";
+import icon80 from "../assets/brand/romkade-manager-icon-80.webp";
+import logo240 from "../assets/brand/romkade-manager-logo-240.webp";
+import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
+import { APP_VERSION } from "../version";
 import { GitHubStar } from "./GitHubStar";
 
 const NAV = [
@@ -28,16 +32,10 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <svg className="brand__mark" viewBox="0 0 32 32" aria-hidden>
-          <rect x="5" y="2" width="22" height="28" rx="4" className="brand__shell" />
-          <rect x="8.5" y="5.5" width="15" height="11" rx="1.5" className="brand__screen" />
-          <circle cx="21" cy="23" r="2.2" className="brand__button" />
-          <path d="M9.5 23h5M12 20.5v5" className="brand__dpad" />
-        </svg>
-        <div>
-          <p className="brand__name">Game Manager</p>
-          <p className="brand__device">{system ? system.profile.label : "\u00a0"}</p>
-        </div>
+        <img className="brand__logo" src={logo240} srcSet={`${logo240} 240w, ${logo480} 480w`} sizes="196px"
+          width={196} height={43} alt="ROMKADE Manager" />
+        <img className="brand__icon" src={icon80} width={34} height={34} alt="ROMKADE Manager" />
+        <p className="brand__device">{system ? system.profile.label : "\u00a0"}</p>
       </div>
       <nav aria-label={t("common.nav.main")}>
         <ul className="nav">
@@ -56,6 +54,11 @@ export function Sidebar() {
       </nav>
       <DeviceCard />
       <GitHubStar className="sidebar__github" />
+      <p className="sidebar__meta">
+        <Link to="/conditions">{t("legal.link")}</Link>
+        <span aria-hidden> · </span>
+        <Link to="/parametres/a-propos" title={t("legal.version", { version: APP_VERSION })}>v{APP_VERSION}</Link>
+      </p>
     </aside>
   );
 }

@@ -58,7 +58,7 @@ def create_app(
         await app.state.pool.close()
 
     app = FastAPI(
-        title="Anbernic Game Manager",
+        title="ROMKADE Manager",
         version="0.4.0",
         lifespan=lifespan,
         description="Catalogue local et transferts vers une Anbernic RG35XX Pro.",

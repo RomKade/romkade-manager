@@ -587,6 +587,29 @@ describe("Connexion à une IA", () => {
   });
 });
 
+describe("Conditions d'utilisation et version", () => {
+  it("montre le bandeau au premier lancement, mène aux conditions, puis disparaît", async () => {
+    localStorage.removeItem("romkade-terms-v1");
+    renderAt("/");
+    const notice = await screen.findByRole("region", { name: "Conditions d'utilisation" });
+    expect(within(notice).getByText(/ne fournit aucun jeu/)).toBeInTheDocument();
+    await userEvent.click(within(notice).getByRole("link", { name: /Lire les conditions/ }));
+    expect(await screen.findByRole("heading", { name: "Responsabilité" })).toBeInTheDocument();
+    expect(screen.getByText(/carte mémoire corrompue/)).toBeInTheDocument();
+    await userEvent.click(within(notice).getByRole("button", { name: "J'ai compris" }));
+    expect(screen.queryByRole("region", { name: "Conditions d'utilisation" })).not.toBeInTheDocument();
+    expect(localStorage.getItem("romkade-terms-v1")).toBe("1");
+  });
+
+  it("affiche le logo, la version et le lien des conditions", async () => {
+    renderAt("/parametres/a-propos");
+    expect(await screen.findByText(/^Version \d+\.\d+\.\d+$/)).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "ROMKADE Manager" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: "Conditions d'utilisation" })[0]).toHaveAttribute("href", "/conditions");
+    expect(screen.getByRole("link", { name: /^v\d/ })).toHaveAttribute("href", "/parametres/a-propos");
+  });
+});
+
 describe("Sources et crédits", () => {
   it("cite chaque source avec un lien, et le dépôt GitHub", async () => {
     renderAt("/parametres/credits");

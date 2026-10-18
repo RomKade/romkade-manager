@@ -370,6 +370,10 @@ Settings > AI: a single AI for everything that uses one (game descriptions, game
 (most recently added first, with "Play again") and in the library: "Favorites" button among the
 filters, or `/bibliotheque?fav=1` ("All my favorites" link). Stored in the Mac's database (`favorite` table).
 
+Favorites belong to a console: each one records the SHA-256 fingerprint of the console's approved SSH key
+(stable, unlike its IP address). Plugging in another console (a friend's, another firmware) only shows its own
+favorites, limited to games present on its card; the others stay in the database and come back with their console.
+
 ## Play time
 
 "Play time" page: today's time, the last 7 days and the total, 14-day histogram, time per game,
@@ -437,6 +441,10 @@ opening a connection costs ~0.5 s on the console, a command on the open connecti
 console does not respond, subsequent calls fail immediately for 15 s instead of each waiting for the connection
 timeout. Game additions and the connection test in Settings keep their own connection.
 
+Settings > Connection guides the setup in three numbered, checked steps: 1. the console (address, user,
+then password or SSH key, depending on the chosen authentication, in the same block); 2. identify the console
+(compare and approve its key fingerprint, once per console); 3. test the connection.
+
 ## Other consoles and systems
 
 Game Manager detects the console's firmware over SSH (a few `test -d`, read-only); you can also
@@ -472,10 +480,20 @@ cuts SSH when games launch, except with "Keep services alive" (Tweaks > Network)
 (`.tmp_update/config/.keepServicesAlive_` renamed to `.keepServicesAlive`, as Tweaks does), the only write
 to the card, to keep the console reachable during the game (running game, Quit).
 
+## Version, terms of use
+
+- Single version number in `backend/pyproject.toml` and `frontend/package.json` (checked by
+  `backend/tests/test_version.py`), shown in the sidebar and in Settings > About.
+- Terms of use at `/conditions` (link in the sidebar): ROMKADE provides no games and is not liable for what the user
+  does on the console or its memory card (data loss, corrupted card, lost saves). A notice shows them on first launch
+  until "Got it" (`romkade-terms-v1` in the browser). Text to have reviewed by a lawyer before public release.
+- ROMKADE Manager logo and icons (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), from the brand files
+  of the romkade-website repository.
+
 ## Sources and credits
 
 ROMKADE Manager does not provide any games. What it takes from elsewhere is credited in the interface
-(Settings > Sources & credits, list in `frontend/src/lib/credits.ts`, and under each game page):
+(Settings > About, list in `frontend/src/lib/credits.ts`, and under each game page):
 
 | Source | Use | License |
 |---|---|---|
@@ -485,7 +503,7 @@ ROMKADE Manager does not provide any games. What it takes from elsewhere is cred
 | [OpenVGDB](https://github.com/OpenVGDB/OpenVGDB) | Summaries, dates, GameFAQs link, genres | MIT |
 | [catver.ini (progettoSNAPS)](https://www.progettosnaps.net/catver/) | Arcade categories | — |
 | MAME, FBNeo, HBMAME | Full titles, year, manufacturer (via libretro-database) | — |
-| Wikipedia, GameFAQs, YouTube, Claude (Anthropic) | Links, trailers and AI descriptions (user's own keys) | — |
+| Wikipedia, GameFAQs, YouTube, the chosen AI (Claude, ChatGPT, Mistral, Gemini, local model) | Links, trailers, AI descriptions and controls (user's own keys) | — |
 | [Lucide](https://lucide.dev/), Archivo, Atkinson Hyperlegible Next | Icons, fonts | ISC, SIL OFL 1.1 |
 
 Any new source (`backend/scripts/build_*.py` script, online service, illustration) is added to

@@ -9,6 +9,7 @@
 import bluetooth from "./locales/bluetooth";
 import common from "./locales/common";
 import dashboard from "./locales/dashboard";
+import legal from "./locales/legal";
 import library from "./locales/library";
 import players from "./locales/players";
 import playtime from "./locales/playtime";
@@ -28,7 +29,7 @@ export const LANGS: { code: Lang; label: string }[] = [
 const LOCALES: Record<Lang, string> = { fr: "fr-FR", en: "en-GB", es: "es-ES" };
 const STORAGE_KEY = "agm-lang";
 
-export const NAMESPACES: Record<string, Messages> = { bluetooth, common, dashboard, library, players, playtime, saves, settings, sheet, sync, transfers };
+export const NAMESPACES: Record<string, Messages> = { bluetooth, common, dashboard, legal, library, players, playtime, saves, settings, sheet, sync, transfers };
 
 const catalogs: Record<Lang, Record<string, string>> = { fr: {}, en: {}, es: {} };
 for (const [ns, messages] of Object.entries(NAMESPACES)) {
