@@ -203,6 +203,7 @@ export function useSetVolume() {
   return useMutation({ mutationFn: api.setVolume, onSuccess: (d) => qc.setQueryData(["volume"], d) });
 }
 
+export const useAiSettings = () => useQuery({ queryKey: ["ai-settings"], queryFn: api.aiSettings });
 export const useYoutubeSettings = () => useQuery({ queryKey: ["youtube-settings"], queryFn: api.youtubeSettings });
 
 export const useSyncs = () => useQuery({ queryKey: ["syncs"], queryFn: api.syncs });

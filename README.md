@@ -335,7 +335,14 @@ console (Mega Drive : A = Y, B = B, C = A ; PlayStation : Croix = B, Rond = A…
 pièce = Select). Réponse en français, anglais et espagnol, gardée en base (table `game_controls`, partagée par
 les éditions d'un même jeu). Jeu mal connu du modèle : commandes habituelles de la console, signalé comme tel.
 « Corriger » / « Saisir à la main » remplace la liste par la sienne (même texte dans les trois langues). Même clé
-d'API Anthropic que les descriptions (Paramètres > Descriptions).
+d'API IA que les descriptions (Paramètres > IA).
+
+## Clé d'API IA
+
+Paramètres > IA, comme la clé YouTube de Paramètres > Vidéos : une seule clé Anthropic (`sk-ant-…`), gardée dans
+le trousseau macOS, pour tout ce qui utilise Claude : descriptions des jeux et commandes (touches). Sans clé dans
+le trousseau, les identifiants du SDK sur le Mac (variable `ANTHROPIC_API_KEY` ou profil) servent s'ils existent.
+`GET /api/settings/anthropic` indique si une clé est disponible et d'où elle vient (`keychain`, `environment`).
 
 ## Favoris
 

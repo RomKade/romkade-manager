@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpen, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpen, Bot, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { Link, NavLink, useParams } from "react-router-dom";
 
 import { api, ApiError, type Capabilities, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
 import {
-  useDetectSystem, useDeviceStatus, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
+  useAiSettings, useDetectSystem, useDeviceStatus, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
 import { GitHubStar } from "../components/GitHubStar";
 import { ErrorNotice, hintFor, Meter, PageHeader, Spinner } from "../components/ui";
@@ -21,6 +21,7 @@ const TABS = [
   { slug: "systeme", label: "settings.tab.system", icon: Cpu },
   { slug: "temps-de-jeu", label: "settings.tab.playtime", icon: Hourglass },
   { slug: "videos", label: "settings.tab.videos", icon: Video },
+  { slug: "ia", label: "settings.tab.ai", icon: Bot },
   { slug: "descriptions", label: "settings.tab.descriptions", icon: Languages },
   { slug: "credits", label: "settings.tab.credits", icon: BookOpen },
 ] as const;
@@ -62,6 +63,7 @@ export function SettingsPage() {
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}
       {current === "videos" && <YouTubePanel />}
+      {current === "ia" && <AiKeyPanel />}
       {current === "descriptions" && <DescriptionsPanel />}
       {current === "credits" && <CreditsPanel />}
     </div>
@@ -445,10 +447,6 @@ function DescriptionsPanel() {
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["descriptions"], queryFn: api.descriptions,
     refetchInterval: (q) => (q.state.data?.batches.some((b) => !b.imported) ? 60_000 : false) });
-  const [key, setKey] = useState("");
-  const refresh = () => qc.invalidateQueries({ queryKey: ["descriptions"] });
-  const save = useMutation({ mutationFn: api.saveAnthropicKey, onSuccess: () => { setKey(""); refresh(); } });
-  const remove = useMutation({ mutationFn: api.deleteAnthropicKey, onSuccess: refresh });
   const start = useMutation({ mutationFn: api.startDescriptions, onSuccess: (d) => qc.setQueryData(["descriptions"], d) });
   const st = status.data;
   const running = st?.batches.find((b) => !b.imported);
@@ -475,7 +473,7 @@ function DescriptionsPanel() {
                   {start.isPending ? <Loader2 size={16} aria-hidden className="spin" /> : <Sparkles size={16} aria-hidden />}
                   {t("settings.desc.start", { count: st.pending, cost: st.estimate_usd.toFixed(0) })}
                 </button>
-                {!st.credentials && <span className="muted">{t("settings.desc.needKey")}</span>}
+                {!st.credentials && <Link to="/parametres/ia" className="muted">{t("settings.desc.needKey")}</Link>}
               </div>
             )}
             <p className="muted">{t("settings.desc.model", { model: st.model })}</p>
@@ -497,28 +495,59 @@ function DescriptionsPanel() {
         )}
       </section>
 
-      <form className="block form" aria-labelledby="ak-h" onSubmit={(e) => { e.preventDefault(); if (key.trim()) save.mutate(key.trim()); }}>
-        <h2 id="ak-h"><KeyRound size={18} aria-hidden /> {t("settings.desc.keyTitle")}</h2>
-        <p className="muted block__lead">
-          {t("settings.desc.keyLeadBefore")}{" "}
-          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer noopener">console.anthropic.com</a>
-          {t("settings.desc.keyLeadAfter")}
-        </p>
-        <p className="muted">{st?.key_in_keychain ? t("settings.desc.keySaved") : st?.credentials ? t("settings.desc.keyProfile") : t("settings.desc.keyNone")}</p>
-        <div className="field">
-          <label htmlFor="akey">{st?.key_in_keychain ? t("settings.yt.replace") : t("settings.desc.keyLabel")}</label>
-          <input id="akey" type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
-        </div>
-        <div className="form__actions">
-          <button type="submit" className="button" disabled={!key.trim() || save.isPending}>{t("settings.saveKeychain")}</button>
-          {st?.key_in_keychain && (
-            <button type="button" className="link-button" onClick={() => remove.mutate()} disabled={remove.isPending}>{t("settings.yt.remove")}</button>
-          )}
-          {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.savedF")}</span>}
-        </div>
-        {save.isError && <ErrorNotice error={save.error} />}
-      </form>
     </>
+  );
+}
+
+/**
+ * Clé d'API IA (Anthropic), comme la clé YouTube : une seule clé, dans le trousseau macOS, pour tout ce qui
+ * utilise Claude (descriptions des jeux, commandes des jeux). Sans clé, les identifiants du SDK sur ce Mac
+ * (variable ANTHROPIC_API_KEY ou profil) sont utilisés s'ils existent.
+ */
+function AiKeyPanel() {
+  const t = useT();
+  const qc = useQueryClient();
+  const ai = useAiSettings();
+  const [key, setKey] = useState("");
+  const done = () => {
+    setKey("");
+    for (const k of ["ai-settings", "descriptions", "game-controls"]) qc.invalidateQueries({ queryKey: [k] });
+  };
+  const save = useMutation({ mutationFn: api.saveAnthropicKey, onSuccess: done });
+  const remove = useMutation({ mutationFn: api.deleteAnthropicKey, onSuccess: done });
+  const source = ai.data?.source;
+  return (
+    <form className="block form" aria-labelledby="ai-h" onSubmit={(e) => { e.preventDefault(); if (key.trim()) save.mutate(key.trim()); }}>
+      <h2 id="ai-h"><Bot size={18} aria-hidden /> {t("settings.ai.title")}</h2>
+      <p className="muted block__lead">
+        {t("settings.ai.leadBefore")}{" "}
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer noopener">console.anthropic.com</a>
+        {t("settings.ai.leadAfter")}
+      </p>
+      <div>
+        <p>{t("settings.ai.usesTitle")}</p>
+        <ul className="ai-uses">
+          <li><Link to="/parametres/descriptions">{t("settings.ai.useDescriptions")}</Link></li>
+          <li>{t("settings.ai.useControls")}</li>
+        </ul>
+      </div>
+      <p className="muted">
+        {ai.isPending ? " " : source === "keychain" ? t("settings.ai.saved") : source === "environment" ? t("settings.ai.env") : t("settings.ai.none")}
+      </p>
+      <div className="field">
+        <label htmlFor="aikey">{source === "keychain" ? t("settings.yt.replace") : t("settings.ai.label")}</label>
+        <input id="aikey" type="password" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
+      </div>
+      <div className="form__actions">
+        <button type="submit" className="button" disabled={!key.trim() || save.isPending}>{t("settings.saveKeychain")}</button>
+        {source === "keychain" && (
+          <button type="button" className="link-button" onClick={() => remove.mutate()} disabled={remove.isPending}>{t("settings.yt.remove")}</button>
+        )}
+        {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("settings.savedF")}</span>}
+      </div>
+      <p className="muted">{t("settings.ai.cost")}</p>
+      {(save.isError || remove.isError) && <ErrorNotice error={save.error ?? remove.error} />}
+    </form>
   );
 }
 

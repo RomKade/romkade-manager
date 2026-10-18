@@ -2,6 +2,7 @@
 
 import asyncio
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
@@ -96,6 +97,21 @@ async def descriptions_start(request: Request) -> dict:
     except Exception as exc:  # noqa: BLE001
         raise errors.AppError("descriptions_submit_failed", f"Le lot n'a pas pu être soumis : {exc}", 502) from exc
     return await asyncio.to_thread(_status, request)
+
+
+class AiSettingsOut(BaseModel):
+    """Clé d'API IA (Anthropic), partagée par tout ce qui utilise Claude : descriptions des jeux, commandes (touches)."""
+    configured: bool
+    source: Literal["keychain", "environment"] | None  # trousseau macOS, ou variable / profil du SDK sur ce Mac
+
+
+@router.get("/settings/anthropic", response_model=AiSettingsOut)
+def anthropic_settings(request: Request) -> AiSettingsOut:
+    creds = request.app.state.credentials
+    if creds.get_password(d.KEY_HOST, d.KEY_ACCOUNT):
+        return AiSettingsOut(configured=True, source="keychain")
+    env = d.has_credentials(None)
+    return AiSettingsOut(configured=env, source="environment" if env else None)
 
 
 @router.put("/settings/anthropic", status_code=204)

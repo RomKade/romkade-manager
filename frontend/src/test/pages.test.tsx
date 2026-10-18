@@ -56,6 +56,7 @@ function mockFetch() {
       return json(deviceOnline ? { connected: true, error: null } : { connected: false, error: { code: "device_unreachable", message: "Console injoignable sur 192.168.86.242:22" } });
     if (url === "/api/device/host-key/trust") { hostKeyTrusted = true; return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: true }); }
     if (url === "/api/device/host-key") return json({ host: "192.168.86.243", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc", trusted: false });
+    if (url.startsWith("/api/settings/anthropic")) return init?.method && init.method !== "GET" ? new Response(null, { status: 204 }) : json({ configured: true, source: "keychain" });
     if (url.startsWith("/api/settings")) return json({ host: "192.168.86.242", port: 22, username: "root", auth_method: "password", key_path: null, roms_root: "/mnt/mmc/Roms", connect_timeout: 8, has_password: true, host_key_trusted: hostKeyTrusted });
     if (url.startsWith("/api/platforms")) return json([{ ...platform, label_status: "confirmed", kind: "emulated", present: true, image_dir_present: true, last_scanned_at: null, game_count: 2, file_count: 2, total_bytes: 1048576, image_count: 0, images_matched: 0 }]);
     if (url.startsWith("/api/catalog/facets")) return json({
@@ -518,6 +519,19 @@ describe("Paramètres", () => {
     expect(await within(panel).findByText("Une étape a échoué : les suivantes n'ont pas été testées.")).toBeInTheDocument();
     expect(within(panel).getByText(/Réseau local, active l'application qui a lancé le serveur/)).toBeInTheDocument();
     expect(within(panel).getAllByText("Non testé")).toHaveLength(5);
+  });
+});
+
+describe("Clé d'API IA", () => {
+  it("a son onglet, liste ses usages et enregistre la clé dans le trousseau", async () => {
+    renderAt("/parametres/ia");
+    const form = (await screen.findByRole("heading", { name: "Clé d'API IA (Anthropic)" })).closest("form")!;
+    expect(await within(form).findByText("Une clé est enregistrée dans le trousseau.")).toBeInTheDocument();
+    expect(within(form).getByRole("link", { name: /Descriptions des jeux/ })).toHaveAttribute("href", "/parametres/descriptions");
+    expect(within(form).getByText(/Commandes des jeux/)).toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText("Remplacer la clé"), "sk-ant-api03-test");
+    await userEvent.click(within(form).getByRole("button", { name: /trousseau/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/anthropic", api_key: "sk-ant-api03-test" }));
   });
 });
 

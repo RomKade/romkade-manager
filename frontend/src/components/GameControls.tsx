@@ -96,7 +96,7 @@ export function GameControlsSection({ id }: { id: number }) {
             </button>
           </div>
           {!data.can_generate && data.status === "none" && (
-            <p className="muted"><Link to="/parametres/descriptions">{t("sheet.controls.needKey")}</Link></p>
+            <p className="muted"><Link to="/parametres/ia">{t("sheet.controls.needKey")}</Link></p>
           )}
           {generate.isError && <ErrorNotice error={generate.error} />}
         </>

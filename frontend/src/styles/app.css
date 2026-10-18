@@ -1197,3 +1197,4 @@ kbd {
 
 /* Bloc qui attend une action (clé de la console à approuver) */
 .block--attention { border-color: color-mix(in srgb, var(--warn) 60%, var(--line)); }
+.ai-uses { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }

@@ -130,6 +130,7 @@ export const api = {
   deleteYoutubeKey: () => request<void>("DELETE", "/settings/youtube"),
   descriptions: () => request<DescriptionsStatus>("GET", "/descriptions"),
   startDescriptions: () => request<DescriptionsStatus>("POST", "/descriptions/start"),
+  aiSettings: () => request<{ configured: boolean; source: "keychain" | "environment" | null }>("GET", "/settings/anthropic"),
   saveAnthropicKey: (api_key: string) => request<void>("PUT", "/settings/anthropic", { api_key }),
   deleteAnthropicKey: () => request<void>("DELETE", "/settings/anthropic"),
   launchGame: (id: number, slot?: string | null) =>
