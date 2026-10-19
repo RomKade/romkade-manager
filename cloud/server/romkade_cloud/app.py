@@ -37,6 +37,7 @@ from starlette.staticfiles import StaticFiles
 from app.services import cheats as cheat_db
 
 from . import catalog
+from .analytics import Analytics
 from .art import Art
 from .auth import SupabaseAuth, account_id
 from .relay import Relay
@@ -114,6 +115,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     if auth is None and supabase_url:
         auth = SupabaseAuth(supabase_url, publishable_key)
     mcp = build(store, relay, public_url)
+    analytics = Analytics(mcp)  # statistiques d'usage, sans le contenu des appels (analytics.py)
     art = Art(store)
 
     hosts = [h.strip() for h in os.environ.get("ROMKADE_ALLOWED_HOSTS", "").split(",") if h.strip()]
@@ -287,8 +289,11 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         await asyncio.to_thread(rebuild_catalogs, store)
         if cheat_db.index() is None and os.environ.get("ROMKADE_FETCH_CHEATS", "1") == "1":
             asyncio.get_running_loop().create_task(_fetch_cheats())
-        async with inner_lifespan(a) as state:
-            yield state
+        try:
+            async with inner_lifespan(a) as state:
+                yield state
+        finally:
+            await analytics.close()
 
     app.router.lifespan_context = lifespan
     app.state.store, app.state.relay = store, relay

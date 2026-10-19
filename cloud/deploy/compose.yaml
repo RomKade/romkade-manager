@@ -13,6 +13,9 @@ services:
       # Comptes ROMKADE (Supabase Auth, serveur OAuth) : adresse du projet et clé publique (pas des secrets).
       ROMKADE_SUPABASE_URL: https://urpvxqtyscuomkusqsiu.supabase.co
       ROMKADE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_4TKxIKKsIU97CwTtATuckw_mhYMMlPq
+      # Statistiques d'usage MCP (PostHog Cloud EU, projet RomKade) : clé publique du projet, pas un secret.
+      POSTHOG_PROJECT_TOKEN: phc_yRwnSr3HGYSAiRtL4Q6baZw9H3ZXn886i86E28ATc9qv
+      POSTHOG_HOST: https://eu.i.posthog.com
     volumes:
       - romkade_data:/data
     networks: [licenses_web]

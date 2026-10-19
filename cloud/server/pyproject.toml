@@ -5,6 +5,7 @@ description = "Cloud ROMKADE : serveur MCP (ChatGPT, Claude…) et relais vers l
 requires-python = ">=3.13"
 dependencies = [
     "mcp==2.3.0",
+    "posthog>=7.40.0",
     "uvicorn[standard]>=0.30",
     "pyjwt[crypto]>=2.9",  # jetons OAuth de Supabase (ES256, clés publiques JWKS)
     "anbernic-game-manager",  # backend du Manager (../../backend) : plateformes, tri des fichiers, cheats

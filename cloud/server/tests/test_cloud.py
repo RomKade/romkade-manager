@@ -303,3 +303,30 @@ def test_oauth_accounts(env):
             await task
 
     asyncio.run(scenario())
+
+
+def test_mcp_analytics_never_sends_call_content(env, monkeypatch):
+    """Statistiques PostHog : mêmes outils qu'avant (aucun paramètre ajouté), ni arguments ni réponses envoyés."""
+    import posthog
+
+    store, token = env
+    sent = []
+    monkeypatch.setenv("POSTHOG_PROJECT_TOKEN", "phc_test")
+    monkeypatch.setattr(posthog.Posthog, "capture", lambda self, event, **kw: sent.append({"event": event, **kw}))
+
+    async def scenario():
+        base, server, task = await serving(store, Relay())
+        try:
+            async with Client(f"{base}/{token}") as mcp:
+                tools = (await mcp.list_tools()).tools
+                assert all("context" not in (t.input_schema.get("properties") or {}) for t in tools)
+                await mcp.call_tool("search_games", {"query": "Sonic"})
+        finally:
+            server.should_exit = True
+            await task
+
+    asyncio.run(scenario())
+    calls = [e for e in sent if e["event"] == "$mcp_tool_call"]
+    assert calls and calls[0]["properties"]["$mcp_tool_name"] == "search_games"
+    assert "Sonic" not in json.dumps(sent, default=str)
+    assert not {"$mcp_parameters", "$mcp_response", "$mcp_intent"} & {k for e in sent for k in e.get("properties", {})}
