@@ -94,6 +94,7 @@ Options, dans un fichier `.env` à côté de `compose.yaml` : `ROMKADE_PORT` (d�
 Même numéro dans `backend/pyproject.toml` et `frontend/package.json`, puis `git tag vX.Y.Z && git push origin vX.Y.Z`.
 Le workflow [Image Docker](.github/workflows/docker.yml) publie l'image (`X.Y.Z`, `X.Y`, `latest`, amd64 + arm64) et
 une release GitHub avec `compose.yaml`. Chaque push sur `main` publie `edge`.
+La variable du dépôt `POSTHOG_KEY` (clé publique `phc_…`) active dans l'image les statistiques anonymes sur accord.
 
 ## Lancer depuis le code source (macOS)
 
@@ -627,6 +628,12 @@ sous Android).
   pas des manipulations de l'utilisateur sur la console ou sa carte mémoire (perte de données, carte corrompue,
   sauvegardes perdues). Un bandeau les rappelle au premier lancement, jusqu'à « J'ai compris » (`romkade-terms-v1`
   dans le navigateur). Texte à faire relire par un juriste avant une diffusion publique.
+- Statistiques d'utilisation anonymes (PostHog Cloud EU), **sur accord** : demandé une fois au premier lancement,
+  puis Paramètres > À propos (`romkade-analytics` dans le navigateur). Textes et attributs des éléments masqués,
+  adresses réduites au chemin, ni provenance ni enregistrement de session, aucun script externe
+  (`frontend/src/lib/analytics.ts`). Proposé seulement si le build reçoit une clé : `VITE_POSTHOG_KEY` (variable du
+  dépôt `POSTHOG_KEY` pour l'image Docker, `frontend/.env.local` en développement) ; sans clé, rien n'est demandé ni
+  envoyé.
 - Logo et icônes ROMKADE Manager (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), tirés des fichiers de
   marque du dépôt romkade-website.
 

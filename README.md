@@ -93,6 +93,7 @@ Options, in a `.env` file next to `compose.yaml`: `ROMKADE_PORT` (default `8765`
 Same number in `backend/pyproject.toml` and `frontend/package.json`, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
 The [Image Docker](.github/workflows/docker.yml) workflow publishes the image (`X.Y.Z`, `X.Y`, `latest`, amd64 + arm64)
 and a GitHub release with `compose.yaml`. Every push to `main` publishes `edge`.
+The repository variable `POSTHOG_KEY` (public `phc_…` key) enables the opt-in anonymous statistics in the image.
 
 ## Run from the source code (macOS)
 
@@ -617,6 +618,11 @@ ROMs folder (RetroArch's default folders on Android).
 - Terms of use at `/conditions` (link in the sidebar): ROMKADE provides no games and is not liable for what the user
   does on the console or its memory card (data loss, corrupted card, lost saves). A notice shows them on first launch
   until "Got it" (`romkade-terms-v1` in the browser). Text to have reviewed by a lawyer before public release.
+- Anonymous usage statistics (PostHog Cloud EU), **opt-in**: asked once on first launch, then Settings > About
+  (`romkade-analytics` in the browser). Text and element attributes masked, URLs reduced to their path, no referrer,
+  no session recording, no external script (`frontend/src/lib/analytics.ts`). Only offered when the build gets a
+  key: `VITE_POSTHOG_KEY` (repository variable `POSTHOG_KEY` for the Docker image, `frontend/.env.local` in
+  development); without it, nothing is asked or sent.
 - ROMKADE Manager logo and icons (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), from the brand files
   of the romkade-website repository.
 

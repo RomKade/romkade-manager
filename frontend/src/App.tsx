@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 
 import { ApiError } from "./api/client";
 import { useStatus, useTransfersLive } from "./api/queries";
+import { AnalyticsNotice } from "./components/AnalyticsNotice";
 import { AssistantBubble } from "./components/AssistantBubble";
 import { GameSheet } from "./components/GameSheet";
 import { Sidebar } from "./components/Sidebar";
@@ -69,6 +70,7 @@ function Layout() {
         <TopBar />
         <PlayAlerts />
         <TermsNotice />
+        <AnalyticsNotice />
         <div className="main__content">
           <Outlet />
         </div>

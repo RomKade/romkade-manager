@@ -94,6 +94,7 @@ defecto `latest`), `TZ` (por defecto `Europe/Paris`).
 Mismo número en `backend/pyproject.toml` y `frontend/package.json`, y luego `git tag vX.Y.Z && git push origin vX.Y.Z`.
 El workflow [Image Docker](.github/workflows/docker.yml) publica la imagen (`X.Y.Z`, `X.Y`, `latest`, amd64 + arm64) y
 una release de GitHub con `compose.yaml`. Cada push a `main` publica `edge`.
+La variable del repositorio `POSTHOG_KEY` (clave pública `phc_…`) activa en la imagen las estadísticas anónimas con consentimiento.
 
 ## Ejecutar desde el código fuente (macOS)
 
@@ -624,6 +625,12 @@ juego con Termux en segundo plano. Las partidas se leen en
   que el usuario haga en la consola o su tarjeta de memoria (pérdida de datos, tarjeta corrupta, partidas perdidas).
   Un aviso las recuerda en el primer inicio, hasta «Entendido» (`romkade-terms-v1` en el navegador). Texto que debe
   revisar un jurista antes de una difusión pública.
+- Estadísticas de uso anónimas (PostHog Cloud EU), **con consentimiento**: se pregunta una vez en el primer inicio,
+  luego Ajustes > Acerca de (`romkade-analytics` en el navegador). Textos y atributos de los elementos ocultos,
+  direcciones reducidas a la ruta, sin procedencia ni grabación de sesión, sin script externo
+  (`frontend/src/lib/analytics.ts`). Solo se ofrece si la compilación recibe una clave: `VITE_POSTHOG_KEY` (variable
+  del repositorio `POSTHOG_KEY` para la imagen Docker, `frontend/.env.local` en desarrollo); sin clave, no se pregunta
+  ni se envía nada.
 - Logo e iconos de ROMKADE Manager (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), tomados de los
   archivos de marca del repositorio romkade-website.
 

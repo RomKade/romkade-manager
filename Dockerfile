@@ -7,7 +7,9 @@ WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
-RUN npm run build
+# Clé PostHog (statistiques anonymes, proposées à l'utilisateur et refusées par défaut) : vide = fonction absente.
+ARG VITE_POSTHOG_KEY=""
+RUN VITE_POSTHOG_KEY="$VITE_POSTHOG_KEY" npm run build
 
 # 2. Serveur (FastAPI)
 FROM python:3.13-slim
