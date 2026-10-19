@@ -53,7 +53,7 @@ PROVIDERS: dict[str, Provider] = {p.id: p for p in (
     Provider("openai", "ChatGPT (OpenAI)", "cloud", "openai", "https://api.openai.com/v1", "required",
              r"sk-[A-Za-z0-9_\-]{20,}", "https://platform.openai.com/api-keys", "OPENAI_API_KEY"),
     Provider("mistral", "Mistral AI", "cloud", "openai", "https://api.mistral.ai/v1", "required",
-             r"[A-Za-z0-9]{20,}", "https://console.mistral.ai/api-keys", "MISTRAL_API_KEY"),
+             r"[A-Za-z0-9_.\-]{20,}", "https://console.mistral.ai/api-keys", "MISTRAL_API_KEY"),
     Provider("gemini", "Gemini (Google)", "cloud", "openai", "https://generativelanguage.googleapis.com/v1beta/openai",
              "required", r"AIza[0-9A-Za-z_\-]{30,}", "https://aistudio.google.com/apikey", "GEMINI_API_KEY"),
     Provider("local", "Modèle local ou service compatible OpenAI", "local", "openai", "http://localhost:11434/v1",
