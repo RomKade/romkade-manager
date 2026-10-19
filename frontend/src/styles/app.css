@@ -1491,3 +1491,10 @@ kbd {
 .shots-game.is-focus { box-shadow: 0 0 0 2px var(--accent); }
 .shots-game__title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .shots-game__title .muted { font-size: 0.8em; font-weight: 400; }
+
+/* Bulle de l'assistant : captures d'écran (montrer, partager, analyser) */
+.assistant__shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.assistant__shot { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.assistant__shot img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); image-rendering: pixelated; }
+.assistant__shot-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.assistant__shot-text { margin: 0; white-space: pre-wrap; font-size: var(--fs-sm); background: var(--panel-2); border-radius: 6px; padding: 8px; }

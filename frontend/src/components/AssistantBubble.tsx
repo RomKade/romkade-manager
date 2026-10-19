@@ -92,7 +92,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           } else update((m) => ({ ...m, intent: e.intent, games: e.games, sources: e.sources }));
         } else if (e.type === "delta") update((m) => ({ ...m, content: m.content + e.text }));
         else if (e.type === "action") {
-          update((m) => ({ ...m, action: { kind: e.kind, supported: e.supported, system: e.system, percent: e.percent, games: e.games } }));
+          update((m) => ({ ...m, action: { kind: e.kind, supported: e.supported, system: e.system, percent: e.percent, games: e.games, shots: e.shots } }));
         }
         else if (e.type === "error") {
           const list = assistant.messages(target);

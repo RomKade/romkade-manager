@@ -205,6 +205,9 @@ export const api = {
   takeScreenshot: () => request<ShotTaken>("POST", "/device/screenshot"),
   screenshots: () => request<GameShots[]>("GET", "/screenshots"),
   gameScreenshots: (id: number) => request<Shot[]>("GET", `/games/${id}/screenshots`),
+  /** Lecture d'une capture par le modèle réglé (texte de l'écran, rôle des touches). */
+  analyzeScreenshot: (id: number, name: string, lang: string) =>
+    request<{ text: string; model: string }>("POST", `/games/${id}/screenshots/${encodeURIComponent(name)}/analyze`, { lang }),
   deleteScreenshot: (url: string) => request<void>("DELETE", url.replace(/^\/api/, "")),
   saves: () => request<SavesList>("GET", "/saves"),
   gameSaves: (id: number) => request<Save[]>("GET", `/games/${id}/saves`),

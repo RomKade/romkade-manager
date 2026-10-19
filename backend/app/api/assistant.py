@@ -179,6 +179,23 @@ async def _prepare_action(request: Request, route: dict, game, search_text: str)
     profile = st.system.profile()
     caps = profile.capabilities(st.system.es_http())
     games: list[dict] = []
+    shots: list[dict] = []
+    if kind in asst.SCREENSHOT_VIEWS:
+        def gallery():
+            store = st.screenshots
+            gid = game[0] if game else next((g["game_id"] for g in store.all()), None)
+            if gid is None:
+                return [], []
+            with st.sessions() as s:
+                try:
+                    outs = [asst.game_out(cq.get_file(s, gid))]
+                except errors.AppError:  # jeu sorti du catalogue : titre gardé avec ses captures
+                    info = next((g for g in store.all() if g["game_id"] == gid), {})
+                    outs = [{"id": gid, "title": info.get("title", f"#{gid}"), "platform": info.get("platform_label") or "",
+                             "code": info.get("platform_code") or ""}]
+            return outs, store.for_game(gid)
+
+        games, shots = await asyncio.to_thread(gallery)
     if kind == "launch_game":
         mentioned = [str(n)[:120] for n in route.get("games_mentioned") or []][:5]
         ids = None
@@ -197,7 +214,7 @@ async def _prepare_action(request: Request, route: dict, game, search_text: str)
 
         games = await asyncio.to_thread(find)
     volume = route.get("volume")
-    action = asst.action_proposal(kind, volume if isinstance(volume, int) else None, caps, profile.label, games)
+    action = asst.action_proposal(kind, volume if isinstance(volume, int) else None, caps, profile.label, games, shots)
     return asst.Prepared(True, intent="console_action", games=action["games"], action=action)
 
 
@@ -244,3 +261,44 @@ async def assistant(body: AssistantIn, request: Request) -> StreamingResponse:
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+class ShotAnalysisIn(BaseModel):
+    lang: Literal["fr", "en", "es"] = "fr"
+
+
+class ShotAnalysisOut(BaseModel):
+    text: str
+    model: str
+
+
+@router.post("/games/{game_id}/screenshots/{name}/analyze", response_model=ShotAnalysisOut)
+async def analyze_screenshot(game_id: int, name: str, body: ShotAnalysisIn, request: Request) -> dict:
+    """Lecture d'une capture d'écran par le modèle réglé (qui doit lire les images) : quel écran, texte lisible,
+    et rôle des touches si c'est un écran de commandes. Rien n'est enregistré."""
+    st = request.app.state
+    llm = llm_mod.resolve(st)
+    path = st.screenshots.path(game_id, name)  # 404 si la capture n'existe pas
+
+    def read():
+        with st.sessions() as s:
+            try:
+                f = cq.get_file(s, game_id)
+                return asst._game_title(f), f.platform.label or f.platform.directory
+            except errors.AppError:
+                return f"#{game_id}", ""
+
+    title, console = await asyncio.to_thread(read)
+    image = await asyncio.to_thread(path.read_bytes)
+    prompt = "Read this screenshot." if body.lang == "en" else "Lis cette capture d'écran." if body.lang == "fr" else "Lee esta captura."
+    try:
+        text = await asyncio.to_thread(llm.describe_image, asst.shot_system(title, console, body.lang), prompt, image)
+    except errors.AppError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise errors.AppError("screenshot_analysis_failed", f"{llm.provider.label} n'a pas pu lire la capture : {exc}",
+                              502) from exc
+    if not text:
+        raise errors.AppError("screenshot_analysis_empty", f"{llm.label} n'a rien rendu pour cette capture.", 502)
+    return {"text": text[:2000],
+            "model": llm.label}

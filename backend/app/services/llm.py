@@ -372,6 +372,49 @@ class LLM:
             ids = []
         return sorted({i.removeprefix("models/") for i in ids})
 
+    def describe_image(self, system: str, prompt: str, image: bytes, *, media_type: str = "image/png",
+                       max_tokens: int = 900) -> str:
+        """Texte rédigé par le modèle à partir d'une image (capture d'écran) et d'une consigne. Lève AppError si le
+        fournisseur refuse (modèle qui ne lit pas les images, notamment) ou ne répond pas."""
+        import base64
+
+        data = base64.b64encode(image).decode()
+        if self.provider.protocol == "anthropic":
+            body = {"model": self.model, "max_tokens": max_tokens, "system": system, "messages": [{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}},
+                {"type": "text", "text": prompt}]}]}
+            with self._client() as http:
+                r = self._post(http, "/messages", body)
+            if r.status_code >= 400:
+                raise errors.AppError("llm_rejected", _status_message(self.provider, r.status_code, r.text), 502,
+                                      {"status": r.status_code})
+            return "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text").strip()
+        tokens = "max_completion_tokens" if self.provider.id == "openai" else "max_tokens"
+        body = {"model": self.model, tokens: max_tokens, "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": [{"type": "text", "text": prompt},
+                                         {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{data}"}}]}]}
+        if self.default_reasoning:
+            body["reasoning_effort"] = self.default_reasoning
+        elif self.provider.id == "local":
+            body["reasoning_effort"] = "none"
+        with self._client() as http:
+            r = self._post(http, "/chat/completions", body)
+            if r.status_code == 400 and "reasoning_effort" in body and re.search(r"reasoning", r.text, re.I):
+                body.pop("reasoning_effort")
+                r = self._post(http, "/chat/completions", body)
+        if r.status_code >= 400:
+            if re.search(r"image|vision|multimodal|content type", r.text, re.I):
+                raise errors.AppError("llm_no_vision", f"{self.label} ne sait pas lire les images : choisis un "
+                                      "modèle qui les lit (Gemma 4, Mistral Large, Claude…).", 409)
+            raise errors.AppError("llm_rejected", _status_message(self.provider, r.status_code, r.text), 502,
+                                  {"status": r.status_code})
+        try:
+            msg = r.json()["choices"][0]["message"]
+        except (ValueError, KeyError, IndexError, TypeError):
+            return ""
+        return re.sub(r"<think>.*?</think>", "", content_text(msg.get("content")), flags=re.S).strip()
+
     def test(self) -> dict:
         """Petite demande réelle : le modèle répond-il, et en JSON ? (quelques jetons, coût négligeable)."""
         start = time.monotonic()
