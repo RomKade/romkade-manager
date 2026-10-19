@@ -577,7 +577,7 @@ las ROMs y las partidas guardadas, cómo lanzar y salir de un juego, y qué est�
 | Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | sí (como el menú de Onion), salir | probado |
 | spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | salir | experimental |
 | MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | no | experimental |
-| Android + RetroArch | Retroid Pocket, AYN Odin/Thor, Anbernic y Ayaneo con Android | `/storage/emulated/0/ROMs` | sí (RetroArch), salir, guardar | experimental |
+| Android + RetroArch | Retroid Pocket, AYN Odin/Thor, Anbernic y Ayaneo con Android | `/storage/emulated/0/ROMs` | lanzar (en RetroArch); salir en la consola | experimental |
 | Otro (Linux + SSH) | — | por configurar | salir (RetroArch) | experimental |
 
 Nombres de carpetas: cada firmware tiene los suyos («snes», «SFC», «Super Nintendo Entertainment System (SFC)»,
@@ -604,15 +604,16 @@ una sola vez:
 2. En Termux: `termux-setup-storage`, `pkg install openssh`, `passwd` (elegir una contraseña), `sshd`.
 3. Ajustes de Android → Aplicaciones → Termux → permitir **«Mostrar sobre otras aplicaciones»** (sin ello, Android
    bloquea un juego lanzado desde el ordenador mientras Termux está en segundo plano).
-4. RetroArch → Ajustes → Red → **Comandos de red** activados (juego en curso, salir, guardar).
-5. En ROMKADE Manager: la dirección IP de la consola, el puerto **8022**, cualquier nombre de usuario y la contraseña
+4. En ROMKADE Manager: la dirección IP de la consola, el puerto **8022**, cualquier nombre de usuario y la contraseña
    de Termux.
 
 Los juegos se lanzan con un intent de Android (`am start` hacia RetroArch, extras `ROM` y `LIBRETRO`; un núcleo por
-consola, `ANDROID_CORES` en `launcher.py`). Android oculta los procesos de RetroArch a las demás aplicaciones: el juego
-en curso se lee con el comando de red `GET_STATUS` de RetroArch (y su archivo se busca por nombre), y se sale de un
-juego con `CLOSE_CONTENT` (RetroArch sigue abierto en su menú). No disponible en Android: reanudar desde un guardado
-rápido, volumen, Bluetooth, mandos por jugador, hora de la consola (requiere root). Las partidas se leen en
+consola, `ANDROID_CORES` en `launcher.py`, comprobado con la lista de núcleos Android de RetroArch). El juego en curso
+no se puede leer ni cerrar desde el ordenador: RetroArch para Android se compila sin sus comandos de red (comprobado en
+la 1.22.2) y Android oculta sus procesos a las demás aplicaciones. Tampoco disponible en Android: guardar ahora,
+reanudar desde un guardado rápido, volumen, Bluetooth, mandos por jugador, hora de la consola (requiere root). Probado
+en un emulador Android 14 (Termux 0.118.3, RetroArch 1.22.2): conexión, detección, sincronización y lanzamiento de un
+juego con Termux en segundo plano. Las partidas se leen en
 `RetroArch/saves` y `RetroArch/states`, junto a la carpeta de ROMs (carpetas por defecto de RetroArch en Android).
 
 ## Versión, condiciones de uso
