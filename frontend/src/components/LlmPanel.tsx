@@ -1,23 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, Bot, Cloud, ExternalLink, HardDrive, Loader2, PlugZap, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { api, type LlmProvider, type LlmSettings } from "../api/client";
 import { useLlmSettings } from "../api/queries";
 import { dateTime } from "../lib/format";
 import { REPO_URL } from "../lib/credits";
 import { getLang, useT } from "../i18n";
+import { assistant, useAssistant } from "../lib/assistant";
 import { SecretInput } from "./SecretInput";
+import { StepCards } from "./StepCards";
 import { ErrorNotice, Spinner } from "./ui";
 
 /** Guide d'installation d'un LLM local (Ollama, LM Studio) et de sa connexion, dans la langue de l'interface. */
 export const localLlmDoc = () => `${REPO_URL}/blob/main/docs/local-llm${getLang() === "en" ? "" : `.${getLang()}`}.md`;
 
 /**
- * Paramètres > Assistant : la connexion à un modèle de langage, partagée par tout ce qui utilise l'IA (assistant, descriptions et
- * commandes des jeux). Service en ligne : choisir le fournisseur, coller la clé, c'est tout (modèle proposé d'après
- * la liste du fournisseur, connexion vérifiée d'elle-même). Modèle local ou service compatible OpenAI : adresse
- * (Ollama, LM Studio, Docker) et modèle. Voir backend app/services/llm.py.
+ * Paramètres > Assistant IA : la connexion à un modèle de langage, partagée par tout ce qui utilise l'IA (assistant,
+ * descriptions et commandes des jeux), en trois étapes comme la connexion à la console : 1. type d'IA (service en
+ * ligne ou modèle local) ; 2. connexion et modèle (clé du fournisseur, ou adresse d'Ollama / LM Studio, puis modèle) ;
+ * 3. test. L'état (connectée ou non) reste affiché en haut, avec l'option d'afficher la bulle. Voir app/services/llm.py.
  */
 export function LlmPanel() {
   const t = useT();
@@ -26,6 +29,8 @@ export function LlmPanel() {
   if (q.isError) return <ErrorNotice error={q.error} />;
   return <LlmForm settings={q.data} />;
 }
+
+type Kind = "cloud" | "local";
 
 function LlmForm({ settings }: { settings: LlmSettings }) {
   const t = useT();
@@ -51,68 +56,115 @@ function LlmForm({ settings }: { settings: LlmSettings }) {
   }, [settings.state, signature, test]);
 
   const p = settings.providers.find((x) => x.id === settings.provider);
+  // Type choisi à l'étape 1 : celui du fournisseur enregistré, ou « en ligne » choisi sans fournisseur encore.
+  const [kind, setKind] = useState<Kind | null>((p?.kind as Kind | undefined) ?? null);
+  useEffect(() => { if (p) setKind(p.kind as Kind); }, [p]);
   const choose = (id: string) => {
     if (id !== settings.provider) save.mutate({ provider: id });
   };
   const cloud = settings.providers.filter((x) => x.kind === "cloud");
   const local = settings.providers.find((x) => x.kind === "local")!;
+  const pickKind = (k: Kind) => {
+    setKind(k);
+    if (k === "local") choose(local.id);
+  };
+  const providerName = settings.provider ? t(`settings.ai.provider.${settings.provider}`) : "";
+  const checking = test.isPending;
+  const connected = settings.state === "connected" && !checking;
+  const where = (() => {
+    try { return settings.base_url ? new URL(settings.base_url).host : ""; } catch { return settings.base_url ?? ""; }
+  })();
 
   return (
     <>
-      <StatusCard settings={settings} checking={test.isPending} onCheck={() => test.mutate()}
-        onDisconnect={() => save.mutate({ provider: null })} />
+      <StatusCard settings={settings} checking={checking} onDisconnect={() => { setKind(null); save.mutate({ provider: null }); }} />
       {test.isError && settings.state !== "error" && <ErrorNotice error={test.error} />}
 
-      <section className="block llm" aria-labelledby="llm-p-h">
-        <h2 id="llm-p-h">{t("settings.ai.providerTitle")}</h2>
-        <fieldset className="llm__group">
-          <legend><Cloud size={16} aria-hidden /> {t("settings.ai.kind.cloud")}</legend>
-          <p className="muted">{t("settings.ai.kind.cloudHint")}</p>
-          <div className="auth-choice__options" role="radiogroup">
-            {cloud.map((x) => <ProviderOption key={x.id} provider={x} on={settings.provider === x.id} onPick={choose} />)}
-          </div>
-        </fieldset>
-        <fieldset className="llm__group">
-          <legend><HardDrive size={16} aria-hidden /> {t("settings.ai.kind.local")}</legend>
-          <p className="muted">{t("settings.ai.kind.localHint")}</p>
-          <div className="auth-choice__options" role="radiogroup">
-            <ProviderOption provider={local} on={settings.provider === local.id} onPick={choose} />
-          </div>
-        </fieldset>
-        {save.isError && <ErrorNotice error={save.error} />}
+      <StepCards label={t("settings.ai.steps.label")} steps={[
+        { n: 1, label: t("settings.ai.steps.kind"), done: !!p, target: "ai-1",
+          sub: p ? t(p.kind === "cloud" ? "settings.ai.steps.kindCloud" : "settings.ai.steps.kindLocal", { provider: providerName })
+            : t("settings.ai.steps.kindTodo"),
+          action: t(p ? "settings.steps.edit" : "settings.ai.steps.choose") },
+        { n: 2, label: t("settings.ai.steps.connect"), done: settings.ready, target: "ai-2",
+          sub: settings.ready ? `${p?.kind === "local" ? where : providerName} · ${settings.model ?? ""}`
+            : settings.provider ? t(`settings.ai.problem.${settings.problem ?? "llm_no_model"}`, { provider: providerName })
+            : t("settings.ai.steps.connectTodo"),
+          action: t(settings.ready ? "settings.steps.edit" : "settings.steps.open") },
+        { n: 3, label: t("settings.ai.steps.test"), done: connected, target: "ai-3",
+          sub: connected && settings.tested_at ? t("settings.ai.checkedAt", { date: dateTime(settings.tested_at) })
+            : settings.state === "error" ? t("settings.ai.steps.testFailed") : t("settings.ai.steps.testTodo"),
+          action: t("settings.steps.run") },
+      ]} />
 
-        {p && (
-          <div className="auth-choice__panel llm__panel">
-            {p.kind === "cloud" ? (
-              <>
+      <section className="block llm" aria-labelledby="ai-1">
+        <h2 id="ai-1"><span className="step-badge" aria-hidden>1</span> {t("settings.ai.steps.kind")}</h2>
+        <div className="llm__kinds" role="radiogroup" aria-labelledby="ai-1">
+          <KindOption on={kind === "cloud"} onPick={() => pickKind("cloud")} icon={<Cloud size={20} aria-hidden />}
+            title={t("settings.ai.kind.cloud")} hint={t("settings.ai.kind.cloudHint")} />
+          <KindOption on={kind === "local"} onPick={() => pickKind("local")} icon={<HardDrive size={20} aria-hidden />}
+            title={t("settings.ai.kind.local")} hint={t("settings.ai.kind.localHint")} />
+        </div>
+        {save.isError && <ErrorNotice error={save.error} />}
+      </section>
+
+      <section className="block llm" aria-labelledby="ai-2">
+        <h2 id="ai-2"><span className="step-badge" aria-hidden>2</span> {t("settings.ai.steps.connect")}</h2>
+        {!kind ? <p className="muted">{t("settings.ai.steps.kindFirst")}</p> : kind === "cloud" ? (
+          <>
+            <div className="auth-choice__options" role="radiogroup" aria-label={t("settings.ai.providerTitle")}>
+              {cloud.map((x) => <ProviderOption key={x.id} provider={x} on={settings.provider === x.id} onPick={choose} />)}
+            </div>
+            {p?.kind === "cloud" ? (
+              <div className="auth-choice__panel llm__panel">
                 <KeyField provider={p} onSaved={apply} />
                 <ModelField settings={settings} provider={p} onPick={(m) => save.mutate({ provider: p.id, model: m })} />
-              </>
-            ) : (
-              <>
-                <LocalHelp />
-                <AddressField settings={settings} provider={p}
-                  onPick={(url) => save.mutate({ provider: p.id, base_url: url, model: null })} />
-                <ModelField settings={settings} provider={p}
-                  onPick={(m) => save.mutate({ provider: p.id, model: m, base_url: settings.base_url })} />
-                <details className="llm__optional">
-                  <summary>{t("settings.ai.keyOptionalTitle")}</summary>
-                  <KeyField provider={p} onSaved={apply} />
-                </details>
-              </>
-            )}
-            <p className="muted">{t(settings.local ? "settings.ai.costLocal" : p.batch ? "settings.ai.costBatch" : "settings.ai.cost")}</p>
+                <p className="muted">{t(p.batch ? "settings.ai.costBatch" : "settings.ai.cost")}</p>
+              </div>
+            ) : <p className="muted">{t("settings.ai.steps.pickProvider")}</p>}
+          </>
+        ) : p && (
+          <div className="auth-choice__panel llm__panel">
+            <LocalHelp />
+            <AddressField settings={settings} provider={p}
+              onPick={(url) => save.mutate({ provider: p.id, base_url: url, model: null })} />
+            <ModelField settings={settings} provider={p}
+              onPick={(m) => save.mutate({ provider: p.id, model: m, base_url: settings.base_url })} />
+            <details className="llm__optional">
+              <summary>{t("settings.ai.keyOptionalTitle")}</summary>
+              <KeyField provider={p} onSaved={apply} />
+            </details>
+            <p className="muted">{t("settings.ai.costLocal")}</p>
           </div>
         )}
+      </section>
+
+      <section className="block llm" aria-labelledby="ai-3">
+        <h2 id="ai-3"><span className="step-badge" aria-hidden>3</span> {t("settings.ai.steps.test")}</h2>
+        <p className="muted">{t("settings.ai.steps.testLead")}</p>
+        <div className="form__actions">
+          <button type="button" className="button button--primary" onClick={() => test.mutate()} disabled={!settings.ready || checking}>
+            {checking ? <Loader2 size={16} aria-hidden className="spin" /> : <PlugZap size={16} aria-hidden />} {t("settings.ai.steps.testButton")}
+          </button>
+          {!settings.ready && <span className="muted">{t("settings.ai.steps.testNeedsStep2")}</span>}
+        </div>
+        <StatusLine settings={settings} checking={checking} />
       </section>
     </>
   );
 }
 
-/** Voyant d'état : aucune IA, incomplète, vérification, connectée, erreur ; et les deux actions utiles. */
-function StatusCard({ settings, checking, onCheck, onDisconnect }: {
-  settings: LlmSettings; checking: boolean; onCheck: () => void; onDisconnect: () => void;
-}) {
+function KindOption({ on, onPick, icon, title, hint }: { on: boolean; onPick: () => void; icon: ReactNode; title: string; hint: string }) {
+  return (
+    <label className={`llm__kind ${on ? "is-on" : ""}`}>
+      <input type="radio" name="llm-kind" checked={on} onChange={onPick} />
+      <span className="llm__kind-title">{icon} {title}</span>
+      <span className="llm__kind-hint">{hint}</span>
+    </label>
+  );
+}
+
+/** Voyant d'état (aucune IA, incomplète, vérification, connectée, erreur) : une ligne, réutilisée en haut et à l'étape 3. */
+function StatusLine({ settings, checking }: { settings: LlmSettings; checking: boolean }) {
   const t = useT();
   const provider = settings.provider ? t(`settings.ai.provider.${settings.provider}`) : "";
   const state = checking ? "checking" : settings.state;
@@ -123,26 +175,35 @@ function StatusCard({ settings, checking, onCheck, onDisconnect }: {
     : state === "incomplete" ? t(`settings.ai.problem.${settings.problem ?? "llm_no_model"}`, { provider })
     : state === "none" ? t("settings.ai.noneHint") : null;
   return (
-    <section className="block llm llm-status" aria-labelledby="llm-h">
-      <h2 id="llm-h"><Bot size={18} aria-hidden /> {t("settings.ai.title")}</h2>
-      <div className={`llm-status__line is-${state}`} role="status">
-        <span className="status-dot" aria-hidden />
-        <div>
-          <p className="llm-status__title">{title}</p>
-          {detail && <p className="muted">{detail}</p>}
-        </div>
-        <div className="llm-status__actions">
-          {settings.ready && (
-            <button type="button" className="button" onClick={onCheck} disabled={checking}>
-              {checking ? <Loader2 size={16} aria-hidden className="spin" /> : <PlugZap size={16} aria-hidden />} {t("settings.ai.test")}
-            </button>
-          )}
-          {settings.provider && (
-            <button type="button" className="link-button" onClick={onDisconnect}>{t("settings.ai.disconnect")}</button>
-          )}
-        </div>
+    <div className={`llm-status__line is-${state}`} role="status">
+      <span className="status-dot" aria-hidden />
+      <div>
+        <p className="llm-status__title">{title}</p>
+        {detail && <p className="muted">{detail}</p>}
       </div>
-      <p className="muted">{t("settings.ai.uses")}</p>
+    </div>
+  );
+}
+
+/** En-tête de l'onglet : l'assistant IA de jeu, son état de connexion (toujours visible) et l'affichage de sa bulle. */
+function StatusCard({ settings, checking, onDisconnect }: { settings: LlmSettings; checking: boolean; onDisconnect: () => void }) {
+  const t = useT();
+  const { hidden } = useAssistant();
+  return (
+    <section className="block llm llm-status" aria-labelledby="llm-h">
+      <h2 id="llm-h"><Bot size={18} aria-hidden /> {t("settings.as.title")}</h2>
+      <p className="muted">{t("settings.as.lead")}</p>
+      <div className="llm-status__row">
+        <StatusLine settings={settings} checking={checking} />
+        {settings.provider && (
+          <button type="button" className="link-button" onClick={onDisconnect}>{t("settings.ai.disconnect")}</button>
+        )}
+      </div>
+      <label className="toggle-inline">
+        <input type="checkbox" checked={!hidden} onChange={(e) => assistant.setHidden(!e.target.checked)} />
+        {t("settings.as.show")}
+      </label>
+      <p className="muted small">{t("settings.ai.uses")} <Link to="/parametres/connaissances">{t("settings.as.knowledge")}</Link></p>
     </section>
   );
 }

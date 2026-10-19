@@ -23,10 +23,11 @@ from pathlib import Path
 import anthropic
 from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
 from anthropic.types.messages.batch_create_params import Request
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import data_dir
+from app.errors import AppError
 from app.db.models import GameText, Platform, RemoteFile
 from app.services.catalog_query import GAME_KINDS_EXCLUDED
 from app.services.classify import display_title
@@ -153,6 +154,35 @@ def pending_games(s: Session, limit: int | None = None) -> list[dict]:
         if limit and len(games) >= limit:
             break
     return list(games.values())
+
+
+def game_for(f: RemoteFile) -> dict:
+    """Un jeu précis (fiche ouverte, test) au format des demandes."""
+    return {"platform_id": f.platform_id, "normalized_title": f.normalized_title,
+            "title": display_title(f.full_title) if f.full_title else f.title,
+            "platform": f.platform.label or f.platform.directory, "year": f.release_year, "publisher": f.publisher,
+            "developer": f.developer, "genre": GENRES.get(f.genre or ""), "subgenre": SUB_LABELS.get(f.subgenre or ""),
+            "summary": f.description}
+
+
+def describe_one(sessions, llm: LLM, file_id: int) -> dict:
+    """Décrit (ou décrit à nouveau) un seul jeu tout de suite, avec `llm` : sert aussi de test avant le lot.
+    Les textes rédigés ou traduits par l'IA sont remplacés ; le résumé d'origine (« source ») est gardé."""
+    from app.services import catalog_query as cq
+
+    with sessions() as s:
+        game = game_for(cq.get_file(s, file_id))
+    mode, prompt, schema = request_for(game)
+    data = llm.complete_json(SYSTEM, prompt, schema, max_tokens=MAX_TOKENS, effort=EFFORT, name="description",
+                             reasoning="none" if llm.provider.id == "local" else None)
+    if data is None:
+        raise AppError("description_unreadable", f"{llm.label} n'a pas rendu de description utilisable pour ce jeu.", 502)
+    with sessions.begin() as s:
+        s.execute(delete(GameText).where(GameText.platform_id == game["platform_id"],
+                                         GameText.normalized_title == game["normalized_title"],
+                                         GameText.origin != "source"))
+        written = store(s, game, mode, data, llm.model)
+    return {"texts": written, "mode": mode}
 
 
 def request_for(game: dict) -> tuple[str, str, dict]:
@@ -335,7 +365,8 @@ def start_direct(sessions, llm: LLM, limit: int | None = None) -> dict:
                 mode, prompt, schema = request_for(game)
                 try:
                     data = llm.complete_json(SYSTEM, prompt, schema, max_tokens=MAX_TOKENS, effort=EFFORT,
-                                             name="description")
+                                             name="description",
+                                             reasoning="none" if llm.provider.id == "local" else None)
                     failures = 0
                 except Exception as exc:  # noqa: BLE001 — réseau, quota, modèle arrêté : on passe au jeu suivant
                     log.warning("description de %s impossible", game["title"], exc_info=True)

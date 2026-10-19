@@ -62,3 +62,39 @@ async def test_api_key_and_start(app_factory, monkeypatch, no_llm_env):
         st = (await c.get("/api/descriptions")).json()
         assert st["credentials"] and st["model"] == "claude-opus-5-5" and st["batch"] and st["batches"] == []
         assert st["estimate_usd"] is not None
+
+
+async def test_describe_one_game_replaces_ai_texts(app_factory, monkeypatch):
+    """Un seul jeu, tout de suite (test avant le lot) ; modèle local sans réflexion préalable."""
+    import json as _json
+
+    from tests.test_catalog import sync
+
+    from app.db.models import GameText
+    from app.services import llm
+
+    seen = []
+    answers = iter([{"known": True, "en": "A platformer.", "fr": "Un jeu de plateforme.", "es": "Un plataformas."},
+                    {"known": True, "en": "Mario's quest.", "fr": "La quête de Mario.", "es": "La búsqueda de Mario."}])
+
+    def handler(request):
+        body = _json.loads(request.content)
+        seen.append(body)
+        return httpx.Response(200, json={"choices": [{"message": {"content": _json.dumps(next(answers))},
+                                                      "finish_reason": "stop"}]})
+
+    model = llm.LLM(llm.PROVIDERS["local"], "qwen-test", "http://localhost:11434/v1", None,
+                    transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(llm, "resolve", lambda state: model)
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        game = (await c.get("/api/games", params={"platform": "SFC"})).json()["items"][0]
+        r = await c.post(f"/api/games/{game['id']}/description")
+        assert r.status_code == 200, r.text
+        assert r.json() == {"texts": 3, "mode": "translate"} and seen[0]["reasoning_effort"] == "none"
+        # À nouveau : le français et l'espagnol de l'IA sont remplacés, le résumé anglais d'origine est gardé.
+        assert (await c.post(f"/api/games/{game['id']}/description")).json()["texts"] == 2
+    with app.state.sessions() as s:
+        texts = {t.lang: (t.text, t.origin) for t in s.query(GameText)}
+    assert texts["fr"] == ("La quête de Mario.", "translated") and texts["en"][1] == "source" and len(texts) == 3

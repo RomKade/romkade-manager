@@ -16,6 +16,8 @@ export type ChatMessage =
 
 type State = {
   open: boolean;
+  /** Bulle masquée (Paramètres > Assistant IA), mémorisé dans ce navigateur. */
+  hidden: boolean;
   scope: Scope;
   /** Jeu détecté : fiche ouverte (prioritaire) ou jeu en cours sur la console. */
   sheetGame: AssistantGame | null;
@@ -24,7 +26,10 @@ type State = {
 };
 
 const STORAGE = "romkade-assistant";
-let state: State = { open: false, scope: { kind: "library" }, sheetGame: null, sheetOpen: false, conversations: load() };
+const HIDDEN = "romkade-assistant-hidden";
+const loadHidden = () => { try { return localStorage.getItem(HIDDEN) === "1"; } catch { return false; } };
+let state: State = { open: false, hidden: loadHidden(), scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
+  conversations: load() };
 const listeners = new Set<() => void>();
 
 function load(): Record<string, ChatMessage[]> {
@@ -51,6 +56,10 @@ export const assistant = {
   get: () => state,
   subscribe: (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; },
   setOpen: (open: boolean) => set({ open }),
+  setHidden: (hidden: boolean) => {
+    try { if (hidden) localStorage.setItem(HIDDEN, "1"); else localStorage.removeItem(HIDDEN); } catch { /* stockage indisponible */ }
+    set({ hidden, open: hidden ? false : state.open });
+  },
   setScope: (scope: Scope) => set({ scope }),
   /** La fiche d'un jeu s'ouvre (ou se ferme : null). */
   setSheet: (game: AssistantGame | null) => set({ sheetGame: game, sheetOpen: game != null }),
@@ -58,7 +67,7 @@ export const assistant = {
   setMessages: (scope: Scope, messages: ChatMessage[]) =>
     set({ conversations: { ...state.conversations, [scopeKey(scope)]: messages } }),
   /** Tests : état de départ. */
-  reset: () => set({ open: false, scope: { kind: "library" }, sheetGame: null, sheetOpen: false, conversations: {} }),
+  reset: () => set({ open: false, hidden: false, scope: { kind: "library" }, sheetGame: null, sheetOpen: false, conversations: {} }),
 };
 
 export function useAssistant() {

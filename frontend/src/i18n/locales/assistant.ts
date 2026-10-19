@@ -3,8 +3,8 @@ import type { Messages } from "../core";
 /** Assistant de jeu (bulle en bas à droite). */
 const messages: Messages = {
   fr: {
-    "fab": "Assistant",
-    "title": "Assistant",
+    "fab": "Assistant IA",
+    "title": "Assistant IA de jeu",
     "scope": "Sujet de la discussion",
     "library": "Bibliothèque",
     "clear": "Effacer la discussion",
@@ -40,8 +40,8 @@ const messages: Messages = {
     "refusal.unclear": "Je n'ai pas compris la question. Peux-tu la reformuler ?",
   },
   en: {
-    "fab": "Assistant",
-    "title": "Assistant",
+    "fab": "AI assistant",
+    "title": "AI game assistant",
     "scope": "Conversation topic",
     "library": "Library",
     "clear": "Clear the conversation",
@@ -77,8 +77,8 @@ const messages: Messages = {
     "refusal.unclear": "I didn't understand the question. Could you rephrase it?",
   },
   es: {
-    "fab": "Asistente",
-    "title": "Asistente",
+    "fab": "Asistente IA",
+    "title": "Asistente IA de juego",
     "scope": "Tema de la conversación",
     "library": "Biblioteca",
     "clear": "Borrar la conversación",

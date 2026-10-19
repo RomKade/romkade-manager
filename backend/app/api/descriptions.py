@@ -117,3 +117,20 @@ async def descriptions_start(request: Request) -> dict:
     except Exception as exc:  # noqa: BLE001
         raise errors.AppError("descriptions_submit_failed", f"La génération n'a pas pu démarrer : {exc}", 502) from exc
     return await asyncio.to_thread(_status, request)
+
+
+class DescribeOneOut(BaseModel):
+    texts: int
+    mode: str  # translate (résumé anglais traduit) | write (rédigé)
+
+
+@router.post("/games/{game_id}/description", response_model=DescribeOneOut)
+async def describe_game(game_id: int, request: Request) -> dict:
+    """Décrit ce jeu tout de suite avec l'IA réglée (remplace les textes de l'IA) : un jeu, ou un test avant le lot."""
+    llm = llm_mod.resolve(request.app.state)
+    try:
+        return await asyncio.to_thread(d.describe_one, request.app.state.sessions, llm, game_id)
+    except errors.AppError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise errors.AppError("description_failed", f"{llm.provider.label} n'a pas pu répondre : {exc}", 502) from exc

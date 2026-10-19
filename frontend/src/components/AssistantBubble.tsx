@@ -20,6 +20,7 @@ export function AssistantBubble({ placement, onOpenGame }: { placement: "page" |
   const online = useDeviceStatus().data?.connected === true;
   const now = useNowPlaying(online).data;
   const llm = useLlmSettings().data;
+  if (st.hidden) return null;  // masquée dans Paramètres > Assistant IA
   if (placement === "page" && st.sheetOpen) return null;
   if (placement === "sheet" && !st.sheetOpen) return null;
 

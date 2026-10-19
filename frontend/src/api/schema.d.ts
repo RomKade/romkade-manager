@@ -1182,6 +1182,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/description": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Describe Game
+         * @description Décrit ce jeu tout de suite avec l'IA réglée (remplace les textes de l'IA) : un jeu, ou un test avant le lot.
+         */
+        post: operations["describe_game_api_games__game_id__description_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/games/{game_id}/controls": {
         parameters: {
             query?: never;
@@ -2063,6 +2083,13 @@ export interface components {
         DeleteIn: {
             /** Path */
             path: string;
+        };
+        /** DescribeOneOut */
+        DescribeOneOut: {
+            /** Texts */
+            texts: number;
+            /** Mode */
+            mode: string;
         };
         /** DescriptionsStatusOut */
         DescriptionsStatusOut: {
@@ -5389,6 +5416,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DescriptionsStatusOut"];
+                };
+            };
+        };
+    };
+    describe_game_api_games__game_id__description_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DescribeOneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

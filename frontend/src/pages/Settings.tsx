@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpenText, MessageCircle, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, ChevronRight, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { Activity, BookOpenText, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
 import { api, ApiError, type Capabilities, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
 import {
-  useDetectSystem, useDeviceStatus, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
+  useDetectSystem, useDeviceStatus, useGame, useLlmSettings, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
 import { GitHubStar } from "../components/GitHubStar";
+import { GamePicker, type PickedGame } from "../components/GamePicker";
+import { StepCards } from "../components/StepCards";
 import { KnowledgePanel } from "../components/KnowledgePanel";
 import { LlmPanel } from "../components/LlmPanel";
 import { SecretInput } from "../components/SecretInput";
@@ -25,14 +27,15 @@ const TABS = [
   { slug: "test", label: "settings.tab.test", icon: Activity },
   { slug: "systeme", label: "settings.tab.system", icon: Cpu },
   { slug: "temps-de-jeu", label: "settings.tab.playtime", icon: Hourglass },
-  { slug: "videos", label: "settings.tab.videos", icon: Video },
   { slug: "ia", label: "settings.tab.ai", icon: Bot },
   { slug: "connaissances", label: "settings.tab.knowledge", icon: BookOpenText },
+  { slug: "videos", label: "settings.tab.videos", icon: Video },
   { slug: "a-propos", label: "legal.about.title", icon: Info },
 ] as const;
 
 export function SettingsPage() {
   const t = useT();
+  const llm = useLlmSettings().data;  // voyant de l'onglet Assistant IA, visible depuis tous les onglets
   const settings = useSettings();
   const { tab: raw = "" } = useParams();
   // Anciennes adresses : Sources et crédits, Contenu IA (devenu Connaissances).
@@ -49,6 +52,10 @@ export function SettingsPage() {
             className={() => `subnav__item ${current === slug ? "is-active" : ""}`}
             aria-current={current === slug ? "page" : undefined}>
             <Icon size={16} aria-hidden /> {t(label)}
+            {slug === "ia" && llm && (
+              <span className={`status-dot subnav__dot is-${llm.state}`} title={t(`settings.ai.state.${llm.state}`,
+                { provider: llm.provider ? t(`settings.ai.provider.${llm.provider}`) : "", model: llm.model ?? "" })} />
+            )}
           </NavLink>
         ))}
       </nav>
@@ -69,8 +76,8 @@ export function SettingsPage() {
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}
       {current === "videos" && <YouTubePanel />}
-      {current === "ia" && <><AssistantPanel /><LlmPanel /><DescriptionsPanel /></>}
-      {current === "connaissances" && <KnowledgePanel />}
+      {current === "ia" && <LlmPanel />}
+      {current === "connaissances" && <><KnowledgePanel /><DescriptionsPanel /></>}
       {current === "a-propos" && <><AboutPanel /><CreditsPanel /></>}
     </div>
   );
@@ -93,54 +100,19 @@ function ConnectionSteps({ settings }: { settings: Settings }) {
   const t = useT();
   const auth = settings.auth_method === "password" ? settings.has_password : !!settings.key_path;
   const authLabel = t(settings.auth_method === "password" ? "settings.steps.authPassword" : "settings.steps.authKey");
-  const steps = [
-    { n: 1, label: t("settings.steps.console"), done: !!settings.host && auth, href: "conn-h",
-      sub: settings.host && auth ? t("settings.steps.consoleSub", { host: settings.host, user: settings.username, auth: authLabel })
-        : t("settings.steps.consoleTodo") },
-    { n: 2, label: t("settings.steps.identity"), done: settings.host_key_trusted, href: "hk",
-      sub: t(settings.host_key_trusted ? "settings.steps.identityDone" : "settings.steps.identityTodo") },
-    { n: 3, label: t("settings.steps.test"), done: false, to: "/parametres/test", sub: t("settings.steps.testSub") },
-  ];
-  const current = steps.find((s) => !s.done)?.n ?? 3;
-  const goTo = (id: string) => (e: MouseEvent) => {
-    const target = document.getElementById(id);
-    if (!target) return;
-    e.preventDefault();
-    const block = target.closest<HTMLElement>(".block") ?? target;
-    block.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-    block.classList.remove("is-flash");
-    void block.offsetWidth;  // relance l'animation si on clique deux fois
-    block.classList.add("is-flash");
-    history.replaceState(null, "", `#${id}`);
-  };
+  const consoleDone = !!settings.host && auth;
   return (
-    <nav className="steps" aria-label={t("settings.steps.label")}>
-      <ol>
-        {steps.map((s) => {
-          const action = s.to ? t("settings.steps.run") : s.done ? t(s.n === 1 ? "settings.steps.edit" : "settings.steps.review")
-            : t("settings.steps.open");
-          const body = (
-            <>
-              <span className="steps__num" aria-hidden>{s.done ? <CheckCircle2 size={18} /> : s.n}</span>
-              <span className="steps__text">
-                <span className="steps__label">
-                  <span className="steps__index">{t("settings.steps.index", { n: s.n })}</span> {s.label}
-                </span>
-                <span className="steps__sub">{s.sub}</span>
-              </span>
-              <span className="steps__action">{action} <ChevronRight size={16} aria-hidden /></span>
-              <span className="visually-hidden"> — {t(s.done ? "settings.steps.done" : s.n === current ? "settings.steps.current" : "settings.steps.todo")}</span>
-            </>
-          );
-          const cls = `steps__item ${s.done ? "is-done" : ""} ${s.n === current ? "is-current" : ""}`;
-          return (
-            <li key={s.n}>
-              {s.to ? <Link to={s.to} className={cls}>{body}</Link> : <a href={`#${s.href}`} className={cls} onClick={goTo(s.href!)}>{body}</a>}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
+    <StepCards label={t("settings.steps.label")} steps={[
+      { n: 1, label: t("settings.steps.console"), done: consoleDone, target: "conn-h",
+        sub: consoleDone ? t("settings.steps.consoleSub", { host: settings.host, user: settings.username, auth: authLabel })
+          : t("settings.steps.consoleTodo"),
+        action: t(consoleDone ? "settings.steps.edit" : "settings.steps.open") },
+      { n: 2, label: t("settings.steps.identity"), done: settings.host_key_trusted, target: "hk",
+        sub: t(settings.host_key_trusted ? "settings.steps.identityDone" : "settings.steps.identityTodo"),
+        action: t(settings.host_key_trusted ? "settings.steps.review" : "settings.steps.open") },
+      { n: 3, label: t("settings.steps.test"), done: false, to: "/parametres/test", sub: t("settings.steps.testSub"),
+        action: t("settings.steps.run") },
+    ]} />
   );
 }
 
@@ -555,19 +527,6 @@ const hasError = (code: string) => getLang() !== "fr" && has(`common.error.${cod
  * (LlmPanel) et les autres usages de cette IA (descriptions, commandes). Les connaissances qu'il lit sont récupérées
  * sans IA : onglet Connaissances.
  */
-function AssistantPanel() {
-  const t = useT();
-  return (
-    <section className="block" aria-labelledby="as-h">
-      <div className="block__head">
-        <h2 id="as-h"><MessageCircle size={18} aria-hidden /> {t("settings.as.title")}</h2>
-      </div>
-      <p className="muted block__lead">{t("settings.as.lead")}</p>
-      <p><Link to="/parametres/connaissances"><BookOpenText size={14} aria-hidden /> {t("settings.as.knowledge")}</Link></p>
-    </section>
-  );
-}
-
 /**
  * Descriptions des jeux en français, anglais et espagnol, rédigées ou traduites par Claude : clé d'API Anthropic
  * (trousseau), avancement, lancement d'un lot (API Batches) et suivi. Voir backend app/services/descriptions.py.
@@ -632,9 +591,53 @@ function DescriptionsPanel() {
             )}
           </>
         )}
+        <DescribeOne />
       </section>
 
     </>
+  );
+}
+
+/** Descriptions, un seul jeu : voir la description actuelle, la faire rédiger (ou rédiger à nouveau) par l'IA. Sert
+ * aussi de test avant de lancer tous les jeux. */
+function DescribeOne() {
+  const t = useT();
+  const qc = useQueryClient();
+  const [picked, setPicked] = useState<PickedGame | null>(null);
+  const game = useGame(picked?.id ?? null);
+  const describe = useMutation({
+    mutationFn: (id: number) => api.describeGame(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["game", picked?.id] });
+      qc.invalidateQueries({ queryKey: ["descriptions"] });
+    },
+  });
+  const lang = getLang();
+  const texts = game.data?.descriptions ?? {};
+  const text = (texts[lang] ?? texts.en) as { text: string; origin: string } | undefined;
+  return (
+    <div className="knowledge__test">
+      <h3>{t("settings.desc.oneTitle")}</h3>
+      <GamePicker id="desc-pick" onPick={(g) => { setPicked(g); describe.reset(); }} />
+      {picked && (
+        <div className="knowledge__game">
+          <p><strong>{picked.title}</strong> <span className="muted">· {picked.platform}</span></p>
+          {game.isPending ? <Spinner label={t("common.loading")} /> : text ? (
+            <blockquote className="desc-one__text">
+              {text.text}
+              <span className="muted small"> · {t(`settings.desc.origin.${text.origin}`)}</span>
+            </blockquote>
+          ) : <p className="muted">{t("settings.desc.oneNone")}</p>}
+          <div className="form__actions">
+            <button type="button" className="button button--small" disabled={describe.isPending} onClick={() => describe.mutate(picked.id)}>
+              {describe.isPending ? <Loader2 size={14} aria-hidden className="spin" /> : <Sparkles size={14} aria-hidden />}{" "}
+              {describe.isPending ? t("settings.desc.oneWriting") : t(text && text.origin !== "source" ? "settings.desc.oneAgain" : "settings.desc.oneWrite")}
+            </button>
+          </div>
+          {describe.isError && <ErrorNotice error={describe.error} />}
+        </div>
+      )}
+    </div>
   );
 }
 

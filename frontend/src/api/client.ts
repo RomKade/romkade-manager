@@ -141,6 +141,7 @@ export const api = {
   youtubeSettings: () => request<{ configured: boolean }>("GET", "/settings/youtube"),
   saveYoutubeKey: (api_key: string) => request<void>("PUT", "/settings/youtube", { api_key }),
   deleteYoutubeKey: () => request<void>("DELETE", "/settings/youtube"),
+  describeGame: (id: number) => request<{ texts: number; mode: string }>("POST", `/games/${id}/description`),
   descriptions: () => request<DescriptionsStatus>("GET", "/descriptions"),
   startDescriptions: () => request<DescriptionsStatus>("POST", "/descriptions/start"),
   llmSettings: () => request<LlmSettings>("GET", "/settings/llm"),

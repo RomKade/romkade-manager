@@ -172,6 +172,7 @@ function mockFetch() {
       ].join("");
       return new Response(sse, { status: 200, headers: { "Content-Type": "text/event-stream" } });
     }
+    if (/^\/api\/games\/\d+\/description/.test(url)) return json({ texts: 2, mode: "translate" });
     if (url.startsWith("/api/knowledge")) {
       if (url === "/api/knowledge/start") knowledgeJob = { running: true, total: 1, done: 0, found: 0, current: "zelda", stopping: false };
       return json({ games: 2, found: 1, not_found: 0, errors: 0, pending: knowledgeJob.running ? 1 : 1, chunks: 30,
@@ -447,7 +448,7 @@ describe("Connexion en étapes", () => {
     expect(first).toHaveTextContent("192.168.86.242 · root · mot de passe");
     expect(first).toHaveTextContent("Modifier");
     expect(first).toHaveAttribute("href", "#conn-h");
-    expect(within(steps).getByRole("link", { name: /Tester la connexion/ })).toHaveTextContent("Lancer le test");
+    expect(within(steps).getByRole("link", { name: /Tester la connexion/ })).toHaveTextContent("Faire le test");
     const form = (await screen.findByRole("heading", { name: /La console/ })).closest("form")!;
     expect(within(form).getByLabelText("Remplacer le mot de passe")).toBeInTheDocument();
     await userEvent.click(within(form).getByRole("radio", { name: /Clé SSH/ }));
@@ -480,21 +481,29 @@ describe("Nouvelle console : clé à approuver", () => {
 });
 
 describe("Paramètres : assistant et connaissances", () => {
-  it("onglet Assistant : l'assistant d'abord, puis son IA, puis les descriptions rédigées par l'IA", async () => {
+  it("onglet Assistant IA : l'assistant et son état, puis trois étapes (type d'IA, connexion et modèle, test)", async () => {
     renderAt("/parametres/ia");
-    expect(await screen.findByRole("link", { name: /^Assistant$/ })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByRole("link", { name: /^Assistant IA/ })).toHaveAttribute("aria-current", "page");
     const headings = (await screen.findAllByRole("heading", { level: 2 })).map((h) => h.textContent ?? "");
-    const order = ["Assistant de jeu", "IA de l'assistant", "Descriptions des jeux, rédigées par l'IA"].map((x) => headings.findIndex((h) => h.includes(x)));
+    const order = ["Assistant IA de jeu", "Type d'IA", "Connexion et modèle", "Tester la connexion"].map((x) => headings.findIndex((h) => h.includes(x)));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+    const steps = screen.getByRole("navigation", { name: "Mise en route de l'assistant IA" });
+    expect(within(steps).getByRole("link", { name: /Type d'IA/ })).toHaveAttribute("href", "#ai-1");
+    expect(within(steps).getByRole("link", { name: /Tester la connexion/ })).toHaveTextContent("Faire le test");
     expect(screen.getByRole("link", { name: /Connaissances de l'assistant/ })).toHaveAttribute("href", "/parametres/connaissances");
-    expect(screen.queryByRole("heading", { name: /Connaissances de l'assistant/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Descriptions des jeux/ })).not.toBeInTheDocument();  // dans Connaissances
+    // La bulle peut être masquée.
+    const show = screen.getByRole("checkbox", { name: /Afficher la bulle de l'assistant IA/ });
+    expect(show).toBeChecked();
+    await userEvent.click(show);
+    expect(screen.queryByRole("button", { name: /^Assistant IA$/ })).not.toBeInTheDocument();
   });
 
-  it("l'ancienne adresse de Contenu IA mène aux connaissances", async () => {
+  it("l'ancienne adresse de Contenu IA mène aux connaissances, avec les descriptions des jeux", async () => {
     renderAt("/parametres/descriptions");
     expect(await screen.findByRole("heading", { name: /Connaissances de l'assistant/ })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /Descriptions des jeux/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Descriptions des jeux/ })).toBeInTheDocument();
   });
 
   it("connaissances : lance la récupération, puis un seul jeu : pages enregistrées et passages pour une question", async () => {
@@ -522,8 +531,8 @@ describe("Assistant de jeu", () => {
     renderAt("/bibliotheque?all=1");
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(await within(dialog).findByRole("button", { name: /^Assistant$/ }));
-    const panel = within(dialog).getByRole("region", { name: "Assistant" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: /^Assistant IA$/ }));
+    const panel = within(dialog).getByRole("region", { name: "Assistant IA de jeu" });
     expect(within(panel).getByText("Tu regardes Super Mario World. Discuter de ce jeu ?")).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: "Oui, ce jeu" }));
     expect(within(panel).getByRole("button", { name: "Super Mario World" })).toHaveAttribute("aria-pressed", "true");
@@ -534,6 +543,18 @@ describe("Assistant de jeu", () => {
     expect(within(panel).getByText(/modèle local : rien ne quitte cet ordinateur/)).toBeInTheDocument();
     expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr",
       messages: [{ role: "user", content: "Je bloque au château" }] });
+  });
+});
+
+describe("Connaissances : descriptions d'un seul jeu", () => {
+  it("montre la description actuelle et la fait rédiger à nouveau par l'IA", async () => {
+    renderAt("/parametres/connaissances");
+    const section = (await screen.findByRole("heading", { name: /Descriptions des jeux/ })).closest("section")!;
+    await userEvent.type(await within(section).findByRole("searchbox", { name: "Jeu" }), "mario");
+    await userEvent.click(await within(section).findByRole("button", { name: /Super Mario World/ }));
+    expect(await within(section).findByText(/Mario part sauver la princesse\./)).toBeInTheDocument();
+    await userEvent.click(within(section).getByRole("button", { name: /Rédiger à nouveau avec l'IA/ }));
+    await waitFor(() => expect(calls).toContain("/api/games/1/description"));
   });
 });
 
@@ -713,10 +734,11 @@ describe("Paramètres", () => {
 describe("Connexion à une IA", () => {
   it("sans IA : Claude se connecte avec la seule clé, vérifiée automatiquement", async () => {
     renderAt("/parametres/ia");
-    expect(await screen.findByText("Aucune IA connectée")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("radio", { name: /Claude \(Anthropic\)/ }));
+    expect((await screen.findAllByText("Aucune IA connectée")).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("radio", { name: /Service en ligne/ }));  // étape 1
+    await userEvent.click(screen.getByRole("radio", { name: /Claude \(Anthropic\)/ }));  // étape 2
     await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "anthropic" }));
-    expect(await screen.findByText("Ajoute la clé d'API de Claude (Anthropic) ci-dessous.")).toBeInTheDocument();
+    expect((await screen.findAllByText("Ajoute la clé d'API de Claude (Anthropic) ci-dessous.")).length).toBeGreaterThan(0);
     const key = screen.getByLabelText("Clé d'API Claude (Anthropic)");
     await userEvent.type(key, "sk-ant-test");
     expect(key).toHaveAttribute("type", "password");
@@ -724,20 +746,20 @@ describe("Connexion à une IA", () => {
     expect(key).toHaveAttribute("type", "text");
     await userEvent.click(screen.getByRole("button", { name: /trousseau/ }));
     await waitFor(() => expect(bodies.some((b) => b.url === "/api/settings/llm/key" && b.api_key === "sk-ant-test")).toBe(true));
-    expect(await screen.findByText("Connectée : Claude (Anthropic) · claude-opus-5-5")).toBeInTheDocument();
+    expect((await screen.findAllByText("Connectée : Claude (Anthropic) · claude-opus-5-5")).length).toBeGreaterThan(0);
     expect(calls).toContain("/api/settings/llm/test");
   });
 
   it("modèle local : adresse LM Studio, modèle de la liste, guide d'installation", async () => {
     renderAt("/parametres/ia");
-    await userEvent.click(await screen.findByRole("radio", { name: /Ollama, LM Studio, autre/ }));
+    await userEvent.click(await screen.findByRole("radio", { name: /Modèle local ou service compatible OpenAI/ }));
     expect(await screen.findByRole("link", { name: /Guide : installer un LLM local/ }))
       .toHaveAttribute("href", "https://github.com/RomKade/romkade-manager/blob/main/docs/local-llm.fr.md");
     await userEvent.click(screen.getByRole("button", { name: "LM Studio" }));
     await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "local", base_url: "http://localhost:1234/v1", model: null }));
     await userEvent.click(await screen.findByRole("option", { name: "qwen2.5:7b" }));
     await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/settings/llm", provider: "local", model: "qwen2.5:7b", base_url: "http://localhost:1234/v1" }));
-    expect(await screen.findByText(/Connectée : Ollama, LM Studio, autre… · qwen2.5:7b/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Connectée : Ollama, LM Studio, autre… · qwen2.5:7b/)).length).toBeGreaterThan(0);
   });
 });
 
