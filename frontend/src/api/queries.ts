@@ -212,6 +212,7 @@ export function useBluetoothActions() {
     disconnect: useMutation({ mutationFn: api.btDisconnect, onSuccess: set }),
     forget: useMutation({ mutationFn: api.btForget, onSuccess: set }),
     audio: useMutation({ mutationFn: api.btAudioOutput, onSuccess: set }),
+    testSound: useMutation({ mutationFn: api.btTestSound }),  // carillon sur l'enceinte : l'état ne change pas
   };
 }
 
@@ -222,6 +223,12 @@ export const usePlayers = (enabled: boolean) =>
 export function useSetPlayers() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: api.setPlayers, onSuccess: (d) => qc.setQueryData(["players"], d) });
+}
+
+/** Ce qui dirige chaque joueur : la croix seule, ou la croix et un stick. */
+export function useSetDirections() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.setDirections, onSuccess: (d) => qc.setQueryData(["players"], d) });
 }
 
 /** Volume du son des jeux (console ou appareil Bluetooth). */

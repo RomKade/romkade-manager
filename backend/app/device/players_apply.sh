@@ -7,6 +7,7 @@
 # « …/soc/5101000.ohci0… » passe avant les boutons « …/soc/soc@03000000:gpio_keys » : Xbox = 0, console = 1.
 # On traduit donc chaque numéro dans l'ordre de RetroArch et on réserve en plus la manette au joueur
 # (« vvvv:pppp nom », type 1 = préférée) : deux garanties pour que la bonne manette contrôle le bon joueur.
+# Les lignes input_playerN_analog_dpad_mode (croix seule ou croix + un stick) sont recopiées telles quelles.
 PLAYERS=/.config/agm-players
 RACFG=/.config/retroarch/retroarch.cfg
 [ -s "$PLAYERS" ] && [ -f "$RACFG" ] || exit 0
@@ -36,6 +37,11 @@ OUT=$(free=$COUNT; grep -o '^input_player[1-4]_joypad_index = "[0-9]*"' "$PLAYER
     echo "input_player${p}_reserved_device = \"$dev\""
     echo "input_player${p}_device_reservation_type = \"$type\""
 done)
+
+# Ce qui dirige chaque joueur (croix seule ou croix + un stick) : recopié tel quel, s'il a été choisi.
+DPAD=$(grep -o '^input_player[1-4]_analog_dpad_mode = "[0-9]"' "$PLAYERS")
+[ -n "$DPAD" ] && OUT=$(printf '%s\n%s' "$OUT" "$DPAD") && \
+    sed -i -E '/^input_player[1-4]_analog_dpad_mode = /d' "$RACFG"
 
 sed -i -E '/^input_player[1-4]_(joypad_index|reserved_device|device_reservation_type) = /d' "$RACFG"
 printf '%s\n' "$OUT" >> "$RACFG"

@@ -1,5 +1,7 @@
 """Bluetooth de la console : manettes, enceintes, casques."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
@@ -84,3 +86,13 @@ async def bt_audio_output(body: AudioIn, request: Request) -> dict:
     """Envoie le son des jeux lancés depuis Game Manager vers une enceinte Bluetooth (address = null : haut-parleurs
     de la console). Vaut à partir du prochain jeu lancé."""
     return await bt.set_audio_output(*_ctx(request, audio=True), body.address)
+
+
+class SoundTestOut(BaseModel):
+    result: Literal["played", "in_use"]  # in_use : un jeu envoie déjà son son à l'appareil
+
+
+@router.post("/test-sound", response_model=SoundTestOut)
+async def bt_sound_test(body: AddressIn, request: Request) -> dict:
+    """Test sonore : joue un court carillon sur l'enceinte ou le casque connecté, pour vérifier que le son y arrive."""
+    return {"result": await bt.sound_test(*_ctx(request, audio=True), body.address)}

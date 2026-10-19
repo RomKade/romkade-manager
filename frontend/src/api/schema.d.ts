@@ -1098,6 +1098,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bluetooth/test-sound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bt Sound Test
+         * @description Test sonore : joue un court carillon sur l'enceinte ou le casque connecté, pour vérifier que le son y arrive.
+         */
+        post: operations["bt_sound_test_api_bluetooth_test_sound_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/players": {
         parameters: {
             query?: never;
@@ -1109,8 +1129,9 @@ export interface paths {
         get: operations["players_status_api_players_get"];
         /**
          * Players Set
-         * @description Manette de chaque joueur (numéros de RetroArch, joueur 1 en premier). Appliqué tout de suite si aucun jeu
-         *     ne tourne, sinon au prochain jeu lancé depuis Game Manager.
+         * @description Manette de chaque joueur (numéros de RetroArch, joueur 1 en premier) et/ou ce qui le dirige (croix seule ou
+         *     croix + un stick) ; ce qui n'est pas donné ne change pas. Appliqué tout de suite si aucun jeu ne tourne, sinon
+         *     au prochain jeu lancé depuis Game Manager.
          */
         put: operations["players_set_api_players_put"];
         post?: never;
@@ -1441,7 +1462,8 @@ export interface paths {
         put?: never;
         /**
          * Knowledge Start
-         * @description Récupère les connaissances de tous les jeux jamais recherchés, une requête à la fois (en arrière-plan).
+         * @description Récupère les connaissances de tous les jeux jamais recherchés, une requête à la fois (en arrière-plan) ;
+         *     avec `refresh`, de tous les jeux à nouveau (par exemple pour ajouter une nouvelle source comme Sega Retro).
          */
         post: operations["knowledge_start_api_knowledge_start_post"];
         delete?: never;
@@ -3082,7 +3104,9 @@ export interface components {
         /** PlayersIn */
         PlayersIn: {
             /** Players */
-            players: number[];
+            players?: number[] | null;
+            /** Directions */
+            directions?: number[] | null;
         };
         /** PlayersOut */
         PlayersOut: {
@@ -3090,6 +3114,8 @@ export interface components {
             controllers: components["schemas"]["ControllerOut"][];
             /** Players */
             players: (number | null)[];
+            /** Directions */
+            directions: (number | null)[];
             /** Applied */
             applied: boolean;
             /** Game Running */
@@ -3344,6 +3370,14 @@ export interface components {
             has_password: boolean;
             /** Host Key Trusted */
             host_key_trusted: boolean;
+        };
+        /** SoundTestOut */
+        SoundTestOut: {
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "played" | "in_use";
         };
         /** StartItem */
         StartItem: {
@@ -5453,6 +5487,39 @@ export interface operations {
             };
         };
     };
+    bt_sound_test_api_bluetooth_test_sound_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoundTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     players_status_api_players_get: {
         parameters: {
             query?: never;
@@ -6092,7 +6159,10 @@ export interface operations {
     };
     knowledge_start_api_knowledge_start_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Tous les jeux à nouveau */
+                refresh?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6106,6 +6176,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

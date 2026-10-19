@@ -1,10 +1,10 @@
-import { Bluetooth, BluetoothSearching, Gamepad2, Headphones, Keyboard, Link2, Link2Off, Smartphone, Speaker, Trash2, Volume2 } from "lucide-react";
+import { BellRing, Bluetooth, BluetoothSearching, Gamepad2, Headphones, Keyboard, Link2, Link2Off, RotateCcw, Smartphone, Speaker, Trash2, Volume2 } from "lucide-react";
 
 import { useRef, useState } from "react";
 
-import type { BtDevice } from "../api/client";
-import { useBluetooth, useBluetoothActions, useCaps, useDeviceStatus } from "../api/queries";
-import { ErrorNotice, PageHeader, Spinner } from "../components/ui";
+import type { BtDevice, NowPlaying, SoundTest } from "../api/client";
+import { useBluetooth, useBluetoothActions, useCaps, useDeviceStatus, useLaunchGame, useNowPlaying } from "../api/queries";
+import { ErrorNotice, PageHeader, Spinner, errorMessage } from "../components/ui";
 import { useT } from "../i18n";
 
 const KIND_ICON = { audio: Speaker, controller: Gamepad2, input: Keyboard, other: Smartphone } as const;
@@ -15,6 +15,7 @@ export function BluetoothPage() {
   const q = useBluetooth(online);
   const a = useBluetoothActions();
   const audioOk = useCaps().bluetooth_audio;
+  const now = useNowPlaying(online).data;
   const busy = a.connect.isPending || a.disconnect.isPending || a.forget.isPending || a.audio.isPending;
   const pendingAddress = (a.connect.isPending && a.connect.variables) || (a.disconnect.isPending && a.disconnect.variables)
     || (a.forget.isPending && a.forget.variables) || null;
@@ -39,6 +40,20 @@ export function BluetoothPage() {
   const [showUnnamed, setShowUnnamed] = useState(false);
   const hidden = nearbyAll.filter(unnamed).length;
   const nearby = showUnnamed ? nearbyAll : nearbyAll.filter((d) => !unnamed(d));
+  // Un jeu déjà lancé garde la sortie du son qu'il a ouverte au démarrage : on retient le jeu en cours au moment
+  // où l'on change la sortie, et on propose de le relancer tant qu'il tourne encore.
+  const [staleRom, setStaleRom] = useState<string | null>(null);
+  const setAudio = (address: string | null) => {
+    setStaleRom(now?.playing ? now.rom_path ?? now.process ?? "" : null);
+    a.audio.mutate(address);
+  };
+  // Test sonore : un carillon sur l'enceinte ; résultat affiché sur la ligne de l'appareil testé.
+  const tested = a.testSound.variables;
+  const sound = (d: BtDevice): SoundCheck | undefined => audioOk && d.kind === "audio" ? {
+    run: () => a.testSound.mutate(d.address), testing: a.testSound.isPending && tested === d.address,
+    result: tested === d.address && !a.testSound.isPending ? a.testSound.data?.result ?? a.testSound.error : undefined,
+  } : undefined;
+  const stale = staleRom !== null && now?.playing && (now.rom_path ?? now.process ?? "") === staleRom ? now : null;
 
   return (
     <div className="page bluetooth">
@@ -70,11 +85,13 @@ export function BluetoothPage() {
               </p>}
             </div>
             {st.audio_output && (
-              <button type="button" className="button button--small" onClick={() => a.audio.mutate(null)} disabled={busy}>
+              <button type="button" className="button button--small" onClick={() => setAudio(null)} disabled={busy}>
                 <Volume2 size={14} aria-hidden /> {t("bluetooth.backToConsole")}
               </button>
             )}
           </section>
+
+          {stale && <RelaunchNotice now={stale} onDone={() => setStaleRom(null)} />}
 
           {error && <ErrorNotice error={error} />}
 
@@ -85,7 +102,8 @@ export function BluetoothPage() {
                 {known.map((d) => (
                   <DeviceRow key={d.address} d={d} audioOutput={st.audio_output} busy={busy} pending={pendingAddress === d.address}
                     onConnect={() => connect(d.address)} onDisconnect={() => a.disconnect.mutate(d.address)}
-                    onForget={() => a.forget.mutate(d.address)} onAudio={audioOk ? () => a.audio.mutate(d.address) : undefined} />
+                    onForget={() => a.forget.mutate(d.address)} onAudio={audioOk ? () => setAudio(d.address) : undefined}
+                    sound={sound(d)} />
                 ))}
               </ul>
             )}
@@ -103,7 +121,8 @@ export function BluetoothPage() {
                 {nearby.map((d) => (
                   <DeviceRow key={d.address} d={d} audioOutput={st.audio_output} busy={busy} pending={pendingAddress === d.address}
                     onConnect={() => connect(d.address)} onDisconnect={() => a.disconnect.mutate(d.address)}
-                    onForget={() => a.forget.mutate(d.address)} onAudio={audioOk ? () => a.audio.mutate(d.address) : undefined} />
+                    onForget={() => a.forget.mutate(d.address)} onAudio={audioOk ? () => setAudio(d.address) : undefined}
+                    sound={sound(d)} />
                 ))}
               </ul>
             )}
@@ -123,9 +142,41 @@ export function BluetoothPage() {
   );
 }
 
-function DeviceRow({ d, audioOutput, busy, pending, onConnect, onDisconnect, onForget, onAudio }: {
+/**
+ * Le son vient de changer de sortie alors qu'un jeu tourne : RetroArch garde la sortie ouverte au démarrage. Un jeu
+ * RetroArch de la bibliothèque se relance d'un clic (launch.sh le quitte proprement puis reprend la partie).
+ */
+function RelaunchNotice({ now, onDone }: { now: NowPlaying; onDone: () => void }) {
+  const t = useT();
+  const caps = useCaps();
+  const launch = useLaunchGame();
+  const title = now.game?.title ?? now.rom_path?.split("/").pop() ?? now.process ?? "";
+  const game = now.process === "retroarch" ? now.game : null;
+  const body = !game ? "bluetooth.relaunch.bodyConsole" : caps.resume_slot ? "bluetooth.relaunch.body" : "bluetooth.relaunch.bodyNoResume";
+  const relaunch = () => game && launch.mutate({ id: game.id, slot: caps.resume_slot ? "auto" : null }, { onSuccess: onDone });
+  return (
+    <section className="block bt-relaunch" role="status" aria-labelledby="bt-relaunch">
+      <RotateCcw size={20} aria-hidden />
+      <div>
+        <h2 id="bt-relaunch">{t("bluetooth.relaunch.title")}</h2>
+        <p>{t(body, { title })}</p>
+        {launch.isError && <p className="text-error">{errorMessage(launch.error)}</p>}
+      </div>
+      {game && caps.launch && (
+        <button type="button" className="button button--primary" onClick={relaunch} disabled={launch.isPending}>
+          <RotateCcw size={16} aria-hidden /> {launch.isPending ? t("bluetooth.relaunch.working") : t("bluetooth.relaunch.button")}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** Test sonore d'une enceinte : lancer, en cours, résultat (« played », « in_use » ou l'erreur). */
+type SoundCheck = { run: () => void; testing: boolean; result?: SoundTest["result"] | Error | null };
+
+function DeviceRow({ d, audioOutput, busy, pending, onConnect, onDisconnect, onForget, onAudio, sound }: {
   d: BtDevice; audioOutput: string | null; busy: boolean; pending: boolean;
-  onConnect: () => void; onDisconnect: () => void; onForget: () => void; onAudio?: () => void;
+  onConnect: () => void; onDisconnect: () => void; onForget: () => void; onAudio?: () => void; sound?: SoundCheck;
 }) {
   const t = useT();
   const Icon = KIND_ICON[d.kind as keyof typeof KIND_ICON] ?? Smartphone;
@@ -139,6 +190,9 @@ function DeviceRow({ d, audioOutput, busy, pending, onConnect, onDisconnect, onF
           {t(`bluetooth.kind.${d.kind}`)} · <code>{d.address}</code>
           {d.rssi != null && ` · ${t("bluetooth.signal", { rssi: d.rssi })}`}
         </p>
+        {d.connected && sound?.result && (sound.result instanceof Error
+          ? <p className="text-error" role="status">{errorMessage(sound.result)}</p>
+          : <p className="bt-device__test" role="status"><BellRing size={14} aria-hidden /> {t(`bluetooth.test.${sound.result}`)}</p>)}
       </div>
       <div className="bt-device__state">
         {d.connected ? <span className="bt-status is-on">{t("bluetooth.connected")}</span>
@@ -151,6 +205,11 @@ function DeviceRow({ d, audioOutput, busy, pending, onConnect, onDisconnect, onF
             {d.kind === "audio" && !isOutput && onAudio && (
               <button type="button" className="button button--small button--primary" onClick={onAudio} disabled={busy}>
                 <Volume2 size={14} aria-hidden /> {t("bluetooth.useForSound")}
+              </button>
+            )}
+            {sound && (
+              <button type="button" className="button button--small" onClick={sound.run} disabled={busy || sound.testing}>
+                <BellRing size={14} aria-hidden /> {sound.testing ? t("bluetooth.test.working") : t("bluetooth.test.button")}
               </button>
             )}
             <button type="button" className="button button--small" onClick={onDisconnect} disabled={busy}>

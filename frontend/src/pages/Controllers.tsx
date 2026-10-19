@@ -2,7 +2,7 @@ import { AlertTriangle, Gamepad2, Library, RotateCcw, Users } from "lucide-react
 import { Link, useNavigate } from "react-router-dom";
 
 import type { Players } from "../api/client";
-import { useCaps, useDeviceStatus, useLaunchGame, useNowPlaying, usePlayers, useSetPlayers } from "../api/queries";
+import { useCaps, useDeviceStatus, useLaunchGame, useNowPlaying, usePlayers, useSetDirections, useSetPlayers } from "../api/queries";
 import { ErrorNotice, PageHeader, Spinner } from "../components/ui";
 import { useT } from "../i18n";
 import { assignPlayer, completePlayers, controllerName } from "../lib/players";
@@ -13,6 +13,7 @@ export function ControllersPage() {
   const online = useDeviceStatus().data?.connected === true;
   const q = usePlayers(online);
   const save = useSetPlayers();
+  const steer = useSetDirections();
   const p = q.data;
   const builtin = p?.controllers.find((c) => c.builtin);
   const players = p ? completePlayers(p.players) : [];
@@ -27,11 +28,14 @@ export function ControllersPage() {
   const game = now?.playing && now.process === "retroarch" ? now.game : null;
   const canRelaunch = !!game && caps.launch;
   const relaunch = () => game && launch.mutate({ id: game.id, slot: caps.resume_slot ? "auto" : null });
-  const busy = save.isPending || launch.isPending;
+  const busy = save.isPending || steer.isPending || launch.isPending;
 
   // Choisir une manette pour un joueur l'échange avec le joueur qui l'avait : deux joueurs n'ont jamais la même.
   const choose = (player: number, index: number, then?: () => void) =>
     save.mutate(assignPlayer(players, player, index), { onSuccess: then });
+  // Ce qui dirige un joueur ; les autres gardent le leur (inconnu : croix seule, le réglage par défaut de RetroArch).
+  const direct = (player: number, direction: number) =>
+    p && steer.mutate(p.directions.map((d, n) => (n === player ? direction : d ?? 0)));
 
   // Un seul bouton d'en-tête. Changement en attente pendant un jeu : relancer le jeu. Joueur 1 sur une manette
   // absente (la console ne contrôle plus rien) : rendre la main aux boutons de la console. Sinon, sans jeu en
@@ -67,16 +71,19 @@ export function ControllersPage() {
       ) : q.isError ? (
         <ErrorNotice error={q.error} />
       ) : p && (
-        <PlayersBlock p={p} players={players} busy={busy} error={save.error ?? launch.error} canRelaunch={canRelaunch}
-          onChoose={(n, i) => choose(n, i)} />
+        <PlayersBlock p={p} players={players} busy={busy} error={save.error ?? steer.error ?? launch.error}
+          canRelaunch={canRelaunch} onChoose={(n, i) => choose(n, i)} onDirection={direct} />
       )}
     </div>
   );
 }
 
-function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose }: {
+/** input_playerN_analog_dpad_mode de RetroArch : 0 croix seule, 1 + stick gauche, 2 + stick droit. */
+const DIRECTIONS = ["dpad", "dpadLeft", "dpadRight"] as const;
+
+function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirection }: {
   p: Players; players: number[]; busy: boolean; error: unknown; canRelaunch: boolean;
-  onChoose: (player: number, index: number) => void;
+  onChoose: (player: number, index: number) => void; onDirection: (player: number, direction: number) => void;
 }) {
   const t = useT();
   const bluetooth = useCaps().bluetooth;
@@ -100,14 +107,24 @@ function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose }: {
         )}
         <ol className="players__list">
           {players.map((index, n) => (
-            <li key={n} className="field">
-              <label htmlFor={`player-${n}`} className="field__label">{t("players.player", { n: n + 1 })}</label>
-              <select id={`player-${n}`} value={index} disabled={busy} onChange={(e) => onChoose(n, Number(e.target.value))}>
-                {options.map((i) => <option key={i} value={i}>{label(i)}</option>)}
-              </select>
+            <li key={n} className="players__player">
+              <div className="field">
+                <label htmlFor={`player-${n}`} className="field__label">{t("players.player", { n: n + 1 })}</label>
+                <select id={`player-${n}`} value={index} disabled={busy} onChange={(e) => onChoose(n, Number(e.target.value))}>
+                  {options.map((i) => <option key={i} value={i}>{label(i)}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`direction-${n}`} className="field__label">{t("players.direction")}</label>
+                <select id={`direction-${n}`} value={p.directions[n] ?? 0} disabled={busy}
+                  onChange={(e) => onDirection(n, Number(e.target.value))}>
+                  {DIRECTIONS.map((d, i) => <option key={d} value={i}>{t(`players.${d}`)}</option>)}
+                </select>
+              </div>
             </li>
           ))}
         </ol>
+        <p className="muted">{t("players.directionLead")}</p>
         {error ? <ErrorNotice error={error} /> : !p.applied && <p className="muted">{t(canRelaunch ? "players.pendingRelaunch" : "players.pending")}</p>}
       </section>
 

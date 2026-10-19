@@ -25,6 +25,11 @@ const messages: Messages = {
     "relaunch": "Relancer le jeu pour appliquer",
     "relaunching": "Relance du jeu…",
     "pendingRelaunch": "Un jeu tourne : relance-le pour appliquer le changement (il est quitté proprement, avec sa sauvegarde automatique).",
+    "direction": "Direction",
+    "dpad": "Croix seule",
+    "dpadLeft": "Croix + stick gauche",
+    "dpadRight": "Croix + stick droit",
+    "directionLead": "Direction : en plus de la croix, un stick peut diriger le joueur (réglage d'origine de la console : stick droit pour le joueur 1). Les jeux qui gèrent eux-mêmes les sticks, comme sur N64 ou PlayStation, les gardent pour eux.",
   },
   en: {
     "title": "Controllers",
@@ -49,6 +54,11 @@ const messages: Messages = {
     "relaunch": "Restart the game to apply",
     "relaunching": "Restarting the game…",
     "pendingRelaunch": "A game is running: restart it to apply the change (it quits cleanly, with its automatic save).",
+    "direction": "Direction",
+    "dpad": "D-pad only",
+    "dpadLeft": "D-pad + left stick",
+    "dpadRight": "D-pad + right stick",
+    "directionLead": "Direction: besides the D-pad, a stick can steer the player (console default: right stick for player 1). Games that use the sticks themselves, such as on N64 or PlayStation, keep them.",
   },
   es: {
     "title": "Mandos",
@@ -73,6 +83,11 @@ const messages: Messages = {
     "relaunch": "Reiniciar el juego para aplicar",
     "relaunching": "Reiniciando el juego…",
     "pendingRelaunch": "Hay un juego en curso: reinícialo para aplicar el cambio (se cierra correctamente, con su guardado automático).",
+    "direction": "Dirección",
+    "dpad": "Solo cruceta",
+    "dpadLeft": "Cruceta + stick izquierdo",
+    "dpadRight": "Cruceta + stick derecho",
+    "directionLead": "Dirección: además de la cruceta, un stick puede dirigir al jugador (ajuste de fábrica de la consola: stick derecho para el jugador 1). Los juegos que usan los sticks por sí mismos, como en N64 o PlayStation, los conservan.",
   },
 };
 

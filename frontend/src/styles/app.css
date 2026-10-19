@@ -880,6 +880,8 @@ kbd {
 .bt-device__icon { color: var(--ink-3); }
 .bt-device.is-connected .bt-device__icon { color: var(--ok); }
 .bt-device__name { font-weight: 700; }
+.bt-device__test { display: flex; gap: 6px; align-items: center; margin: 4px 0 0; color: var(--ink); }
+.bt-device__test > svg { color: var(--ok); flex: none; }
 .bt-device__state { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
 .bt-device.is-pending { border-color: var(--accent); }
 /* État : pastille + texte normal (le texte coloré « vert LCD » se lisait mal en sombre) */
@@ -887,10 +889,16 @@ kbd {
 .bt-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
 .bt-status.is-on { color: var(--ink); font-weight: 600; }
 .bt-status.is-on::before { background: var(--ok-dot); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok-dot) 25%, transparent); }
-.bt-sound { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); font-weight: 600; padding: 4px 10px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--ink); }
+/* État, pas un bouton : texte simple, sans fond de pastille */
+.bt-sound { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.bt-relaunch { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; background: color-mix(in srgb, var(--warn) 15%, transparent); }
+.bt-relaunch > div { flex: 1 1 260px; }
+.bt-relaunch h2 { margin: 0 0 4px; font-size: var(--fs-md); }
+.bt-relaunch p { margin: 0; }
 .players h2 { display: flex; align-items: center; gap: 8px; }
 .players__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
 .players__list select { width: 100%; }
+.players__player { display: grid; gap: 8px; }
 .players__detected { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .players__detected li { display: flex; align-items: center; gap: 8px; }
 .players__warn { display: flex; gap: 8px; align-items: center; margin: 0; padding: 10px 12px; border-radius: var(--r-panel); background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--ink); }

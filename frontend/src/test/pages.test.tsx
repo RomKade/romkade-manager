@@ -134,9 +134,11 @@ function mockFetch() {
       : { playing: false, process: null, rom_path: null, menu: true, game: null });
     const dev = (address: string, name: string, kind: string, paired: boolean, connected: boolean, rssi: number | null) =>
       ({ address, name, icon: "", kind, paired, trusted: paired, connected, rssi });
+    if (url === "/api/bluetooth/test-sound") return json({ result: "played" });
     if (url.startsWith("/api/bluetooth")) return json({
       adapter: { present: true, powered: true, discovering: false, name: "ANBERNIC" }, bluealsa: true, audio_output: null,
-      devices: [dev("AA:00:00:00:00:01", "Voisin 1", "other", false, false, -40), dev("70:77:81:54:FF:14", "KD-43X8309C", "audio", false, false, -70)],
+      devices: [dev("AA:00:00:00:00:01", "Voisin 1", "other", false, false, -40), dev("70:77:81:54:FF:14", "KD-43X8309C", "audio", false, false, -70),
+        dev("F8:DF:15:00:00:02", "JBL Flip", "audio", true, true, -50)],
     });
     if (url === "/api/device/clock") return json({ console_epoch: 1662019043, timezone: "Etc/UTC", utc_offset: "+0000", mac_epoch: 1792188582, drift_seconds: -130169539 });
     if (url === "/api/device/clock/sync") return json({ console_epoch: 1792188582, timezone: "Europe/Paris", utc_offset: "+0200", mac_epoch: 1792188582, drift_seconds: 0 });
@@ -150,9 +152,10 @@ function mockFetch() {
       return json({ mode: "game_manager", adjustable: true, game_running: true, ...volume });
     }
     if (url.startsWith("/api/players")) {
-      const players = init?.method === "PUT" ? (JSON.parse(String(init.body)) as { players: number[] }).players : [2, 1, 0, 3];
+      const body = init?.method === "PUT" ? JSON.parse(String(init.body)) as { players?: number[]; directions?: number[] } : {};
       return json({ controllers: [{ index: 0, name: "ANBERNIC-keys", builtin: true }, { index: 1, name: "8BitDo Pro 2", builtin: false }],
-        players, applied: !(playingId && init?.method === "PUT"), game_running: playingId != null });
+        players: body.players ?? [2, 1, 0, 3], directions: body.directions ?? [2, null, null, null],
+        applied: !(playingId && init?.method === "PUT"), game_running: playingId != null });
     }
     if (url.startsWith("/api/saves/howto")) return json([{ action: "save_state", combo: ["Menu", "R1"] }, { action: "quit", combo: ["Menu", "Start"] }]);
     if (url.startsWith("/api/saves/backups")) return json([]);
@@ -964,6 +967,15 @@ describe("Manettes", () => {
     expect(await screen.findByRole("heading", { name: "Bibliothèque", level: 1 })).toBeInTheDocument();
   });
 
+  it("choisit ce qui dirige le joueur 1 : la croix seule, ou la croix et un stick", async () => {
+    renderAt("/manettes");
+    const [p1] = await screen.findAllByLabelText("Direction");
+    expect(p1).toHaveValue("2");  // réglage d'origine de la console : stick droit
+    await userEvent.selectOptions(p1!, "Croix + stick gauche");
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", directions: [1, 0, 0, 0] }));
+    expect(screen.getAllByLabelText("Direction")[0]).toHaveValue("1");
+  });
+
   it("pendant un jeu, relance le jeu pour appliquer la manette", async () => {
     playingId = 1;
     renderAt("/manettes");
@@ -994,6 +1006,33 @@ describe("Bluetooth", () => {
     const mine = screen.getByRole("region", { name: "Mes appareils" });
     expect(within(mine).getByText("KD-43X8309C")).toBeInTheDocument();
     expect(within(near).queryByText("KD-43X8309C")).not.toBeInTheDocument();
+  });
+
+  it("propose de relancer le jeu en cours quand la sortie du son change", async () => {
+    playingId = 1;
+    renderAt("/bluetooth");
+    const speaker = (await screen.findByText("JBL Flip")).closest("li")!;
+    await userEvent.click(within(speaker).getByRole("button", { name: /Envoyer le son des jeux sur cet appareil/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/bluetooth/audio-output", address: "F8:DF:15:00:00:02" }));
+    expect(await screen.findByText(/Super Mario World était déjà lancé/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Relancer le jeu/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/games/1/launch", slot: "auto" }));
+  });
+
+  it("teste le son sur l'enceinte connectée", async () => {
+    renderAt("/bluetooth");
+    const speaker = (await screen.findByText("JBL Flip")).closest("li")!;
+    await userEvent.click(within(speaker).getByRole("button", { name: /Tester le son/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/bluetooth/test-sound", address: "F8:DF:15:00:00:02" }));
+    expect(await within(speaker).findByText(/Un carillon vient de sonner/)).toBeInTheDocument();
+  });
+
+  it("sans jeu en cours, ne parle pas de relancer", async () => {
+    renderAt("/bluetooth");
+    const speaker = (await screen.findByText("JBL Flip")).closest("li")!;
+    await userEvent.click(within(speaker).getByRole("button", { name: /Envoyer le son des jeux sur cet appareil/ }));
+    await waitFor(() => expect(bodies.at(-1)).toMatchObject({ url: "/api/bluetooth/audio-output" }));
+    expect(screen.queryByText(/était déjà lancé/)).not.toBeInTheDocument();
   });
 });
 

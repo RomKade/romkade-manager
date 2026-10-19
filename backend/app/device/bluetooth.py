@@ -221,3 +221,47 @@ async def set_audio_output(run: Runner, client: DeviceClient, mac: str | None) -
         cmd = f"rm -f {ALSA_CONF}; printf %s {shlex.quote(asoundrc())} > {ASOUNDRC}"
     await run(client, cmd)
     return await status(run, client)
+
+
+# Carillon du test sonore : une demi-seconde de silence (une enceinte qui se réveille avale le début du son), puis
+# deux notes montantes adoucies, en 48 kHz stéréo 16 bits sur la sortie standard. Volume modéré (30 %).
+CHIME = """import math, struct, sys
+r = 48000
+out = bytearray(4 * r // 2)
+for f in (660, 880):
+    n = int(r * 0.35)
+    for i in range(n):
+        v = int(9800 * math.sin(2 * math.pi * f * i / r) * min(1, i / 480) * (1 - i / n))
+        out += struct.pack("<hh", v, v)
+sys.stdout.buffer.write(bytes(out))
+"""
+
+
+def sound_test_command(mac: str) -> str:
+    """Joue CHIME sur l'enceinte `mac` par BlueALSA, comme le son des jeux (aplay 64 bits, profil A2DP), sans
+    passer par la sortie des jeux : on vérifie l'enceinte elle-même. Sort « @@RESULT played|in_use|absent|failed ».
+    Un jeu qui envoie déjà son son à l'enceinte la garde pour lui : BlueALSA refuse un second flux (« busy »)."""
+    m = shlex.quote(mac)
+    aplay = f"env -u LD_LIBRARY_PATH timeout 15 aplay -q -t raw -f S16_LE -r 48000 -c 2 -D bluealsa:DEV={mac},PROFILE=a2dp -"
+    return f"""{BLUEALSA_START}
+timeout 5 bluetoothctl info {m} 2>/dev/null | grep -q 'Connected: yes' || {{ echo '@@RESULT absent'; exit 0; }}
+if python3 -c {shlex.quote(CHIME)} | {aplay} 2>/tmp/agm-bt-test.log; then echo '@@RESULT played'
+elif grep -q 'resource busy' /tmp/agm-bt-test.log; then echo '@@RESULT in_use'
+else echo '@@RESULT failed'; grep -m1 -aoE "Couldn't [^:]+: .*|aplay: .*" /tmp/agm-bt-test.log; fi"""
+
+
+async def sound_test(run: Runner, client: DeviceClient, mac: str) -> str:
+    """Test sonore : un court carillon sur l'enceinte (« played »), ou « in_use » si un jeu y envoie déjà son son.
+    Erreur claire si le son ne peut pas y aller."""
+    mac = check_mac(mac)
+    _, out = await run(client, sound_test_command(mac), timeout=30)
+    result = re.search(r"@@RESULT (\w+)", out)
+    state = result.group(1) if result else "failed"
+    if state == "absent":
+        raise errors.AppError("bt_test_not_connected", "L'appareil n'est pas connecté : connecte-le d'abord, puis "
+                              "refais le test.", 409, {"address": mac})
+    if state not in ("played", "in_use"):
+        detail = out.split("@@RESULT", 1)[-1].split("\n", 1)[-1].strip()
+        raise errors.AppError("bt_test_failed", "Le son n'a pas pu partir vers l'appareil. Éteins-le et rallume-le, "
+                              "reconnecte-le, puis refais le test.", 502, {"detail": detail})
+    return state
