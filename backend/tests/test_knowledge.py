@@ -157,3 +157,38 @@ async def test_sega_retro_source_and_refresh_all(app_factory, monkeypatch):
                 break
             await asyncio.sleep(0.02)
         assert app.state.knowledge.state["total"] == total and app.state.knowledge.state["done"] == total
+
+
+async def test_fallbacks_when_wikidata_lacks_console_and_sega_retro_link(monkeypatch):
+    """« Wonder Boy » : la fiche Wikidata ne cite pas la Master System et n'a pas de lien Sega Retro. Seul jeu à
+    porter exactement ce titre : retenu ; page Sega Retro trouvée par son titre, classée Master System."""
+    monkeypatch.setattr(kn, "PAUSE", 0)
+    parsed = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = urlparse(str(request.url))
+        q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.netloc == "www.wikidata.org":
+            if q["action"] == "wbsearchentities":
+                return httpx.Response(200, json={"search": [{"id": "Q780496"}, {"id": "Q864340"}]})
+            if "Q780496" in q["ids"]:
+                return httpx.Response(200, json={"entities": {
+                    "Q780496": entity("Q780496", "Q7889", ["Q192851"], label="Wonder Boy"),
+                    "Q864340": entity("Q864340", "Q7889", ["Q192851"], label="Wonder Boy in Monster Land")}})
+            return httpx.Response(200, json={"entities": {"Q192851": {"labels": {"en": {"value": "arcade game"}},
+                                                                       "aliases": {}}}})
+        if url.netloc == "segaretro.org":
+            if q.get("prop") == "categories":
+                return httpx.Response(200, json={"query": {"pages": [{"title": "Wonder Boy", "categories": [
+                    {"title": "Category:1987 Master System games"}]}]}})
+            if q.get("list") == "allpages":
+                return httpx.Response(200, json={"query": {"allpages": []}})
+            parsed.append(q["page"])
+            return httpx.Response(200, json={"parse": {"text": "<h2>Gameplay</h2><p>" + "Tom-Tom eats fruit to keep "
+                                                       "his vitality meter from running out. " * 3 + "</p>"}})
+        return httpx.Response(404)
+
+    fetcher = kn.Fetcher(transport=httpx.MockTransport(handler))
+    found = await fetcher.fetch("Wonder Boy", "SMS")
+    assert found.status == "found" and found.wikidata == "Q780496" and found.sources["segaretro"] == "Wonder_Boy"
+    assert parsed == ["Wonder Boy"] and found.chunks[0]["license"] == "GFDL 1.2"

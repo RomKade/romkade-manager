@@ -61,6 +61,11 @@ SKIP_SECTIONS = {
     "production credits", "magazine articles", "physical scans", "promotional material", "artwork",
     "digital manuals", "localised names", "technical information", "versions", "external links",
 }
+# Catégories Sega Retro des jeux de chaque console (« 1987 Master System games ») : page trouvée par son titre
+# quand Wikidata ne donne pas de lien, gardée seulement si elle est classée pour cette console.
+SEGARETRO_CATEGORY = {"SMS": "Master System games", "MD": "Mega Drive games", "GG": "Game Gear games",
+                      "SEGA32X": "32X games", "MDCD": "Mega-CD games", "SATURN": "Saturn games",
+                      "DREAMCAST": "Dreamcast games", "SG1000": "SG-1000 games"}
 # Sous-pages Sega Retro utiles pour jouer (« Jeu/Hidden content » : continues, niveaux cachés, codes).
 SEGARETRO_SUBPAGES = ("hidden content", "hints", "walkthrough", "achievements")
 # Sous-pages StrategyWiki les plus utiles d'abord (soluce, secrets, boss, objets…).
@@ -321,7 +326,28 @@ class Fetcher:
             score = title_score(title, _names(e))
             if score >= 0.88 and (best is None or score > best[0]):
                 best = (score, q)
+        if best is None:
+            # Fiche sans la bonne console (Wikidata incomplet : « Wonder Boy » n'y cite pas la Master System) :
+            # retenue seulement si c'est le seul jeu qui porte exactement ce titre.
+            exact = [q for q, e in games.items() if title_score(title, _names(e)) >= 0.999]
+            if len(exact) == 1:
+                return exact[0], games[exact[0]]
         return (best[1], games[best[1]]) if best else None
+
+    async def segaretro_page(self, http: httpx.AsyncClient, names: list[str], directory: str) -> str | None:
+        """Page Sega Retro du jeu cherchée par son titre, si elle est classée dans les jeux de cette console."""
+        suffix = SEGARETRO_CATEGORY.get(canonical(directory))
+        if not suffix:
+            return None
+        for name in dict.fromkeys(n for n in names if n):
+            data = await self._get(http, SEGARETRO, {"action": "query", "prop": "categories", "titles": name,
+                                                     "cllimit": "500", "redirects": "1"})
+            for page in data.get("query", {}).get("pages", []):
+                if page.get("missing") or page.get("title", "").startswith("Category:"):
+                    continue
+                if any(c["title"].endswith(suffix) for c in page.get("categories", [])):
+                    return page["title"].replace(" ", "_")
+        return None
 
     async def wikipedia(self, http: httpx.AsyncClient, lang: str, page: str) -> list[dict]:
         data = await self._get(http, WIKIPEDIA.format(lang=lang), {"action": "query", "prop": "extracts",
@@ -390,6 +416,9 @@ class Fetcher:
             if guide:
                 chunks += await self.strategywiki(http, guide)
             sega = next((v for v in _claim_values(ent, "P7517") if isinstance(v, str)), None)  # Sega Retro ID
+            if not sega:
+                sega = await self.segaretro_page(http, [ent.get("labels", {}).get("en", {}).get("value"), title],
+                                                 directory)
             if sega:
                 chunks += await self.segaretro(http, sega)
             sources = {"wikipedia": wiki, **({"strategywiki": guide} if guide else {}),
