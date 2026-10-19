@@ -95,16 +95,16 @@ class CheatIndex:
             if n := self.exact.get(system, {}).get(stem.lower()):
                 found.append(n)
             found += [n for n in self.loose.get(system, {}).get(loose_title(stem), []) if n not in found]
-        mine = {t for t in _tags(stem) if t not in DEVICES}
+        mine = {p.strip() for t in _tags(stem) if t not in DEVICES for p in t.split(",")}
 
         def rank(n: str) -> tuple:
             base = Path(n).stem
             tags = _tags(base)
             same = base.lower() == stem.lower()
-            region = bool(mine & set(tags))
+            region = -len(mine & {p.strip() for t in tags for p in t.split(",")})
             proto = any(w in " ".join(tags) or w in base for w in ("proto", "beta", "demo", "[b]"))
             japan = any("japan" in t for t in tags) and not any(r in " ".join(tags) for r in ("usa", "europe", "world"))
-            return (not same, not region, proto, japan, any(t in DEVICES for t in tags), base)
+            return (not same, region, proto, japan, any(t in DEVICES for t in tags), base)
 
         return sorted(found, key=rank)
 

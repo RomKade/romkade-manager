@@ -85,7 +85,8 @@ Rules:
   say so plainly instead of guessing. Never invent levels, items, codes or facts.
 - {solution}
 - Cheat codes: only those of the [RetroArch cheats …] block, copied exactly (code and effect); never write a code
-  that is not in it. If there is no such block, say that the RetroArch cheat database has no code for this game. To
+  that is not in it. Give the few codes that match the question (at most 6, the most useful if the question is
+  general) and say that all of them are on the game page. If there is no such block, say that the RetroArch cheat database has no code for this game. To
   use them: the game page of ROMKADE Manager copies the cheat file to the console, then in game: RetroArch Quick
   Menu > Cheats > Load Cheat File, enable the wanted codes, Apply Changes.
 - Only when you used a passage marked [Wikipedia …], [StrategyWiki …] or [RetroArch cheats …], end with
