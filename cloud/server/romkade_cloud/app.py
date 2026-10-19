@@ -1,16 +1,21 @@
 """Serveur cloud ROMKADE : MCP pour les assistants (ChatGPT, Claude…) et relais pour les agents des consoles.
 
-    /<jeton du compte>       MCP (Streamable HTTP), ex. https://mcp.romkade.com/<jeton>. Prototype : le jeton dans
-                             l'adresse tient lieu de connexion ;
+    /                        MCP (Streamable HTTP) avec OAuth : jeton d'accès Supabase (comptes ROMKADE) ; sans
+                             jeton, 401 et adresse des métadonnées (RFC 9728) pour que ChatGPT, Claude… connectent
+                             l'utilisateur
+    /<jeton du compte>       MCP avec le jeton dans l'adresse (comptes du prototype, le temps de la bascule) ;
                              la V1 passera à OAuth (comptes ROMKADE), exigé par les annuaires d'apps.
     /agent/hello             l'agent se présente (et reçoit son secret et un code d'appairage la première fois)
     /agent/catalog           l'agent envoie la liste des fichiers de son dossier de ROMs
     /agent/poll, /result     ordres pour la console et leurs résultats (voir relay.py)
+    /.well-known/oauth-protected-resource   serveur d'autorisation de ce serveur MCP (Supabase Auth)
+    /oauth/consent           page ROMKADE de connexion et d'autorisation (ui/consent.html)
     /icon.png, /romkade-logo.webp, /fonts/…, /consoles/…   logo, polices et illustrations de l'interface
     /art/<clé>.webp          jaquette d'un jeu (libretro-thumbnails, mise en cache)
 
 Variables : ROMKADE_CLOUD_DB (base SQLite), ROMKADE_DATA_DIR (paquet de cheats), ROMKADE_PUBLIC_URL (adresse
-publique, pour le logo), ROMKADE_ALLOWED_HOSTS (noms d'hôte acceptés par le MCP, séparés par des virgules).
+publique), ROMKADE_ALLOWED_HOSTS (noms d'hôte acceptés par le MCP, séparés par des virgules), ROMKADE_SUPABASE_URL
+et ROMKADE_SUPABASE_PUBLISHABLE_KEY (comptes ROMKADE ; sans elles, pas d'OAuth).
 """
 
 import asyncio
@@ -33,13 +38,14 @@ from app.services import cheats as cheat_db
 
 from . import catalog
 from .art import Art
+from .auth import SupabaseAuth, account_id
 from .relay import Relay
 from .store import Store
 from .tools import build
 
 log = logging.getLogger("romkade.cloud")
 STATIC = Path(__file__).parent / "static"
-PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp"}
+PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp", "romkade-logo.png"}  # .png : e-mails
 MAX_BODY = 8 * 1024 * 1024
 # Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée.
 TOKEN_PATH = re.compile(r"^/(?:mcp/)?([A-Za-z0-9_-]{32,})/?$")
@@ -48,19 +54,39 @@ WEB_CLIENTS = ["https://claude.ai", "https://chatgpt.com", "https://chat.openai.
 AGENT_FIELDS = ("agent_version", "hostname", "model", "firmware", "profile", "os_name", "roms_root", "capabilities")
 
 
-class AccountPath:
-    """/<jeton> -> point d'entrée MCP interne (/mcp), avec le compte du jeton dans la requête (« romkade.account »).
-    Jeton inconnu, ou /mcp appelé directement : 404, sans dire pourquoi."""
+def _is_mcp_call(scope) -> bool:
+    """Requête d'un client MCP sur « / » (et non un navigateur qui ouvre la page d'accueil)."""
+    headers = dict(scope.get("headers") or [])
+    accept = headers.get(b"accept", b"").decode("latin-1")
+    return (scope["method"] in ("POST", "DELETE") or b"authorization" in headers
+            or "text/event-stream" in accept or "application/json" in accept)
 
-    def __init__(self, app, store: Store):
-        self.app, self.store = app, store
+
+class AccountPath:
+    """Trouve le compte ROMKADE d'une requête MCP et la passe au point d'entrée MCP interne (/mcp), avec le compte
+    dans la requête (« romkade.account »), jamais fourni par le client :
+    - « / » + jeton OAuth (Authorization: Bearer, émis par Supabase Auth) : compte « sb:<id> » ; sans jeton valide,
+      401 avec l'adresse des métadonnées, d'où ChatGPT, Claude… lancent la connexion ;
+    - « /<jeton> » (comptes du prototype) : jeton inconnu, ou /mcp appelé directement : 404, sans dire pourquoi."""
+
+    def __init__(self, app, store: Store, auth: SupabaseAuth | None = None, public_url: str = ""):
+        self.app, self.store, self.auth, self.public_url = app, store, auth, public_url
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             scope.pop("romkade.account", None)
             path = scope["path"]
             m = TOKEN_PATH.match(path)
-            if m or path == "/mcp" or path.startswith("/mcp/"):
+            if path in ("/", "/mcp", "/mcp/") and self.auth is not None and _is_mcp_call(scope):
+                account = await self._oauth_account(scope)
+                if account is None:
+                    meta = f"{self.public_url}/.well-known/oauth-protected-resource"
+                    await JSONResponse({"error": "invalid_token", "error_description": "Connexion ROMKADE requise"},
+                                       401, headers={"WWW-Authenticate": f'Bearer resource_metadata="{meta}"'}
+                                       )(scope, receive, send)
+                    return
+                scope = {**scope, "path": "/mcp", "raw_path": b"/mcp", "romkade.account": account}
+            elif m or path == "/mcp" or path.startswith("/mcp/"):
                 account = self.store.account_for_token(m.group(1)) if m else None
                 if account is None:
                     await JSONResponse({"error": "not_found"}, 404)(scope, receive, send)
@@ -68,11 +94,25 @@ class AccountPath:
                 scope = {**scope, "path": "/mcp", "raw_path": b"/mcp", "romkade.account": account}
         await self.app(scope, receive, send)
 
+    async def _oauth_account(self, scope) -> str | None:
+        header = dict(scope.get("headers") or []).get(b"authorization", b"").decode("latin-1")
+        if not header.lower().startswith("bearer "):
+            return None
+        claims = await asyncio.to_thread(self.auth.verify, header[7:].strip())
+        if claims is None:
+            return None
+        return self.store.ensure_account(account_id(claims), claims.get("email"))
 
-def create_app(store: Store | None = None, relay: Relay | None = None, public_url: str | None = None):
+
+def create_app(store: Store | None = None, relay: Relay | None = None, public_url: str | None = None,
+               auth: SupabaseAuth | None = None):
     store = store or Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3"))
     relay = relay or Relay()
     public_url = (public_url or os.environ.get("ROMKADE_PUBLIC_URL", "")).rstrip("/")
+    supabase_url = os.environ.get("ROMKADE_SUPABASE_URL", "")
+    publishable_key = os.environ.get("ROMKADE_SUPABASE_PUBLISHABLE_KEY", "")
+    if auth is None and supabase_url:
+        auth = SupabaseAuth(supabase_url, publishable_key)
     mcp = build(store, relay, public_url)
     art = Art(store)
 
@@ -181,6 +221,47 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     async def health(_: Request) -> Response:
         return JSONResponse({"ok": True})
 
+    # ---------- comptes ROMKADE (OAuth) ----------
+    async def protected_resource(_: Request) -> Response:
+        """RFC 9728 : quel serveur d'autorisation délivre les jetons de ce serveur MCP."""
+        if auth is None:
+            return JSONResponse({"error": "not_found"}, 404)
+        return JSONResponse({"resource": public_url, "authorization_servers": [auth.issuer],
+                             "bearer_methods_supported": ["header"], "resource_name": "ROMKADE",
+                             "resource_documentation": "https://romkade.com", "resource_logo_uri": f"{public_url}/icon.png"},
+                            headers={"Cache-Control": "public, max-age=3600"})
+
+    authorization_metadata: dict = {}
+
+    async def authorization_server(_: Request) -> Response:
+        """Métadonnées de Supabase Auth, servies aussi ici pour les clients qui les cherchent sur le serveur MCP."""
+        if auth is None:
+            return JSONResponse({"error": "not_found"}, 404)
+        if not authorization_metadata or authorization_metadata.get("_at", 0) < time.time() - 3600:
+            import httpx
+            async with httpx.AsyncClient(timeout=10) as http:
+                r = await http.get(auth.metadata_url)
+            if r.status_code != 200:
+                return JSONResponse({"error": "unavailable"}, 503)
+            authorization_metadata.clear()
+            authorization_metadata.update(r.json(), _at=time.time())
+        return JSONResponse({k: v for k, v in authorization_metadata.items() if k != "_at"},
+                            headers={"Cache-Control": "public, max-age=3600"})
+
+    consent_html = (STATIC.parent / "ui" / "consent.html").read_text()
+
+    async def consent(_: Request) -> Response:
+        if auth is None:
+            return JSONResponse({"error": "not_found"}, 404)
+        html = (consent_html.replace("__SUPABASE_URL__", auth.url)
+                .replace("__SUPABASE_KEY__", auth.publishable_key))
+        return Response(html, media_type="text/html; charset=utf-8",
+                        headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY",
+                                 "Referrer-Policy": "no-referrer"})
+
+    async def home(_: Request) -> Response:
+        return Response(status_code=302, headers={"Location": "https://romkade.com"})
+
     app.router.routes.extend([
         Route("/agent/hello", hello, methods=["POST"]),
         Route("/agent/catalog", upload_catalog, methods=["POST"]),
@@ -188,6 +269,11 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/agent/result", result, methods=["POST"]),
         Route("/art/{key}.webp", cover),
         Route("/healthz", health),
+        Route("/.well-known/oauth-protected-resource", protected_resource),
+        Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
+        Route("/.well-known/oauth-authorization-server", authorization_server),
+        Route("/oauth/consent", consent),
+        Route("/", home),
         Mount("/fonts", StaticFiles(directory=STATIC / "fonts")),
         Mount("/consoles", StaticFiles(directory=STATIC / "consoles")),
         Route("/{name}", static_file),
@@ -206,7 +292,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
 
     app.router.lifespan_context = lifespan
     app.state.store, app.state.relay = store, relay
-    return AccountPath(CrossOrigin(app), store)
+    return AccountPath(CrossOrigin(app), store, auth, public_url)
 
 
 class CrossOrigin:

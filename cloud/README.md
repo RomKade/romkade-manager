@@ -56,6 +56,19 @@ d'appairage à donner à l'assistant : « Connecte ma console, code ABC123 ».
 Essayé sur RG35XX Pro (firmware Anbernic + Stock OS Mod) : détection, état, volume et inventaire (5 696
 fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, sans essai.
 
+## Comptes ROMKADE (Supabase)
+
+- Supabase Auth (projet `urpvxqtyscuomkusqsiu`, Paris) est le **serveur OAuth 2.1** : ChatGPT, Claude… découvrent
+  l'authentification par `https://mcp.romkade.com/.well-known/oauth-protected-resource`, s'inscrivent seuls comme
+  clients (DCR) et envoient l'utilisateur sur **`/oauth/consent`** (`ui/consent.html`) : connexion, création du
+  compte avec code de vérification renvoyable, mot de passe oublié, double authentification (application), puis
+  « Autoriser ». Le serveur MCP vérifie le jeton (ES256, clés publiques JWKS, `auth.py`) : compte `sb:<id>`.
+- `deploy/supabase_setup.py` : configuration rejouable de Supabase Auth par l'API de gestion (OAuth, Mailjet,
+  codes à 6 chiffres, règles de mot de passe, e-mails ROMKADE en français, anglais et espagnol). Secrets dans
+  `deploy/.env` (jamais commité).
+- Connecteur : `https://mcp.romkade.com`, authentification **OAuth**. L'adresse à jeton (`/<jeton>`) reste
+  acceptée le temps de la bascule ; `python -m romkade_cloud move-consoles <ancien> sb:<id>` y transfère les consoles.
+
 ## Déploiement (droplet)
 
 En ligne sur **https://mcp.romkade.com** (connecteur : `https://mcp.romkade.com/<jeton>`). DNS : entrée A

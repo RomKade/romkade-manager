@@ -87,6 +87,26 @@ class Store:
             self._db.execute("INSERT INTO accounts VALUES (?, ?, ?, ?)", (account_id, digest(token), label, time.time()))
         return account_id, token
 
+    def ensure_account(self, account_id: str, label: str | None = None) -> str:
+        """Compte d'un utilisateur Supabase (« sb:<id> »), créé à sa première connexion par OAuth.
+        Sans jeton dans l'adresse : l'empreinte enregistrée est celle d'un secret jeté aussitôt."""
+        with self._lock, self._db:
+            self._db.execute("INSERT OR IGNORE INTO accounts VALUES (?, ?, ?, ?)",
+                             (account_id, digest(new_secret()), label, time.time()))
+            if label:
+                self._db.execute("UPDATE accounts SET label = ? WHERE id = ? AND label IS NOT ?", (label, account_id, label))
+        return account_id
+
+    def move_consoles(self, from_account: str, to_account: str) -> int:
+        """Rattache les consoles d'un compte à un autre (passage d'un compte à jeton à un compte ROMKADE)."""
+        with self._lock, self._db:
+            return self._db.execute("UPDATE consoles SET account_id = ? WHERE account_id = ?",
+                                    (to_account, from_account)).rowcount
+
+    def accounts(self) -> list[sqlite3.Row]:
+        return self._db.execute("SELECT a.id, a.label, a.created, count(c.id) AS consoles FROM accounts a "
+                                "LEFT JOIN consoles c ON c.account_id = a.id GROUP BY a.id ORDER BY a.created").fetchall()
+
     def account_for_token(self, token: str) -> str | None:
         row = self._db.execute("SELECT id FROM accounts WHERE token_hash = ?", (digest(token),)).fetchone()
         return row["id"] if row else None

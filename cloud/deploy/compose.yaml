@@ -10,6 +10,9 @@ services:
     restart: unless-stopped
     environment:
       ROMKADE_PUBLIC_URL: ${ROMKADE_PUBLIC_URL:-https://mcp.romkade.com}
+      # Comptes ROMKADE (Supabase Auth, serveur OAuth) : adresse du projet et clé publique (pas des secrets).
+      ROMKADE_SUPABASE_URL: https://urpvxqtyscuomkusqsiu.supabase.co
+      ROMKADE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_4TKxIKKsIU97CwTtATuckw_mhYMMlPq
     volumes:
       - romkade_data:/data
     networks: [licenses_web]

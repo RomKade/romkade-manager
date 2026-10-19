@@ -7,9 +7,11 @@ import socket
 import zipfile
 
 import httpx
+import httpx2
 import pytest
 import uvicorn
 from mcp import Client
+from mcp.client.streamable_http import streamable_http_client
 
 os.environ["ROMKADE_FETCH_CHEATS"] = "0"
 
@@ -244,5 +246,60 @@ def test_relay_ignores_results_from_another_console():
         assert relay.result("b", cmd["id"], {"ok": True}) is False
         assert relay.result("a", cmd["id"], {"ok": True, "result": {"x": 1}}) is True
         assert await call == {"x": 1}
+
+    asyncio.run(scenario())
+
+
+class FakeAuth:
+    """Supabase Auth simulé : « bon-jeton » est valide (utilisateur u-123), le reste refusé."""
+
+    url = "https://projet.supabase.co"
+    issuer = "https://projet.supabase.co/auth/v1"
+    publishable_key = "sb_publishable_test"
+    metadata_url = issuer + "/.well-known/oauth-authorization-server"
+
+    def verify(self, token):
+        return {"sub": "u-123", "email": "joueur@example.com", "role": "authenticated"} if token == "bon-jeton" else None
+
+
+def test_oauth_accounts(env):
+    store, _ = env
+
+    async def scenario():
+        port = free_port()
+        base = f"http://127.0.0.1:{port}"
+        server = uvicorn.Server(uvicorn.Config(create_app(store, Relay(), public_url=base, auth=FakeAuth()),
+                                               host="127.0.0.1", port=port, log_level="warning"))
+        task = asyncio.create_task(server.serve())
+        while not server.started:
+            await asyncio.sleep(0.02)
+        try:
+            async with httpx.AsyncClient() as h:
+                # Sans jeton : 401 et adresse des métadonnées (RFC 9728) pour lancer la connexion.
+                r = await h.post(f"{base}/", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                                 headers={"accept": "application/json, text/event-stream"})
+                assert r.status_code == 401
+                assert f'resource_metadata="{base}/.well-known/oauth-protected-resource"' in r.headers["www-authenticate"]
+                assert (await h.post(f"{base}/", json={}, headers={"authorization": "Bearer faux"})).status_code == 401
+                meta = (await h.get(f"{base}/.well-known/oauth-protected-resource")).json()
+                assert meta["resource"] == base and meta["authorization_servers"] == [FakeAuth.issuer]
+                page = await h.get(f"{base}/oauth/consent?authorization_id=abc")
+                assert page.status_code == 200 and "sb_publishable_test" in page.text and "__SUPABASE" not in page.text
+                assert page.headers["x-frame-options"] == "DENY"
+                assert (await h.get(f"{base}/")).status_code == 302  # navigateur : vers romkade.com
+            # Avec un jeton valide : compte « sb:u-123 » créé, sans console pour l'instant.
+            transport = streamable_http_client(f"{base}/", http_client=httpx2.AsyncClient(
+                headers={"authorization": "Bearer bon-jeton"}))
+            async with Client(transport) as mcp:
+                assert "Aucune console" in error_text(await mcp.call_tool("library_overview", {}))
+            assert any(a["id"] == "sb:u-123" and a["label"] == "joueur@example.com" for a in store.accounts())
+            # Les consoles d'un compte à jeton passent au compte ROMKADE.
+            old = store.create_account("ancien")[0]
+            c, _ = store.register_console({})
+            store.pair(store.pairing_code(c.id), old)
+            assert store.move_consoles(old, "sb:u-123") == 1 and store.consoles_of("sb:u-123")[0].id == c.id
+        finally:
+            server.should_exit = True
+            await task
 
     asyncio.run(scenario())

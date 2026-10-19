@@ -2,3 +2,4 @@ server/.venv/
 server/data/
 agent/dist/
 __pycache__/
+deploy/.env
