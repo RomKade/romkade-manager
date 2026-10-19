@@ -160,3 +160,18 @@ async def test_settings_validation_structured_error(client):
     r = await client.put("/api/settings", json={"host": "h", "port": 22, "username": "root",
                                                 "auth_method": "password", "roms_root": "/"})
     assert r.status_code == 422 and r.json()["error"]["code"] == "validation_error"
+
+
+def test_presence_says_asleep_after_recent_contact():
+    from app.device.presence import Presence
+    from app.errors import AppError, device_unreachable
+
+    p = Presence()
+    exc = device_unreachable("192.168.1.42", 22, "OSError: Host is down")
+    assert p.explain(exc, "192.168.1.42").code == "device_unreachable"  # jamais vue : on ne suppose rien
+    p.seen("192.168.1.42")
+    asleep = p.explain(exc, "192.168.1.42")
+    assert asleep.code == "device_asleep" and asleep.status == 503 and "veille" in asleep.message
+    assert p.explain(exc, "192.168.1.43").code == "device_unreachable"  # autre adresse
+    other = AppError("device_auth_failed", "refusé", 502)
+    assert p.explain(other, "192.168.1.42") is other

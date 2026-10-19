@@ -120,6 +120,7 @@ const messages: Messages = {
 
     "hint.backend_unreachable": "Relance le serveur avec la commande uvicorn indiquée dans le README.",
     "hint.device_unreachable": "Vérifie que la console est allumée, en Wi-Fi, et que son adresse IP n'a pas changé (Paramètres).",
+    "hint.device_asleep": "Appuie brièvement sur le bouton marche de la console pour la réveiller : la connexion revient toute seule en quelques secondes.",
     "hint.local_network_blocked": "La console répond, mais macOS interdit au serveur de joindre le réseau local. Ouvre Réglages Système > Confidentialité et sécurité > Réseau local, active l'application qui a lancé le serveur (Terminal, iTerm, VS Code…), puis relance le serveur (Ctrl+C puis ./run.sh).",
     "hint.device_ssh_refused": "La console répond mais refuse SSH : active SSH dans les réglages de la console (Stock OS Mod), ou vérifie le port dans Paramètres.",
     "hint.device_auth_failed": "La console refuse la connexion : l'utilisateur, le mot de passe ou la clé SSH ne correspond pas. Vérifie-les dans Paramètres > Connexion.",
@@ -256,6 +257,7 @@ const messages: Messages = {
     "error.llm_unreachable": "No AI service responds: start Ollama or LM Studio, or check the address (in Docker: http://host.docker.internal:11434/v1).",
     "error.llm_rejected": "The AI service refused the request: check the API key, the model and your credit.",
     "error.device_unreachable": "Console unreachable",
+    "error.device_asleep": "The console is not responding: it is probably asleep (or off). Wake it up: ROMKADE Manager will find it again on its own.",
     "error.device_auth_failed": "The console refused SSH authentication",
     "error.credentials_missing": "No password saved in the keychain",
     "error.host_key_unknown": "The console's key has not been approved yet",
@@ -312,6 +314,7 @@ const messages: Messages = {
 
     "hint.backend_unreachable": "Restart the server with the uvicorn command given in the README.",
     "hint.device_unreachable": "Check that the console is on, on Wi-Fi, and that its IP address has not changed (Settings).",
+    "hint.device_asleep": "Briefly press the console's power button to wake it up: the connection comes back by itself within a few seconds.",
     "hint.local_network_blocked": "The console answers, but macOS forbids the server to reach the local network. Open System Settings > Privacy & Security > Local Network, enable the app that started the server (Terminal, iTerm, VS Code…), then restart the server (Ctrl+C then ./run.sh).",
     "hint.device_ssh_refused": "The console answers but refuses SSH: enable SSH in the console settings (Stock OS Mod), or check the port in Settings.",
     "error.local_network_blocked": "macOS blocks local network access for the Game Manager server",
@@ -450,6 +453,7 @@ const messages: Messages = {
     "error.llm_unreachable": "Ningún servicio de IA responde: abre Ollama o LM Studio, o revisa la dirección (en Docker: http://host.docker.internal:11434/v1).",
     "error.llm_rejected": "El servicio de IA rechazó la petición: revisa la clave de API, el modelo y tu crédito.",
     "error.device_unreachable": "Consola inaccesible",
+    "error.device_asleep": "La consola no responde: probablemente está en reposo (o apagada). Despiértala: ROMKADE Manager la encontrará solo.",
     "error.device_auth_failed": "La consola rechazó la autenticación SSH",
     "error.credentials_missing": "No hay contraseña guardada en el llavero",
     "error.host_key_unknown": "La clave de la consola aún no está aprobada",
@@ -506,6 +510,7 @@ const messages: Messages = {
 
     "hint.backend_unreachable": "Reinicia el servidor con el comando uvicorn indicado en el README.",
     "hint.device_unreachable": "Comprueba que la consola está encendida, con Wi-Fi, y que su dirección IP no ha cambiado (Ajustes).",
+    "hint.device_asleep": "Pulsa brevemente el botón de encendido de la consola para despertarla: la conexión vuelve sola en unos segundos.",
     "hint.local_network_blocked": "La consola responde, pero macOS prohíbe al servidor acceder a la red local. Abre Ajustes del Sistema > Privacidad y seguridad > Red local, activa la aplicación que lanzó el servidor (Terminal, iTerm, VS Code…) y reinicia el servidor (Ctrl+C y luego ./run.sh).",
     "hint.device_ssh_refused": "La consola responde pero rechaza SSH: activa SSH en los ajustes de la consola (Stock OS Mod) o comprueba el puerto en Ajustes.",
     "error.local_network_blocked": "macOS bloquea el acceso a la red local para el servidor de Game Manager",

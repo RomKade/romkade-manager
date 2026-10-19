@@ -17,6 +17,7 @@ from app.db.session import init_db
 from app.device import launcher
 from app.device.pool import DevicePool
 from app.device.ssh_client import DeviceClient, HostKeyStore
+from app.device.presence import Presence
 from app.errors import AppError
 from app.security import LocalOnlyMiddleware
 from app.services.catalog_sync import SyncManager
@@ -107,8 +108,11 @@ def create_app(
         st.sessions, st.sync, st.transfers.idle, st.pool,
         lambda: DeviceClient(st.settings_store.load(), st.credentials, st.host_keys))
 
+    app.state.presence = Presence()
+
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
+        exc = st.presence.explain(exc, st.settings_store.load().host)  # console vue récemment : « en veille »
         return JSONResponse(exc.to_dict(), status_code=exc.status)
 
     @app.exception_handler(Exception)

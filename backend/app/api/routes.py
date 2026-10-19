@@ -136,11 +136,14 @@ async def device_diagnose(request: Request) -> dict:
 @router.get("/device/status", tags=["device"])
 async def device_status(request: Request) -> dict:
     """Ne lève pas d'erreur : renvoie l'état et le code d'erreur éventuel."""
+    st = request.app.state
+    host = st.settings_store.load().host
     try:
-        await request.app.state.pool.run(_client(request), "true", 10)
+        await st.pool.run(_client(request), "true", 10)
+        st.presence.seen(host)
         return {"connected": True, "error": None}
     except errors.AppError as exc:
-        return {"connected": False, "error": exc.to_dict()["error"]}
+        return {"connected": False, "error": st.presence.explain(exc, host).to_dict()["error"]}
 
 
 @router.get("/device/storage", response_model=StorageOut, tags=["device"])
