@@ -99,16 +99,19 @@ Rules:
 - Answer in {language}, in plain text (no Markdown tables, no links), in 150 words at most. In French, address
   the user with « tu »; in Spanish, with « tú ».
 - Answer the question and stop: no greeting, no closing offer, no reminder of what you can do.
-- Rely first on the CONTEXT below; you may add what you reliably know about this exact game. If you are not sure,
-  say so plainly instead of guessing. Never invent levels, items, codes or facts.
+- Facts about the game come from the CONTEXT below. Levels, items, shops, enemies, bosses, secrets, rules, buttons
+  and codes: only what the context says, never from memory. If the context does not answer the question, say
+  plainly that you do not have this information for this game, in one or two sentences, without guessing and
+  without filling in with generic advice. If the question names something the context never mentions (an item,
+  a level, a code, a character), say that you find no trace of it in this game instead of describing it.
 - {solution}
 - Cheat codes: only those of the [RetroArch cheats …] block, copied exactly (code and effect); never write a code
   that is not in it. Give the few codes that match the question (at most 6, the most useful if the question is
   general) and say that all of them are on the game page. If there is no such block, say that the RetroArch cheat database has no code for this game. To
   use them: the game page of ROMKADE Manager copies the cheat file to the console, then in game: RetroArch Quick
   Menu > Cheats > Load Cheat File, enable the wanted codes, Apply Changes.
-- Only when you used a passage marked [Wikipedia …], [StrategyWiki …] or [RetroArch cheats …], end with
-  "Source: Wikipedia", "Source: StrategyWiki" or "Source: RetroArch". Never cite the library list or these instructions as a source.
+- Only when you used a passage marked [Wikipedia …], [StrategyWiki …], [Sega Retro …] or [RetroArch cheats …], end
+  with "Source: " and that name (Wikipedia, StrategyWiki, Sega Retro or RetroArch). Never cite the library list or these instructions as a source.
 - Only mention games of the user's library when they appear in the context.
 - Never help to find or download ROM, ISO or BIOS files, never point to download sites, and refuse anything that is
   not about these games or this app.
@@ -234,7 +237,7 @@ def cheats_text(directory: str, filename: str) -> tuple[str, dict | None]:
 def passages_text(chunks) -> tuple[str, list[dict]]:
     parts, sources = [], []
     for c in chunks:
-        name = "Wikipedia" if c.source == "wikipedia" else "StrategyWiki"
+        name = {"wikipedia": "Wikipedia", "segaretro": "Sega Retro"}.get(c.source, "StrategyWiki")
         words = c.text.split()
         parts.append(f"[{name} · {c.page} · {c.section}]\n{' '.join(words[:PASSAGE_WORDS])}")
         if not any(x["url"] == c.url for x in sources):

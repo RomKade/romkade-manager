@@ -250,7 +250,7 @@ function Message({ m, game, onOpenGame, onSettle }: {
         <span className="assistant__sources">
           {m.sources!.map((s) => (
             <a key={s.url} href={s.url} target="_blank" rel="noreferrer noopener">
-              {s.source === "wikipedia" ? "Wikipédia" : s.source === "retroarch" ? "RetroArch" : "StrategyWiki"} · {s.license} <ExternalLink size={11} aria-hidden />
+              {({ wikipedia: "Wikipédia", retroarch: "RetroArch", segaretro: "Sega Retro" } as Record<string, string>)[s.source] ?? "StrategyWiki"} · {s.license} <ExternalLink size={11} aria-hidden />
             </a>
           ))}
         </span>
