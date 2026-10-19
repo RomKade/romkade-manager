@@ -10,6 +10,7 @@ import { Cover } from "./Cover";
 import { Flag } from "./Flag";
 import { GameSheet } from "./GameSheet";
 import { QuickSearch } from "./QuickSearch";
+import { ScreenshotButton } from "./Screenshots";
 import { errorMessage } from "./ui";
 import { VolumeControl } from "./VolumeControl";
 
@@ -83,6 +84,7 @@ function NowPlayingChip({ onOpen }: { onOpen: (id: number) => void }) {
       </div>
       <div className="now-chip__controls">
         <VolumeControl online={online} compact />
+        {now.game && <ScreenshotButton variant="chip" />}
         {now.process === "retroarch" && (
           <button type="button" className="now-chip__stop" onClick={() => quit.mutate()} disabled={quit.isPending}>
             <Square size={12} fill="currentColor" aria-hidden /> {quit.isPending ? t("common.device.quitting") : t("common.device.quit")}

@@ -5,11 +5,13 @@ import { imageUrl } from "../api/client";
 import { useCaps, useNowPlaying, useQuitGame, useSaveStateNow } from "../api/queries";
 import { useT } from "../i18n";
 import { ConsoleBadge } from "./ConsoleBadge";
+import { ScreenshotButton } from "./Screenshots";
 import { Cover } from "./Cover";
 import { VolumeControl } from "./VolumeControl";
 import { errorMessage } from "./ui";
 
-/** Tableau de bord : le jeu qui tourne sur la console, avec « Sauvegarder maintenant » et « Quitter le jeu ». */
+/** Tableau de bord : le jeu qui tourne sur la console, avec « Sauvegarder maintenant », « Quitter le jeu » et
+ * « Capture d'écran ». */
 export function NowPlayingCard({ online, onOpen }: { online: boolean; onOpen?: (id: number) => void }) {
   const t = useT();
   const now = useNowPlaying(online).data;
@@ -53,6 +55,7 @@ export function NowPlayingCard({ online, onOpen }: { online: boolean; onOpen?: (
             </button>
           )}
           {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("dashboard.saved")}</span>}
+          {now.game && <ScreenshotButton />}
         </div>
         {!((ra || !caps.resume_slot) && caps.quit) && <p className="muted">{t("dashboard.quitOnConsole")}</p>}
         {(save.isError || quit.isError) && <p className="text-error">{errorMessage(save.error ?? quit.error)}</p>}

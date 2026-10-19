@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import assistant, bluetooth, catalog, cheats, controls, descriptions, knowledge, llm, play, players, playtime, saves, system, transfers, videos, volume
+from app.api import assistant, bluetooth, catalog, cheats, controls, descriptions, knowledge, llm, play, players, playtime, saves, screenshots, system, transfers, videos, volume
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
 from app.credentials import CredentialStore, default_store
@@ -33,6 +33,7 @@ from app.services.search import SearchService
 from app.device.systems import SystemService
 from app.services.catalog_watch import CatalogWatcher
 from app.services.save_vault import SaveVault
+from app.services.screenshots import ScreenshotStore
 from app.services.staging import StagingStore
 from app.services.transfers import TransferManager
 
@@ -81,6 +82,7 @@ def create_app(
     app.state.pool = DevicePool()
     # Copies des sauvegardes sur le Mac (à côté du cache en test, dans le dossier de données sinon).
     app.state.save_vault = SaveVault((cache_dir.parent if cache_dir else base) / "save-backups")
+    app.state.screenshots = ScreenshotStore((cache_dir.parent if cache_dir else base) / "screenshots")
     # Commandes sur la console, sur la connexion SSH partagée du pool (une poignée de main SSH coûte ~0,5 s sur la
     # console ; les tests remplacent ce runner).
     app.state.device_runner = lambda client, command, timeout=20: app.state.pool.run(client, command, timeout)
@@ -139,6 +141,7 @@ def create_app(
     app.include_router(videos.router)
     app.include_router(play.router)
     app.include_router(saves.router)
+    app.include_router(screenshots.router)
     app.include_router(bluetooth.router)
     app.include_router(players.router)
     app.include_router(volume.router)

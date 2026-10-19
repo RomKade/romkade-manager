@@ -1,4 +1,4 @@
-import { Bluetooth, BookOpen, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
+import { Bluetooth, BookOpen, Camera, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 
 import { isActive, useCaps, useDeviceStatus, useSettings, useStatus, useSystem, useTransfers } from "../api/queries";
@@ -18,6 +18,7 @@ const NAV = [
   { to: "/ajouter-des-jeux", label: "common.nav.transfers", icon: HardDriveUpload },
   { to: "/temps-de-jeu", label: "common.nav.playtime", icon: Hourglass },
   { to: "/sauvegardes", label: "common.nav.saves", icon: Save },
+  { to: "/captures", label: "common.nav.screenshots", icon: Camera },
   { to: "/manettes", label: "common.nav.players", icon: Gamepad2 },
   { to: "/bluetooth", label: "common.nav.bluetooth", icon: Bluetooth },
   { to: "/synchronisation", label: "common.nav.sync", icon: RefreshCw },

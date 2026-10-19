@@ -130,6 +130,21 @@ export function useSaveStateNow() {
   return useMutation({ mutationFn: api.saveStateNow });
 }
 
+/** Captures d'écran des jeux, gardées sur le Mac (toutes, ou celles d'un jeu). */
+export const useScreenshots = () => useQuery({ queryKey: ["screenshots"], queryFn: api.screenshots });
+export const useGameScreenshots = (id: number) =>
+  useQuery({ queryKey: ["screenshots", id], queryFn: () => api.gameScreenshots(id) });
+
+export function useTakeScreenshot() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.takeScreenshot, onSuccess: () => qc.invalidateQueries({ queryKey: ["screenshots"] }) });
+}
+
+export function useDeleteScreenshot() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteScreenshot, onSuccess: () => qc.invalidateQueries({ queryKey: ["screenshots"] }) });
+}
+
 /** Sauvegardes de la carte : une lecture SFTP de quelques dossiers, relancée à la demande. */
 export const useSaves = (enabled = true) =>
   useQuery({ queryKey: ["saves"], queryFn: api.saves, enabled, staleTime: 60_000, retry: false });
@@ -262,6 +277,7 @@ export const useSystems = () => useQuery({ queryKey: ["systems"], queryFn: api.s
 const ALL_CAPS: Capabilities = {
   launch: true, resume_slot: true, quit: true, save_state: true, now_playing: true, saves: true,
   retroarch_logs: true, bluetooth: true, bluetooth_audio: true, players: true, volume: true, on_screen_message: true, clock: true,
+  screenshot: true,
 };
 /** Fonctions disponibles. Tant que le système n'est pas connu, tout reste affiché (le serveur refuse proprement). */
 export const useCaps = (): Capabilities => useSystem().data?.capabilities ?? ALL_CAPS;

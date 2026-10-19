@@ -65,6 +65,9 @@ function llmStatus() {
 }
 let systemCaps: Record<string, boolean> | null = null; // null : système inconnu (tout reste affiché)
 let volume = { percent: 60, muted: false };
+// Captures d'écran gardées sur le Mac (deux pour Super Mario World), supprimées par DELETE.
+const shot = (name: string) => ({ name, taken_at: "2026-10-19T20:30:00Z", size: 1000, url: `/api/screenshots/1/${name}` });
+let shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
 let playAlerts: { id: number; created_at: string; minutes: number; scope: string; game_title: string }[] = [];
 
 function mockFetch() {
@@ -129,6 +132,16 @@ function mockFetch() {
       sessions: [{ id: 1, title: "Super Mario World", platform: "SFC", game: game(1, "Super Mario World"),
         started_at: "2026-10-16T08:00:00Z", ended_at: "2026-10-16T10:00:00Z", seconds: 7200 }],
     });
+    if (url === "/api/device/screenshot") {
+      shots = [shot("20261019-210000.png"), ...shots];
+      return json({ game_id: 1, title: "Super Mario World", shot: shots[0] });
+    }
+    if (url.startsWith("/api/screenshots/") && init?.method === "DELETE") {
+      shots = shots.filter((s) => s.url !== url);
+      return new Response(null, { status: 204 });
+    }
+    if (url === "/api/screenshots") return json(shots.length ? [{ game_id: 1, title: "Super Mario World", platform_code: "SFC", platform_label: "Super Nintendo", shots }] : []);
+    if (url === "/api/games/1/screenshots") return json(shots);
     if (url.startsWith("/api/device/now-playing")) return json(playingId
       ? { playing: true, process: "retroarch", rom_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc", menu: false, game: game(playingId, "Super Mario World") }
       : { playing: false, process: null, rom_path: null, menu: true, game: null });
@@ -283,6 +296,7 @@ beforeEach(() => {
   bodies = [];
   deviceOnline = true;
   playingId = null;
+  shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
   favoriteIds = [];
   hostKeyTrusted = true;
   assistantBodies = [];
@@ -1033,6 +1047,52 @@ describe("Bluetooth", () => {
     await userEvent.click(within(speaker).getByRole("button", { name: /Envoyer le son des jeux sur cet appareil/ }));
     await waitFor(() => expect(bodies.at(-1)).toMatchObject({ url: "/api/bluetooth/audio-output" }));
     expect(screen.queryByText(/était déjà lancé/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Captures d'écran", () => {
+  it("prend une capture du jeu en cours depuis le tableau de bord, puis mène à ses captures", async () => {
+    playingId = 1;
+    renderAt("/");
+    await userEvent.click(await screen.findByRole("button", { name: /Capture d'écran/ }));
+    const done = await screen.findByRole("link", { name: /Capture enregistrée/ });
+    expect(calls).toContain("/api/device/screenshot");
+    await userEvent.click(done);
+    const game = await screen.findByRole("region", { name: /Super Mario World/ });
+    expect(within(game).getAllByRole("img")).toHaveLength(3);
+    expect(within(game).getByText("3 captures")).toBeInTheDocument();
+  });
+
+  it("prend une capture depuis le jeu en cours de la barre du haut, sur les autres pages", async () => {
+    playingId = 1;
+    renderAt("/bluetooth");
+    const chip = await screen.findByRole("status", { name: "En cours sur la console" });
+    await userEvent.click(await within(chip).findByRole("button", { name: /Capture d'écran/ }));
+    expect(await within(chip).findByRole("link", { name: /Capture enregistrée/ })).toBeInTheDocument();
+    expect(calls).toContain("/api/device/screenshot");
+  });
+
+  it("liste les captures par jeu et en supprime une", async () => {
+    renderAt("/captures");
+    const game = await screen.findByRole("region", { name: /Super Mario World/ });
+    expect(within(game).getAllByRole("img")).toHaveLength(2);
+    await userEvent.click(within(game).getAllByRole("button", { name: "Supprimer la capture" })[0]!);
+    await waitFor(() => expect(within(game).getAllByRole("img")).toHaveLength(1));
+    expect(within(game).getByText("1 capture")).toBeInTheDocument();
+  });
+
+  it("sans capture, explique comment en prendre ; la section est dans le menu", async () => {
+    shots = [];
+    renderAt("/captures");
+    expect(await screen.findByText("Pas encore de capture")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Captures" })).toBeInTheDocument();
+  });
+
+  it("la fiche du jeu montre ses captures", async () => {
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const section = await within(await screen.findByRole("dialog")).findByRole("region", { name: "Mes captures" });
+    expect(within(section).getAllByRole("img")).toHaveLength(2);
   });
 });
 

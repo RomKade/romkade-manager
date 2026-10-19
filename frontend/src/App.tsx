@@ -19,6 +19,7 @@ import { BluetoothPage } from "./pages/Bluetooth";
 import { ControllersPage } from "./pages/Controllers";
 import { PlaytimePage } from "./pages/Playtime";
 import { SavesPage } from "./pages/Saves";
+import { ScreenshotsPage } from "./pages/Screenshots";
 import { SettingsPage } from "./pages/Settings";
 import { SyncPage } from "./pages/Sync";
 import { TermsPage } from "./pages/Terms";
@@ -94,6 +95,7 @@ export function AppRoutes() {
         <Route path="transferts" element={<Navigate to="/ajouter-des-jeux" replace />} />
         <Route path="synchronisation" element={<SyncPage />} />
         <Route path="sauvegardes" element={<SavesPage />} />
+        <Route path="captures" element={<ScreenshotsPage />} />
         <Route path="manettes" element={<ControllersPage />} />
         <Route path="bluetooth" element={<BluetoothPage />} />
         <Route path="temps-de-jeu" element={<PlaytimePage />} />

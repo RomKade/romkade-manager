@@ -17,6 +17,7 @@ import { GameCheatsSection } from "./GameCheats";
 import { GameControlsSection } from "./GameControls";
 import { GameInfo } from "./GameInfo";
 import { GameGallery } from "./GameGallery";
+import { GameScreenshots, ScreenshotButton } from "./Screenshots";
 import { PlaySaveButton } from "./PlaySaveButton";
 import { TrailerButton, YoutubeIcon } from "./Trailer";
 import { ErrorNotice, Spinner } from "./ui";
@@ -111,6 +112,7 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
 
       {game.role === "candidate" && <GameControlsSection id={game.id} />}
       {game.role === "candidate" && <GameCheatsSection id={game.id} />}
+      <GameScreenshots id={game.id} title={game.title} />
 
       <dl className="facts">
         {game.full_title && <div className="facts__wide"><dt>{t("sheet.fullTitle")}</dt><dd>{game.full_title}</dd></div>}
@@ -268,7 +270,7 @@ function GameSaves({ id }: { id: number }) {
   );
 }
 
-/** Bandeau « En cours sur la console » quand ce jeu tourne, avec Sauvegarder, Quitter et le volume. */
+/** Bandeau « En cours sur la console » quand ce jeu tourne, avec Sauvegarder, Quitter, Capture d'écran et le volume. */
 function PlayingBanner({ gameId }: { gameId: number }) {
   const t = useT();
   const online = useDeviceStatus().data?.connected === true;
@@ -282,16 +284,17 @@ function PlayingBanner({ gameId }: { gameId: number }) {
     <div className="playing-banner" role="status">
       <span className="led led--live" aria-hidden />
       <strong>{t("dashboard.nowPlaying")}</strong>
-      {(ra || !caps.resume_slot) && caps.quit && (
-        <span className="playing-banner__actions">
+      <span className="playing-banner__actions">
+        {(ra || !caps.resume_slot) && caps.quit && <>
           {ra && caps.save_state && <button type="button" className="button button--small" onClick={() => save.mutate()} disabled={save.isPending}>
             <Save size={14} aria-hidden /> {save.isSuccess ? t("dashboard.saved") : t("dashboard.saveNow")}
           </button>}
           <button type="button" className="button button--small button--danger" onClick={() => quit.mutate()} disabled={quit.isPending}>
             <Square size={14} fill="currentColor" aria-hidden /> {t("common.device.quit")}
           </button>
-        </span>
-      )}
+        </>}
+        <ScreenshotButton variant="small" />
+      </span>
       <div className="playing-banner__volume"><VolumeControl online={online} /></div>
     </div>
   );
