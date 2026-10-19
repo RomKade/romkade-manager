@@ -1,0 +1,11 @@
+
+# ROMKADE Cloud (MCP pour ChatGPT/Claude + relais des consoles) - conteneur romkade-cloud.
+mcp.romkade.com {
+  encode zstd gzip
+  request_body {
+    max_size 16MB
+  }
+  reverse_proxy romkade-cloud:8787 {
+    flush_interval -1
+  }
+}

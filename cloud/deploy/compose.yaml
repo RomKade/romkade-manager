@@ -1,5 +1,5 @@
 # ROMKADE Cloud sur la droplet : joint le réseau du Caddy commun (licenses_web), aucun port publié.
-# Caddy (bloc www.likyly.com) : handle_path /romkade/* -> romkade-cloud:8787 (voir caddy.snippet).
+# Caddy : site mcp.romkade.com -> romkade-cloud:8787 (caddy.site) ; ancienne route www.likyly.com/romkade (caddy.snippet).
 services:
   romkade-cloud:
     container_name: romkade-cloud
@@ -9,7 +9,9 @@ services:
       dockerfile: cloud/deploy/Dockerfile
     restart: unless-stopped
     environment:
-      ROMKADE_PUBLIC_URL: ${ROMKADE_PUBLIC_URL:-https://www.likyly.com/romkade}
+      ROMKADE_PUBLIC_URL: ${ROMKADE_PUBLIC_URL:-https://mcp.romkade.com}
+      # Ancienne adresse (www.likyly.com/romkade), acceptée le temps que les connecteurs et les consoles basculent.
+      ROMKADE_ALLOWED_HOSTS: ${ROMKADE_ALLOWED_HOSTS:-www.likyly.com}
     volumes:
       - romkade_data:/data
     networks: [licenses_web]

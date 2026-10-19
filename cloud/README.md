@@ -45,7 +45,7 @@ Python 3.10+ de la console, bibliothèque standard seule. Il embarque les module
 actions nommées (`status`, `launch`, `quit`, `save_state`, `volume`, `rescan`), jamais de commande libre.
 
 ```sh
-cd cloud/agent && ./build.sh https://adresse-du-cloud   # -> dist/sd, à copier à la racine de la carte SD
+cd cloud/agent && ./build.sh https://mcp.romkade.com   # -> dist/sd, à copier à la racine de la carte SD
 ```
 
 Sur la console : menu **APPS → ROMKADE**. L'écran ROMKADE (`screen.py`, Pillow écrit dans `/dev/fb0` comme l'app
@@ -58,20 +58,19 @@ fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, s
 
 ## Déploiement (droplet)
 
-En ligne sur **https://www.likyly.com/romkade/** (connecteur : `https://www.likyly.com/romkade/mcp/<jeton>`).
+En ligne sur **https://mcp.romkade.com** (connecteur : `https://mcp.romkade.com/mcp/<jeton>`). DNS : entrée A
+`mcp` de la zone romkade.com (OVH) vers la droplet ; le site romkade.com reste sur l'hébergement OVH.
 
 - `deploy/Dockerfile`, `deploy/compose.yaml` : conteneur `romkade-cloud`, sans port publié, sur le réseau
   `licenses_web` du Caddy commun de la droplet ; données (base, cheats, jaquettes) dans le volume
   `deploy_romkade_data`.
 - `deploy/deploy.sh` : envoie les sources (hôte SSH `do-deployer`, dossier `~/app/romkade-cloud`) et reconstruit.
-- `deploy/caddy.snippet` : route ajoutée au bloc `www.likyly.com` du Caddyfile commun
-  (`~/app/licenses/caddy/Caddyfile`, image `caddy-edge`) ; le préfixe `/romkade` est retiré avant le serveur.
+- `deploy/caddy.site` : site `mcp.romkade.com` du Caddyfile commun (`~/app/licenses/caddy/Caddyfile`, image
+  `caddy-edge`), certificat Let's Encrypt automatique. `deploy/caddy.snippet` : ancienne route
+  `www.likyly.com/romkade/*`, gardée le temps de la bascule (à retirer ensuite, avec `ROMKADE_ALLOWED_HOSTS`).
   Le Caddyfile sert aussi d'autres sites (xp-flightdeck, licences, datatoform…) : sauvegarde, `caddy validate`,
   puis `caddy reload` à chaud. Le disque système de la droplet est presque plein ; Docker est sur
   `/mnt/volume_add_1`.
-
-Pas de sous-domaine pour l'instant (romkade.com est sur l'hébergement mutualisé OVH du site). Un domaine à nous
-(`mcp.romkade.com` ou autre) sera nécessaire pour les annuaires ChatGPT et Claude.
 
 ## Licence
 
