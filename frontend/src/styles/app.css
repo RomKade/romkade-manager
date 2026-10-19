@@ -1327,7 +1327,8 @@ kbd {
 .knowledge__results { list-style: none; padding: 0; }
 .knowledge__game { display: flex; flex-direction: column; gap: 10px; }
 .knowledge__ask { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
-.knowledge__ask .field { flex: 1 1 280px; }
+.knowledge__ask .field { flex: 0 1 440px; }
+.knowledge__ask .button { align-self: flex-end; flex: none; min-height: 40px; }
 .knowledge__hits li { display: flex; flex-direction: column; gap: 2px; }
 .knowledge__hit-head { margin: 0; }
 
