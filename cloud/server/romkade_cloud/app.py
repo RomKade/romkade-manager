@@ -1,6 +1,7 @@
 """Serveur cloud ROMKADE : MCP pour les assistants (ChatGPT, Claude…) et relais pour les agents des consoles.
 
-    /mcp/<jeton du compte>   MCP (Streamable HTTP). Prototype : le jeton dans l'adresse tient lieu de connexion ;
+    /<jeton du compte>       MCP (Streamable HTTP), ex. https://mcp.romkade.com/<jeton>. Prototype : le jeton dans
+                             l'adresse tient lieu de connexion ;
                              la V1 passera à OAuth (comptes ROMKADE), exigé par les annuaires d'apps.
     /agent/hello             l'agent se présente (et reçoit son secret et un code d'appairage la première fois)
     /agent/catalog           l'agent envoie la liste des fichiers de son dossier de ROMs
@@ -40,15 +41,16 @@ log = logging.getLogger("romkade.cloud")
 STATIC = Path(__file__).parent / "static"
 PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp"}
 MAX_BODY = 8 * 1024 * 1024
-TOKEN_PATH = re.compile(r"^/mcp/([A-Za-z0-9_-]{20,})/?$")
+# Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée.
+TOKEN_PATH = re.compile(r"^/(?:mcp/)?([A-Za-z0-9_-]{32,})/?$")
 WEB_CLIENTS = ["https://claude.ai", "https://chatgpt.com", "https://chat.openai.com", "https://www.perplexity.ai",
                "https://playground.ai.cloudflare.com"]
 AGENT_FIELDS = ("agent_version", "hostname", "model", "firmware", "profile", "os_name", "roms_root", "capabilities")
 
 
 class AccountPath:
-    """/mcp/<jeton> -> /mcp, avec le compte du jeton dans la requête (scope « romkade.account »).
-    Jeton inconnu ou /mcp sans jeton : 404, sans dire pourquoi."""
+    """/<jeton> -> point d'entrée MCP interne (/mcp), avec le compte du jeton dans la requête (« romkade.account »).
+    Jeton inconnu, ou /mcp appelé directement : 404, sans dire pourquoi."""
 
     def __init__(self, app, store: Store):
         self.app, self.store = app, store
@@ -57,8 +59,8 @@ class AccountPath:
         if scope["type"] == "http":
             scope.pop("romkade.account", None)
             path = scope["path"]
-            if path == "/mcp" or path.startswith("/mcp/"):
-                m = TOKEN_PATH.match(path)
+            m = TOKEN_PATH.match(path)
+            if m or path == "/mcp" or path.startswith("/mcp/"):
                 account = self.store.account_for_token(m.group(1)) if m else None
                 if account is None:
                     await JSONResponse({"error": "not_found"}, 404)(scope, receive, send)

@@ -20,7 +20,7 @@ def main() -> None:
     if args.cmd == "new-account":
         _, token = Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3")).create_account(args.label)
         base = os.environ.get("ROMKADE_PUBLIC_URL", "http://127.0.0.1:8787").rstrip("/")
-        print(f"{base}/mcp/{token}")
+        print(f"{base}/{token}")
         return
 
     import uvicorn

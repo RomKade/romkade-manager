@@ -35,7 +35,7 @@ ROMKADE_PUBLIC_URL=https://… .venv/bin/python -m romkade_cloud new-account "Mo
 ROMKADE_PUBLIC_URL=https://… .venv/bin/python -m romkade_cloud serve --port 8787
 ```
 
-Prototype : le jeton dans l'adresse `/mcp/<jeton>` tient lieu de connexion. À remplacer par OAuth (comptes
+Prototype : le jeton dans l'adresse (`https://mcp.romkade.com/<jeton>`) tient lieu de connexion. À remplacer par OAuth (comptes
 ROMKADE) avant toute ouverture au public : c'est aussi ce qu'exigent les annuaires d'apps ChatGPT et Claude.
 
 ## Agent (`agent/`)
@@ -58,7 +58,7 @@ fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, s
 
 ## Déploiement (droplet)
 
-En ligne sur **https://mcp.romkade.com** (connecteur : `https://mcp.romkade.com/mcp/<jeton>`). DNS : entrée A
+En ligne sur **https://mcp.romkade.com** (connecteur : `https://mcp.romkade.com/<jeton>`). DNS : entrée A
 `mcp` de la zone romkade.com (OVH) vers la droplet ; le site romkade.com reste sur l'hébergement OVH.
 
 - `deploy/Dockerfile`, `deploy/compose.yaml` : conteneur `romkade-cloud`, sans port publié, sur le réseau
@@ -66,8 +66,7 @@ En ligne sur **https://mcp.romkade.com** (connecteur : `https://mcp.romkade.com/
   `deploy_romkade_data`.
 - `deploy/deploy.sh` : envoie les sources (hôte SSH `do-deployer`, dossier `~/app/romkade-cloud`) et reconstruit.
 - `deploy/caddy.site` : site `mcp.romkade.com` du Caddyfile commun (`~/app/licenses/caddy/Caddyfile`, image
-  `caddy-edge`), certificat Let's Encrypt automatique. `deploy/caddy.snippet` : ancienne route
-  `www.likyly.com/romkade/*`, gardée le temps de la bascule (à retirer ensuite, avec `ROMKADE_ALLOWED_HOSTS`).
+  `caddy-edge`), certificat Let's Encrypt automatique.
   Le Caddyfile sert aussi d'autres sites (xp-flightdeck, licences, datatoform…) : sauvegarde, `caddy validate`,
   puis `caddy reload` à chaud. Le disque système de la droplet est presque plein ; Docker est sur
   `/mnt/volume_add_1`.

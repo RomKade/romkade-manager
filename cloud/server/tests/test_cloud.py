@@ -137,7 +137,7 @@ def test_pairing_catalog_cheats_and_play(env):
             assert (await agent.upload(FILES))["games"] == 5  # ni image, ni sauvegarde, ni piste du .m3u, ni app
             loop = asyncio.create_task(agent.serve())
 
-            async with Client(f"{base}/mcp/{token}") as mcp:
+            async with Client(f"{base}/{token}") as mcp:
                 assert mcp.server_info.title == "ROMKADE"
                 tools = (await mcp.list_tools()).tools
                 assert {"pair_console", "search_games", "game_details", "launch_game", "get_cheats",
@@ -200,6 +200,7 @@ def test_pairing_catalog_cheats_and_play(env):
                 assert (await h.get(f"{base}/app.py")).status_code == 404
                 assert (await h.post(f"{base}/mcp/{'x' * 30}", json={})).status_code == 404
                 assert (await h.post(f"{base}/mcp", json={})).status_code == 404
+                assert (await h.post(f"{base}/{'y' * 43}", json={})).status_code == 404
                 assert (await h.get(f"{base}/agent/poll", headers={"Authorization": "Bearer nope"})).status_code == 401
 
             # Une fois appairée, la console ne reçoit plus de code.
@@ -222,7 +223,7 @@ def test_console_offline_is_reported_as_asleep(env):
         try:
             code = (await agent.hello())["pairing_code"]
             await agent.upload(FILES)
-            async with Client(f"{base}/mcp/{token}") as mcp:
+            async with Client(f"{base}/{token}") as mcp:
                 data(await mcp.call_tool("pair_console", {"code": code}))
                 # Jamais venue chercher d'ordre : hors ligne. Le catalogue reste consultable.
                 assert "veille" in error_text(await mcp.call_tool("console_status", {}))
