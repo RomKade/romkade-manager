@@ -20,13 +20,17 @@ export function ScreenshotButton({ variant }: { variant?: "small" | "chip" }) {
   const className = variant === "chip" ? "now-chip__btn" : `button ${variant === "small" ? "button--small" : ""}`;
   return (
     <>
-      <button type="button" className={className} onClick={() => take.mutate()} disabled={take.isPending}>
-        <Camera size={size} aria-hidden /> {take.isPending ? t("screenshots.taking") : t("screenshots.take")}
+      {/* Bandeau étroit de la fiche : libellés courts, le libellé complet reste le nom du bouton et l'infobulle */}
+      <button type="button" className={className} onClick={() => take.mutate()} disabled={take.isPending}
+        {...(variant === "small" ? { "aria-label": t("screenshots.take"), title: t("screenshots.take") } : {})}>
+        <Camera size={size} aria-hidden />{" "}
+        {take.isPending ? t("screenshots.taking") : variant === "small" ? t("screenshots.takeShort") : t("screenshots.take")}
       </button>
       {take.isSuccess && (
         <span role="status">
-          <Link className="ok-text" to={`/captures?game=${take.data.game_id}`}>
-            <CheckCircle2 size={size} aria-hidden /> {t("screenshots.taken")}
+          <Link className="ok-text" to={`/captures?game=${take.data.game_id}`}
+            {...(variant === "small" ? { "aria-label": t("screenshots.taken"), title: t("screenshots.taken") } : {})}>
+            <CheckCircle2 size={size} aria-hidden />{variant !== "small" && ` ${t("screenshots.taken")}`}
           </Link>
         </span>
       )}

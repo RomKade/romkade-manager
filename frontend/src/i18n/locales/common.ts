@@ -44,6 +44,7 @@ const messages: Messages = {
     "device.playing": "En cours :",
     "device.live": "En cours sur la console",
     "device.quit": "Quitter le jeu",
+    "device.quitShort": "Quitter",
     "device.quitting": "Fermeture…",
 
     "unit.b": "o", "unit.kb": "Ko", "unit.mb": "Mo", "unit.gb": "Go", "unit.tb": "To",
@@ -175,6 +176,7 @@ const messages: Messages = {
     "device.playing": "Now playing:",
     "device.live": "Now playing on the console",
     "device.quit": "Quit game",
+    "device.quitShort": "Quit",
     "device.quitting": "Closing…",
 
     "unit.b": "B", "unit.kb": "KB", "unit.mb": "MB", "unit.gb": "GB", "unit.tb": "TB",
@@ -372,6 +374,7 @@ const messages: Messages = {
     "device.playing": "Jugando:",
     "device.live": "Jugando en la consola",
     "device.quit": "Salir del juego",
+    "device.quitShort": "Salir",
     "device.quitting": "Cerrando…",
 
     "unit.b": "B", "unit.kb": "KB", "unit.mb": "MB", "unit.gb": "GB", "unit.tb": "TB",

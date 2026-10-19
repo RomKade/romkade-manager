@@ -286,11 +286,13 @@ function PlayingBanner({ gameId }: { gameId: number }) {
       <strong>{t("dashboard.nowPlaying")}</strong>
       <span className="playing-banner__actions">
         {(ra || !caps.resume_slot) && caps.quit && <>
-          {ra && caps.save_state && <button type="button" className="button button--small" onClick={() => save.mutate()} disabled={save.isPending}>
-            <Save size={14} aria-hidden /> {save.isSuccess ? t("dashboard.saved") : t("dashboard.saveNow")}
+          {ra && caps.save_state && <button type="button" className="button button--small" onClick={() => save.mutate()} disabled={save.isPending}
+            aria-label={save.isSuccess ? t("dashboard.saved") : t("dashboard.saveNow")} title={t("dashboard.saveNow")}>
+            <Save size={14} aria-hidden /> {save.isSuccess ? t("dashboard.savedShort") : t("dashboard.saveShort")}
           </button>}
-          <button type="button" className="button button--small button--danger" onClick={() => quit.mutate()} disabled={quit.isPending}>
-            <Square size={14} fill="currentColor" aria-hidden /> {t("common.device.quit")}
+          <button type="button" className="button button--small button--danger" onClick={() => quit.mutate()} disabled={quit.isPending}
+            aria-label={t("common.device.quit")} title={t("common.device.quit")}>
+            <Square size={14} fill="currentColor" aria-hidden /> {t("common.device.quitShort")}
           </button>
         </>}
         <ScreenshotButton variant="small" />
