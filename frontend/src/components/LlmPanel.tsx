@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Bot, Cloud, ExternalLink, HardDrive, Loader2, PlugZap, RefreshCw } from "lucide-react";
+import { BookOpen, Cloud, ExternalLink, HardDrive, Loader2, PlugZap, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -78,7 +78,6 @@ function LlmForm({ settings }: { settings: LlmSettings }) {
 
   return (
     <>
-      <StatusCard settings={settings} checking={checking} onDisconnect={() => { setKind(null); save.mutate({ provider: null }); }} />
       {test.isError && settings.state !== "error" && <ErrorNotice error={test.error} />}
 
       <StepCards label={t("settings.ai.steps.label")} steps={[
@@ -148,7 +147,14 @@ function LlmForm({ settings }: { settings: LlmSettings }) {
           </button>
           {!settings.ready && <span className="muted">{t("settings.ai.steps.testNeedsStep2")}</span>}
         </div>
-        <StatusLine settings={settings} checking={checking} />
+        <div className="llm-status__row">
+          <StatusLine settings={settings} checking={checking} />
+          {settings.provider && (
+            <button type="button" className="link-button" onClick={() => { setKind(null); save.mutate({ provider: null }); }}>
+              {t("settings.ai.disconnect")}
+            </button>
+          )}
+        </div>
       </section>
 
       <NameAndDisplay />
@@ -185,24 +191,6 @@ function StatusLine({ settings, checking }: { settings: LlmSettings; checking: b
         {detail && <p className="muted">{detail}</p>}
       </div>
     </div>
-  );
-}
-
-/** En-tête de l'onglet, en une ligne : ce que fait l'assistant, et son état de connexion. */
-function StatusCard({ settings, checking, onDisconnect }: { settings: LlmSettings; checking: boolean; onDisconnect: () => void }) {
-  const t = useT();
-  const { name } = useAssistant();
-  return (
-    <section className="block llm llm-head" aria-labelledby="llm-h">
-      <h2 id="llm-h" className="llm-head__title"><Bot size={18} aria-hidden /> {name}{" "}
-        <span className="llm-head__lead">{t("settings.as.short")}</span></h2>
-      <div className="llm-status__row">
-        <StatusLine settings={settings} checking={checking} />
-        {settings.provider && (
-          <button type="button" className="link-button" onClick={onDisconnect}>{t("settings.ai.disconnect")}</button>
-        )}
-      </div>
-    </section>
   );
 }
 

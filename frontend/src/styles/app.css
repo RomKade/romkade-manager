@@ -1439,11 +1439,6 @@ kbd {
 .assistant__title { flex-wrap: wrap; }
 .assistant__subtitle { color: var(--ink-3); font-weight: 600; font-size: 0.7rem; letter-spacing: 0.04em; }
 
-/* Paramètres > Assistant IA : en-tête en une ligne */
-.llm-head { gap: 8px; }
-.llm-head__title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font-size: var(--fs-lg); }
-.llm-head__title svg { align-self: center; color: var(--accent); }
-.llm-head__lead { font-family: var(--font-text, inherit); font-size: var(--fs-sm); font-weight: 500; color: var(--ink-2); }
 
 /* Connaissances > Descriptions, un seul jeu : proposition de l'IA à valider */
 .desc-one__draft { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-control); border: 1px dashed var(--line-strong); }

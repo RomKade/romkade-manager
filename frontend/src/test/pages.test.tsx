@@ -490,11 +490,11 @@ describe("Nouvelle console : clé à approuver", () => {
 });
 
 describe("Paramètres : assistant et connaissances", () => {
-  it("onglet Assistant IA : une ligne (rôle et état), les trois étapes, puis le prénom (Duke, modifiable) et l'affichage", async () => {
+  it("onglet Assistant IA : les trois étapes d'abord (état et déconnexion à l'étape 3), puis le prénom (Duke, modifiable) et l'affichage", async () => {
     renderAt("/parametres/ia");
     expect(await screen.findByRole("link", { name: /^Assistant IA/ })).toHaveAttribute("aria-current", "page");
     const headings = (await screen.findAllByRole("heading", { level: 2 })).map((h) => h.textContent ?? "");
-    const order = ["Duke répond à tes questions", "Type d'IA", "Connexion et modèle", "Tester la connexion", "Prénom et affichage"].map((x) => headings.findIndex((h) => h.includes(x)));
+    const order = ["Type d'IA", "Connexion et modèle", "Tester la connexion", "Prénom et affichage"].map((x) => headings.findIndex((h) => h.includes(x)));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     const steps = screen.getByRole("navigation", { name: "Mise en route de l'assistant IA" });
