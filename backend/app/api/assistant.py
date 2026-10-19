@@ -138,6 +138,8 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
             with st.sessions() as s:
                 f = cq.get_file(s, target.id)
                 chunks = kn.best_chunks(s, f.platform_id, f.normalized_title, search_text, asst.PASSAGES, ids)
+                if extra := kn.version_chunk(s, f.platform_id, f.normalized_title, f.platform.directory, chunks):
+                    chunks = [*chunks, extra]
                 passages, srcs = asst.passages_text(chunks)
                 text = asst.game_card(s, f, body.lang)
                 if passages:

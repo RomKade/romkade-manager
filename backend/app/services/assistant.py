@@ -104,6 +104,10 @@ Rules:
   plainly that you do not have this information for this game, in one or two sentences, without guessing and
   without filling in with generic advice. If the question names something the context never mentions (an item,
   a level, a code, a character), say that you find no trace of it in this game instead of describing it.
+- The user plays the version for the console named in the context. Passages may also describe other versions
+  (arcade original, other consoles, remakes) that differ in levels, items, counts or names: when a passage says
+  which version it describes, use the one for the user's console; when versions differ and the context does not
+  say which applies to that console, say that it depends on the version instead of picking one.
 - {solution}
 - Cheat codes: only those of the [RetroArch cheats …] block, copied exactly (code and effect); never write a code
   that is not in it. Give the few codes that match the question (at most 6, the most useful if the question is
@@ -199,7 +203,8 @@ def game_card(s: Session, f: RemoteFile, lang: str) -> str:
     texts = {t.lang: t.text for t in s.scalars(select(GameText).where(
         GameText.platform_id == f.platform_id, GameText.normalized_title == f.normalized_title))}
     desc = texts.get(lang) or texts.get("en") or f.description or ""
-    lines = [f"Game: {_game_title(f)}", f"Console: {f.platform.label or f.platform.directory}"]
+    console = f.platform.label or f.platform.directory
+    lines = [f"Game: {_game_title(f)}", f"Console: {console} (the user plays this version)"]
     for label, value in (("Year", f.release_year), ("Genre", GENRES.get(f.genre or "")),
                          ("Publisher", f.publisher), ("Developer", f.developer)):
         if value:

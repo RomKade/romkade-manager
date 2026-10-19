@@ -534,6 +534,19 @@ def best_chunks(s: Session, platform_id: int, normalized_title: str, question: s
     return picked or chunks[:min(limit, 2)]
 
 
+def version_chunk(s: Session, platform_id: int, normalized_title: str, directory: str,
+                  exclude: list[KnowledgeChunk]) -> KnowledgeChunk | None:
+    """Passage dont la section porte sur la console du joueur (« Master System and Game Gear », « Master System
+    version ») : joint aux passages choisis, pour que la version jouée l'emporte sur l'arcade ou les autres."""
+    names = {m for n in platform_names(directory) for m in (n, n.removeprefix("sega "), n.removeprefix("nintendo "))
+             if (" " in m and len(m) >= 5) or len(m) >= 6}
+    taken = {c.id for c in exclude}
+    for c in chunks_for(s, platform_id, normalized_title):
+        if c.id not in taken and any(n in norm(c.section) for n in names):
+            return c
+    return None
+
+
 def chunks_for(s: Session, platform_id: int, normalized_title: str) -> list[KnowledgeChunk]:
     return list(s.scalars(select(KnowledgeChunk).where(KnowledgeChunk.platform_id == platform_id,
                                                         KnowledgeChunk.normalized_title == normalized_title)
