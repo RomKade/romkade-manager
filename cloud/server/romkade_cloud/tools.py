@@ -10,6 +10,8 @@ l'utilisateur par l'assistant, dans sa langue.
 """
 
 import asyncio
+import base64
+import json
 import time
 from pathlib import Path
 
@@ -17,7 +19,7 @@ from mcp.server import MCPServer
 from mcp.server.apps import Apps, ResourceCsp
 from mcp.server.mcpserver import Context, Icon
 from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
 from app.platforms import PLATFORMS, canonical
 from app.services import boxart
@@ -40,8 +42,9 @@ INSTRUCTIONS = """ROMKADE connects the user's retro handheld console (Anbernic�
   6-character code, then call pair_console with it.
 - Before launch_game, find the game with search_games and use its game_id. Prefer the user's region when several
   versions exist.
-- The ROMKADE interface shows covers, details and buttons by itself: keep your text short, do not repeat the list
-  or invent images.
+- Each result is already displayed to the user by the ROMKADE interface (covers, game sheet, buttons to play,
+  save, quit, volume, cheats). Do not rebuild it: no lists, cards, tables, buttons or images of your own. Answer in
+  one or two short sentences, at most.
 - Cheat codes: mention a few relevant ones (at most 6) unless the user asks for more.
 - Only the games already on the user's console are known here. Never help find or download ROMs.
 Reply in the user's language."""
@@ -54,6 +57,28 @@ SLEEP_HINT = ("La console {name} ne répond pas : elle est sans doute éteinte o
               "veille). Demande à l'utilisateur de la réveiller, puis réessaie.")
 MAX_PAIR_FAILURES = 10  # par compte et par heure : le code d'appairage ne se devine pas à l'aveugle
 CONSOLE_ART = {p.stem for p in (STATIC / "consoles").glob("*.webp")}
+
+
+HEAVY = {"cover", "cover_large", "platform_art", "art", "description", "capabilities"}
+
+
+def _for_model(value):
+    """Ce que lit le modèle : les données sans les adresses d'images ni les résumés (l'interface les affiche)."""
+    if isinstance(value, dict):
+        return {k: _for_model(v) for k, v in value.items() if k not in HEAVY and v is not None}
+    if isinstance(value, list):
+        return [_for_model(v) for v in value]
+    return value
+
+
+def view(data: dict) -> CallToolResult:
+    """Résultat d'un outil : `structuredContent` pour l'interface ROMKADE, texte allégé pour le modèle."""
+    text = json.dumps(_for_model(data), ensure_ascii=False, separators=(",", ":"))
+    return CallToolResult(content=[TextContent(type="text", text=text)], structured_content=data)
+
+
+def data_uri(path: Path, mime: str) -> str:
+    return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
 
 
 class UserError(ToolError):
@@ -127,7 +152,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                 return c
         raise UserError(f"Console « {console} » introuvable. Consoles : " + ", ".join(c.label for c in mine))
 
-    async def device(c: Console, action: str, params: dict | None = None, timeout: float = 45) -> dict:
+    async def device(c: Console, action: str, params: dict | None = None, timeout: float = 45) -> CallToolResult:
         try:
             return await relay.call(c.id, action, params, timeout)
         except ConsoleOffline as exc:
@@ -141,7 +166,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
     def console_art(code: str) -> str | None:
         return f"{base}/consoles/{code}.webp" if base and code in CONSOLE_ART else None
 
-    def describe(c: Console) -> dict:
+    def describe(c: Console) -> CallToolResult:
         seen = relay.last_poll(c.id) or c.last_seen
         info = c.info
         return {"console": c.label, "id": c.id, "online": relay.online(c.id), "model": info.get("model"),
@@ -149,7 +174,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                 "capabilities": info.get("capabilities") or {},
                 "last_seen_minutes_ago": round((time.time() - seen) / 60) if seen else None}
 
-    def game_out(row, c: Console | None = None, full: bool = False) -> dict:
+    def game_out(row, c: Console | None = None, full: bool = False) -> CallToolResult:
         cover = (f"{base}/art/{row['art_key']}.webp" if base and boxart.has_source(row["platform_dir"]) else None)
         out = {"game_id": row["id"], "title": row["title"], "platform": row["platform_label"],
                "platform_code": row["platform_code"], "region": row["region"], "year": row["year"],
@@ -164,7 +189,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
 
     # ---------- appairage et consoles ----------
     @ui_tool(title="Appairer une console", annotations=ACT)
-    def pair_console(code: str, ctx: Context, name: str | None = None) -> dict:
+    def pair_console(code: str, ctx: Context, name: str | None = None) -> CallToolResult:
         """Links a console to the user's ROMKADE account with the 6-character code shown by the ROMKADE app on
         the console (APPS menu). `name`: optional nickname for the console."""
         account = account_of(ctx)
@@ -177,24 +202,24 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
             pair_failures[account] = [*recent, now]
             raise UserError("Code inconnu ou expiré. Ouvre de nouveau l'app ROMKADE sur la console pour avoir "
                             "un code à jour (valable 15 minutes).")
-        return {"view": "consoles", "paired": True, "consoles": [describe(c)]}
+        return view({"view": "consoles", "paired": True, "consoles": [describe(c)]})
 
     @ui_tool(title="Mes consoles", annotations=READ)
-    def list_consoles(ctx: Context) -> dict:
+    def list_consoles(ctx: Context) -> CallToolResult:
         """Lists the user's paired consoles: name, model, firmware, number of games, online now or not."""
-        return {"view": "consoles", "consoles": [describe(c) for c in consoles(account_of(ctx))]}
+        return view({"view": "consoles", "consoles": [describe(c) for c in consoles(account_of(ctx))]})
 
     @ui_tool(title="Renommer une console", annotations=SETTING)
-    def rename_console(name: str, ctx: Context, console: str | None = None) -> dict:
+    def rename_console(name: str, ctx: Context, console: str | None = None) -> CallToolResult:
         """Gives a console a nickname (e.g. « Ma RG35XX »)."""
         c = pick(account_of(ctx), console)
         store.rename(c.id, name.strip()[:40])
-        return {"view": "consoles", "consoles": [describe(store.console(c.id))]}
+        return view({"view": "consoles", "consoles": [describe(store.console(c.id))]})
 
     # ---------- catalogue (cloud) ----------
     @ui_tool(title="Chercher un jeu", annotations=READ)
     def search_games(ctx: Context, query: str = "", platform: str | None = None, genre: str | None = None,
-                     console: str | None = None, limit: int = 24) -> dict:
+                     console: str | None = None, limit: int = 24) -> CallToolResult:
         """Searches the games on the user's console(s) by title words, optionally for one system (« Super
         Nintendo », « GBA », « PlayStation »…) and/or one genre (« RPG », « combat », « plateforme »…). An empty
         query with a platform or genre lists those games. Shows covers; returns game_id values for launch_game,
@@ -207,32 +232,32 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         words = normalize_title(query).split()
         rows, total = store.search(list(by_id), words, platform_codes(platform), max(1, min(limit, 60)),
                                    genre_key(genre))
-        return {"view": "games", "query": query, "platform": platform, "genre": genre, "total": total,
-                "shown": len(rows),
-                "games": [game_out(r, by_id[r["console_id"]] if len(by_id) > 1 else None) for r in rows]}
+        return view({"view": "games", "query": query, "platform": platform, "genre": genre, "total": total,
+                     "shown": len(rows),
+                     "games": [game_out(r, by_id[r["console_id"]] if len(by_id) > 1 else None) for r in rows]})
 
     @ui_tool(title="Fiche du jeu", annotations=READ)
-    def game_details(game_id: int, ctx: Context) -> dict:
+    def game_details(game_id: int, ctx: Context) -> CallToolResult:
         """Full sheet of one game: cover, year, genre, developer, publisher, summary. Use it when the user asks
         about a game."""
         row = store.game(game_id, account_of(ctx))
         if row is None:
             raise UserError("Jeu introuvable dans la bibliothèque (game_id d'après search_games).")
         c = store.console(row["console_id"])
-        return {"view": "game", "game": game_out(row, full=True), "console": describe(c)}
+        return view({"view": "game", "game": game_out(row, full=True), "console": describe(c)})
 
     @ui_tool(title="Ma bibliothèque", annotations=READ)
-    def library_overview(ctx: Context, console: str | None = None) -> dict:
+    def library_overview(ctx: Context, console: str | None = None) -> CallToolResult:
         """Overview of a console's library: number of games per system and per genre."""
         c = pick(account_of(ctx), console)
         systems = [{"platform": r["platform_label"], "code": r["platform_code"], "games": r["games"],
                     "art": console_art(r["platform_code"])} for r in store.platforms(c.id)]
-        return {"view": "library", **describe(c), "systems": systems,
-                "genres": [{"genre": r["genre"], "games": r["games"]} for r in store.genres(c.id)],
-                "catalog_updated_minutes_ago": round((time.time() - c.catalog_at) / 60) if c.catalog_at else None}
+        return view({"view": "library", **describe(c), "systems": systems,
+                     "genres": [{"genre": r["genre"], "games": r["games"]} for r in store.genres(c.id)],
+                     "catalog_updated_minutes_ago": round((time.time() - c.catalog_at) / 60) if c.catalog_at else None})
 
     @ui_tool(title="Codes de triche", annotations=READ)
-    async def get_cheats(game_id: int, ctx: Context, search: str | None = None) -> dict:
+    async def get_cheats(game_id: int, ctx: Context, search: str | None = None) -> CallToolResult:
         """Cheat codes (Game Genie, Action Replay, GameShark…) for a game of the library, from the libretro
         cheat database (CC BY-SA 4.0). `search`: optional words to filter codes (« lives », « invincible »…)."""
         row = store.game(game_id, account_of(ctx))
@@ -241,16 +266,16 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         game = game_out(row)
         files = await asyncio.to_thread(cheat_db.for_game, row["platform_dir"], row["relative_path"])
         if not files:
-            return {"view": "cheats", "game": game, "cheats": [], "total": 0,
-                    "note": "Aucun code connu pour ce jeu dans la base libretro."}
+            return view({"view": "cheats", "game": game, "cheats": [], "total": 0,
+                         "note": "Aucun code connu pour ce jeu dans la base libretro."})
         best = files[0]
         codes = best["cheats"]
         if search and (words := normalize_title(search).split()):
             codes = [c for c in codes if any(w in normalize_title(c["desc"]) for w in words)] or codes
-        return {"view": "cheats", "game": game, "version": best["label"], "total": best["count"],
-                "cheats": [{"description": c["desc"], "code": c["code"]} for c in codes[:40]],
-                "other_versions": [f["label"] for f in files[1:4]],
-                "source": "libretro-database (CC BY-SA 4.0)", "source_url": cheat_db.SOURCE_URL}
+        return view({"view": "cheats", "game": game, "version": best["label"], "total": best["count"],
+                     "cheats": [{"description": c["desc"], "code": c["code"]} for c in codes[:40]],
+                     "other_versions": [f["label"] for f in files[1:4]],
+                     "source": "libretro-database (CC BY-SA 4.0)", "source_url": cheat_db.SOURCE_URL})
 
     # ---------- console (par le relais) ----------
     async def now_playing(c: Console) -> dict:
@@ -263,13 +288,13 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                 "in_menu": st.get("menu"), "process": st.get("process"), "volume": st.get("volume")}
 
     @ui_tool(title="État de la console", annotations=READ)
-    async def console_status(ctx: Context, console: str | None = None) -> dict:
+    async def console_status(ctx: Context, console: str | None = None) -> CallToolResult:
         """Live state of the console: game being played (if any), volume, save and quit buttons. Needs the
         console on."""
-        return await now_playing(pick(account_of(ctx), console))
+        return view(await now_playing(pick(account_of(ctx), console)))
 
     @ui_tool(title="Lancer un jeu", annotations=ACT)
-    async def launch_game(game_id: int, ctx: Context, resume: bool = False) -> dict:
+    async def launch_game(game_id: int, ctx: Context, resume: bool = False) -> CallToolResult:
         """Starts a game on the console (closes the menu or the game in progress). `resume`: continue from
         the automatic save state when there is one. Get game_id from search_games."""
         row = store.game(game_id, account_of(ctx))
@@ -278,29 +303,29 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         c = store.console(row["console_id"])
         await device(c, "launch", {"platform_dir": row["platform_dir"], "relative_path": row["relative_path"],
                                    "slot": "auto" if resume else None}, timeout=60)
-        return {"view": "now", "launching": True, "console": describe(c), "playing": True,
-                "game": game_out(row, full=True), "volume": None}
+        return view({"view": "now", "launching": True, "console": describe(c), "playing": True,
+                     "game": game_out(row, full=True), "volume": None})
 
     @ui_tool(title="Quitter le jeu", annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True,
                                                                  idempotent_hint=True, open_world_hint=False))
-    async def quit_game(ctx: Context, console: str | None = None) -> dict:
+    async def quit_game(ctx: Context, console: str | None = None) -> CallToolResult:
         """Quits the game in progress (RetroArch writes the in-game save) and returns to the console menu.
         Progress since the last save point may be lost: suggest save_state first."""
         c = pick(account_of(ctx), console)
         r = await device(c, "quit")
-        return {"view": "now", "console": describe(c), "playing": False, "game": None, "in_menu": True,
-                "result": {"quit": "quit", "none": "no game was running"}.get(r.get("result"), r.get("result"))}
+        return view({"view": "now", "console": describe(c), "playing": False, "game": None, "in_menu": True,
+                     "result": {"quit": "quit", "none": "no game was running"}.get(r.get("result"), r.get("result"))})
 
     @ui_tool(title="Sauvegarder la partie", annotations=ACT)
-    async def save_state(ctx: Context, console: str | None = None) -> dict:
+    async def save_state(ctx: Context, console: str | None = None) -> CallToolResult:
         """Save state of the RetroArch game in progress, in its current slot."""
         c = pick(account_of(ctx), console)
         await device(c, "save_state")
-        return {**await now_playing(c), "saved": True}
+        return view({**await now_playing(c), "saved": True})
 
     @ui_tool(title="Régler le son", annotations=SETTING)
     async def set_volume(ctx: Context, percent: int | None = None, muted: bool | None = None,
-                         console: str | None = None) -> dict:
+                         console: str | None = None) -> CallToolResult:
         """Sets the game volume (0-100 %) or mutes/unmutes. Works best for games launched from ROMKADE."""
         if percent is None and muted is None:
             raise UserError("Indique un volume (0 à 100) ou muted=true/false.")
@@ -308,11 +333,18 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
             raise UserError("Le volume va de 0 à 100 %.")
         c = pick(account_of(ctx), console)
         await device(c, "volume", {"percent": percent, "muted": muted})
-        return await now_playing(c)
+        return view(await now_playing(c))
 
-    html = UI_FILE.read_text().replace("__ROMKADE_BASE__", base).replace("__ROMKADE_VERSION__", VERSION)
-    apps.add_html_resource(UI, html, name="romkade", title="ROMKADE", description="Interface ROMKADE",
-                           csp=ResourceCsp(resource_domains=[base]) if base else None, prefers_border=False)
+    # Logo et polices intégrés à la page (data:) : ils s'affichent même si le domaine du serveur est filtré
+    # (page d'avertissement de ngrok, pare-feu). Jaquettes et illustrations restent servies par le serveur.
+    html = UI_FILE.read_text()
+    for name, mime in (("fonts/archivo.woff2", "font/woff2"), ("fonts/atkinson.woff2", "font/woff2"),
+                       ("romkade-logo.webp", "image/webp"), ("icon-192.webp", "image/webp")):
+        html = html.replace(f"__ROMKADE_BASE__/{name}", data_uri(STATIC / name, mime))
+    html = html.replace("__ROMKADE_BASE__", base).replace("__ROMKADE_VERSION__", VERSION)
+    csp = ResourceCsp(resource_domains=[base], connect_domains=[base]) if base else None
+    apps.add_html_resource(UI, html, name="romkade", title="ROMKADE", description="Interface ROMKADE", csp=csp,
+                           prefers_border=False)
 
     icons = [Icon(src=f"{base}/icon.png", mime_type="image/png", sizes=["512x512"])] if base else None
     return MCPServer("romkade", title="ROMKADE", instructions=INSTRUCTIONS, website_url="https://romkade.com",

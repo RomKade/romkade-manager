@@ -112,8 +112,12 @@ class FakeAgent:
 
 
 def data(result) -> dict:
+    """Données pour l'interface (structuredContent : sans lui, ChatGPT n'a rien à afficher)."""
     assert not result.is_error, result.content
-    return result.structured_content or json.loads(result.content[0].text)
+    assert result.structured_content is not None
+    text = json.loads(result.content[0].text)  # ce que lit le modèle : sans images ni résumés
+    assert "cover" not in result.content[0].text and "description" not in text.get("game", {})
+    return result.structured_content
 
 
 def error_text(result) -> str:

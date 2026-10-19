@@ -217,6 +217,12 @@ class CrossOrigin:
         if scope["type"] != "http" or scope["path"].startswith(("/mcp", "/agent")):
             await self.app(scope, receive, send)
             return
+        if scope["method"] == "OPTIONS":  # pré-vol du fetch de secours de l'interface (en-tête ngrok)
+            await Response(status_code=204, headers={
+                "access-control-allow-origin": "*", "access-control-allow-methods": "GET",
+                "access-control-allow-headers": "ngrok-skip-browser-warning", "access-control-max-age": "86400",
+            })(scope, receive, send)
+            return
 
         async def send_with_cors(message):
             if message["type"] == "http.response.start":

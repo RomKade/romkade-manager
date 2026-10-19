@@ -378,10 +378,18 @@ let bridged = false;
 
 function receive(result) {
   if (!result) return;
-  if (result.isError) { render(errorView(textOf(result))); return; }
-  const data = result.structuredContent || parseText(result);
-  if (data) show(data, false);
+  const r = result.result && !result.content ? result.result : result;  // enveloppe éventuelle de l'hôte
+  if (r.isError) { render(errorView(textOf(r))); return; }
+  const data = r.structuredContent || parseText(r);
+  if (data && typeof data === "object") show(data, false);
 }
+// Résultat déjà connu de l'hôte (API ChatGPT historique) : utilisé si la notification standard n'arrive pas.
+function fromOpenAI() {
+  const out = window.openai?.toolOutput;
+  if (out && typeof out === "object" && out.view && (!state || state === out)) { if (!state) show(out, false); return true; }
+  return false;
+}
+window.addEventListener("openai:set_globals", () => { if (!state) fromOpenAI(); });
 function show(data, push = true) {
   if (push && state) history.push(state);
   state = data;
@@ -401,8 +409,13 @@ function shell(body, opts = {}) {
 function render(data) {
   const views = { games: gamesView, game: gameView, now: nowView, library: libraryView, cheats: cheatsView, consoles: consolesView };
   const view = views[data?.view] || (() => shell(`<div class="empty">${esc(JSON.stringify(data)).slice(0, 400)}</div>`));
-  root.innerHTML = typeof data === "string" ? data : view(data);
-  wire(data);
+  try {
+    root.innerHTML = typeof data === "string" ? data : view(data);
+    wire(data);
+  } catch (e) {
+    // Une vue qui plante dit pourquoi au lieu de rester sur le chargement.
+    root.innerHTML = `<div class="notice notice--err">ROMKADE · ${esc(e && e.message || e)} (${esc(data?.view || typeof data)})</div>`;
+  }
   reportSize();
 }
 function setNotice(text, kind = "ok") {
@@ -552,6 +565,25 @@ function consolesView(d) {
   return shell(`${d.paired ? `<div class="banner">${icon("check")} ${esc(t("paired"))}</div>` : ""}${cards || `<div class="empty">—</div>`}`);
 }
 
+/* ---------- images ----------
+   Une image du serveur ROMKADE qui ne se charge pas (page d'avertissement de ngrok, cache) est redemandée par
+   fetch avec l'en-tête qui passe l'avertissement, puis affichée en data: (autorisé par la CSP du cadre). */
+const imageCache = new Map();
+function fetchImage(url) {
+  if (!imageCache.has(url)) {
+    imageCache.set(url, fetch(url, { headers: { "ngrok-skip-browser-warning": "1" } })
+      .then((r) => { if (!r.ok || !(r.headers.get("content-type") || "").startsWith("image/")) throw new Error(String(r.status)); return r.blob(); })
+      .then((blob) => new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.onerror = reject; fr.readAsDataURL(blob); })));
+  }
+  return imageCache.get(url);
+}
+function rescue(img, onFail) {
+  const url = img.getAttribute("src") || "";
+  if (img.dataset.rescued || !BASE || !url.startsWith(BASE)) { onFail?.(); return; }
+  img.dataset.rescued = "1";
+  fetchImage(url).then((data) => { img.src = data; }).catch(() => onFail?.());
+}
+
 /* ---------- interactions ---------- */
 async function act(button, work) {
   const label = button?.innerHTML;
@@ -563,9 +595,14 @@ async function act(button, work) {
 function wire(data) {
   root.querySelectorAll("img[data-cover]").forEach((img) => {
     const box = img.closest(".cover");
-    const ok = () => box.classList.add("is-loaded");
-    if (img.complete && img.naturalWidth) ok(); else img.addEventListener("load", ok, { once: true });
-    img.addEventListener("error", () => box.querySelectorAll("img").forEach((i) => i.remove()), { once: true });
+    const backdrop = box.querySelector(".cover__backdrop");
+    const ok = () => { box.classList.add("is-loaded"); if (img.src.startsWith("data:") && backdrop) backdrop.src = img.src; };
+    if (img.complete && img.naturalWidth) ok(); else img.addEventListener("load", ok);
+    img.addEventListener("error", () => rescue(img, () => box.querySelectorAll("img").forEach((i) => i.remove())));
+  });
+  root.querySelectorAll("img:not([data-cover]):not(.cover__backdrop)").forEach((img) => {
+    if (img.complete && !img.naturalWidth) rescue(img, () => { img.style.visibility = "hidden"; });
+    img.addEventListener("error", () => rescue(img, () => { img.style.visibility = "hidden"; }));
   });
   root.querySelectorAll("[data-link]").forEach((b) => b.addEventListener("click", () => openLink(b.dataset.link)));
   root.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", back));
@@ -638,14 +675,14 @@ async function start() {
     hostCaps = r?.hostCapabilities || {};
     applyContext(r?.hostContext || {});
     notify("ui/notifications/initialized", {});
+    for (let i = 0; i < 20 && !state; i++) { if (fromOpenAI()) break; await new Promise((ok) => setTimeout(ok, 250)); }
   } catch {
     // Hôte sans MCP Apps standard : API ChatGPT historique (window.openai), si elle est là.
     const o = window.openai;
     if (o) {
       if (o.theme) document.documentElement.dataset.theme = o.theme;
       if (o.locale) setLang(o.locale);
-      if (o.toolOutput) show(o.toolOutput, false);
-      window.addEventListener("openai:set_globals", () => { if (window.openai?.toolOutput) show(window.openai.toolOutput, false); });
+      fromOpenAI();
     }
   }
 }
