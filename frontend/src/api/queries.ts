@@ -71,7 +71,7 @@ export function useKnowledgeMutations() {
   const qc = useQueryClient();
   const onSuccess = (d: KnowledgeStatus) => qc.setQueryData(["knowledge"], d);
   return {
-    start: useMutation({ mutationFn: api.startKnowledge, onSuccess }),
+    start: useMutation({ mutationFn: (refresh: boolean = false) => api.startKnowledge(refresh), onSuccess }),
     stop: useMutation({ mutationFn: api.stopKnowledge, onSuccess }),
     auto: useMutation({ mutationFn: api.knowledgeSettings, onSuccess }),
   };

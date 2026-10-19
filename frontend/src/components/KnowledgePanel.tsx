@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookOpenText, Download, ExternalLink, KeyRound, Loader2, Search, Square } from "lucide-react";
+import { BookOpenText, Download, ExternalLink, KeyRound, Loader2, RefreshCw, Search, Square } from "lucide-react";
 import { useState } from "react";
 
 import { api, type GameKnowledge, type KnowledgeHit } from "../api/client";
@@ -43,11 +43,19 @@ export function KnowledgePanel() {
                 <Square size={14} aria-hidden /> {t("settings.kn.stop")}
               </button>
             </div>
-          ) : st.pending > 0 && (
+          ) : (st.pending > 0 || st.games > 0) && (
             <div className="form__actions">
-              <button type="button" className="button button--primary" disabled={start.isPending} onClick={() => start.mutate()}>
-                <Download size={16} aria-hidden /> {t("settings.kn.start", { count: st.pending })}
-              </button>
+              {st.pending > 0 && (
+                <button type="button" className="button button--primary" disabled={start.isPending} onClick={() => start.mutate(false)}>
+                  <Download size={16} aria-hidden /> {t("settings.kn.start", { count: st.pending })}
+                </button>
+              )}
+              {st.games > st.pending && (
+                <button type="button" className="button button--small" disabled={start.isPending} onClick={() => start.mutate(true)}
+                  title={t("settings.kn.refreshHint")}>
+                  <RefreshCw size={14} aria-hidden /> {t("settings.kn.refresh", { count: st.games, minutes: Math.max(1, Math.round(st.games * 10 / 60)) })}
+                </button>
+              )}
             </div>
           )}
           <label className="toggle-inline">

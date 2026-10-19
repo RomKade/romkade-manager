@@ -87,9 +87,10 @@ async def knowledge_settings(body: KnowledgeSettingsIn, request: Request) -> dic
 
 
 @router.post("/knowledge/start", response_model=KnowledgeStatusOut)
-async def knowledge_start(request: Request) -> dict:
-    """Récupère les connaissances de tous les jeux jamais recherchés, une requête à la fois (en arrière-plan)."""
-    if not request.app.state.knowledge.start():
+async def knowledge_start(request: Request, refresh: bool = Query(False, description="Tous les jeux à nouveau")) -> dict:
+    """Récupère les connaissances de tous les jeux jamais recherchés, une requête à la fois (en arrière-plan) ;
+    avec `refresh`, de tous les jeux à nouveau (par exemple pour ajouter une nouvelle source comme Sega Retro)."""
+    if not request.app.state.knowledge.start(refresh):
         raise errors.AppError("knowledge_running", "Une récupération est déjà en cours.", 409)
     await asyncio.sleep(0)
     return await asyncio.to_thread(_status, request)

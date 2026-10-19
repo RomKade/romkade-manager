@@ -3,6 +3,8 @@ import type { Messages } from "../core";
 /** Paramètres : connexion, mot de passe, clé de la console, test, YouTube. */
 const messages: Messages = {
   fr: {
+    "kn.refreshHint": "Refait la recherche pour tous les jeux, déjà trouvés compris : ajoute les nouvelles sources (Sega Retro) et les pages mises à jour. Tu peux l'arrêter à tout moment.",
+    "kn.refresh": "Tout récupérer à nouveau ({count} jeux, ≈ {minutes} min)",
     "ch.downloading": "Téléchargement…",
     "ch.update": "Mettre à jour",
     "ch.download": "Télécharger les codes",
@@ -341,6 +343,8 @@ const messages: Messages = {
     "yt.remove": "Retirer la clé",
   },
   en: {
+    "kn.refreshHint": "Searches again for every game, including those already found: adds new sources (Sega Retro) and updated pages. You can stop it at any time.",
+    "kn.refresh": "Fetch everything again ({count} games, ≈ {minutes} min)",
     "ch.downloading": "Downloading…",
     "ch.update": "Update",
     "ch.download": "Download the codes",
@@ -679,6 +683,8 @@ const messages: Messages = {
     "yt.remove": "Remove the key",
   },
   es: {
+    "kn.refreshHint": "Vuelve a buscar todos los juegos, incluidos los ya encontrados: añade las fuentes nuevas (Sega Retro) y las páginas actualizadas. Puedes detenerlo cuando quieras.",
+    "kn.refresh": "Obtener todo de nuevo ({count} juegos, ≈ {minutes} min)",
     "ch.downloading": "Descargando…",
     "ch.update": "Actualizar",
     "ch.download": "Descargar los trucos",

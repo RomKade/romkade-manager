@@ -548,19 +548,24 @@ class KnowledgeJobs:
 
         return await asyncio.to_thread(save)
 
-    def start(self) -> bool:
+    def start(self, refresh: bool = False) -> bool:
+        """Jeux jamais recherchés ; avec `refresh`, tous les jeux à nouveau (nouvelle source, pages mises à jour)."""
         if self.running():
             return False
-        self.task = asyncio.create_task(self._run())
+        self.task = asyncio.create_task(self._run(refresh))
         return True
 
     def stop(self) -> None:
         if self.running():
             self.state["stopping"] = True
 
-    async def _run(self) -> None:
+    async def _run(self, refresh: bool = False) -> None:
         def todo():
             with self.sessions() as s:
+                if refresh:  # les jamais recherchés d'abord, puis les autres
+                    pending = pending_games(s)
+                    return pending + [g for g in s.execute(_games_query().order_by(
+                        RemoteFile.platform_id, RemoteFile.normalized_title)).all() if tuple(g) not in set(pending)]
                 return pending_games(s)
 
         games = await asyncio.to_thread(todo)

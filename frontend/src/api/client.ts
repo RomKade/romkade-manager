@@ -138,7 +138,7 @@ export const api = {
   retryTransfer: (id: number) => request<Transfer[]>("POST", `/transfers/${id}/retry`),
   knowledge: () => request<KnowledgeStatus>("GET", "/knowledge"),
   knowledgeSettings: (auto_after_sync: boolean) => request<KnowledgeStatus>("PUT", "/knowledge/settings", { auto_after_sync }),
-  startKnowledge: () => request<KnowledgeStatus>("POST", "/knowledge/start"),
+  startKnowledge: (refresh = false) => request<KnowledgeStatus>("POST", `/knowledge/start${refresh ? "?refresh=true" : ""}`),
   stopKnowledge: () => request<KnowledgeStatus>("POST", "/knowledge/stop"),
   gameKnowledge: (id: number) => request<GameKnowledge>("GET", `/games/${id}/knowledge`),
   fetchGameKnowledge: (id: number) => request<GameKnowledge>("POST", `/games/${id}/knowledge`),

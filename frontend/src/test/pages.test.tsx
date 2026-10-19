@@ -556,7 +556,11 @@ describe("Paramètres : assistant et connaissances", () => {
     const panel = (await screen.findByRole("heading", { name: /Connaissances de l'assistant/ })).closest("section")!;
     expect(within(panel).getByText(/ce n'est pas un simple essai/)).toBeInTheDocument();
     expect(await within(panel).findByText(/1 jeux documentés sur 2/)).toBeInTheDocument();
-    await userEvent.click(within(panel).getByRole("button", { name: /Récupérer pour le jeu restant/ }));
+    expect(within(panel).getByRole("button", { name: /Tout récupérer à nouveau \(2 jeux/ })).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: /Tout récupérer à nouveau/ }));
+    await waitFor(() => expect(calls).toContain("/api/knowledge/start?refresh=true"));
+    knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null, stopping: false };
+    await userEvent.click(await within(panel).findByRole("button", { name: /Récupérer pour le jeu restant/ }));
     expect(await within(panel).findByText(/Récupération : 0 sur 1/)).toBeInTheDocument();
 
     await userEvent.type(within(panel).getByRole("searchbox", { name: "Jeu" }), "mario");
