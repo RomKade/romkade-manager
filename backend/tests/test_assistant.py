@@ -175,3 +175,21 @@ def test_launch_needs_the_asked_title():
 
     assert asst.title_matches("Tetris", ["tetris"]) and asst.title_matches("Super Mario World", ["super mario wolrd"])
     assert not asst.title_matches("Marko's Magic Football", ["Super Mario World"])
+
+
+async def test_library_info_answers_favorites_and_consoles(app_factory, monkeypatch):
+    """« Quels sont mes favoris ? », « Ai-je la Megadrive ? » : le contexte contient les consoles et les favoris."""
+    model, seen = fake_llm({"in_scope": True, "intent": "library_info", "search": "favoris", "games_mentioned": [],
+                            "genre": "", "console": "", "wants_solution": False, "action": "", "volume": -1},
+                           ["Tes favoris : Super Mario World."])
+    monkeypatch.setattr(llm, "resolve", lambda state: model)
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        game = (await c.get("/api/games", params={"q": "Super Mario World"})).json()["items"][0]
+        assert (await c.put(f"/api/games/{game['id']}/favorite")).status_code == 204
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Quels sont mes favoris ?"}]})
+        evs = events(r.text)
+        assert evs[0][1]["intent"] == "library_info" and [g["id"] for g in evs[0][1]["games"]] == [game["id"]]
+        system = seen["answers"][-1]["messages"][0]["content"]
+        assert "Favorites of the user" in system and "Super Mario World" in system and "Consoles (name: number of games)" in system

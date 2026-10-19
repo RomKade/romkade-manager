@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from app import errors
 from app.services import assistant as asst
+from app.api.catalog import console_id
 from app.services import catalog_query as cq
 from app.services import knowledge as kn
 from app.services import llm as llm_mod
@@ -90,6 +91,8 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
         except Exception:  # noqa: BLE001 — repli SQLite
             library_ids = None
 
+    console_key = console_id(request)  # favoris de la console branchée
+
     def build():
         with st.sessions() as s:
             games: list = []
@@ -102,6 +105,9 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
             if intent == "game_help" and target is not None:
                 games = [target]
                 return target, games, None
+            if intent == "library_info":
+                overview, favs = asst.library_overview(s, console_key)
+                return None, (favs if asst.FAVORITES_RE.search(question) else []), overview
             if intent == "find_games":
                 if library_ids is None and not mentioned and (genre or dirs):
                     games = asst.find_by_filters(s, genre, dirs)
@@ -109,7 +115,9 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                     games = asst.find_library_games(s, mentioned or [search_text], library_ids)
                 filters = ", ".join(x for x in (asst.GENRES.get(genre, ""), console) if x)
                 head = f"Games of the user's library matching {filters}:\n" if filters else "Games of the user's library:\n"
-                return None, games, head + asst.library_lines(games)
+                # Les consoles de la bibliothèque aussi : « ai-je la Magadrive ? » se répond même mal orthographié.
+                overview = asst.library_overview(s, console_key)[0].split("\nFavorites")[0]
+                return None, games, head + asst.library_lines(games) + "\n\n" + overview
             if intent == "game_help":  # jeu cité absent de la bibliothèque
                 return None, [], "The game asked about is not in the user's library; answer from general knowledge " \
                                  "only if you are sure, and say it is not in the library."

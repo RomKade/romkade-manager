@@ -41,7 +41,7 @@ INJECTION_RE = re.compile(
     r"system prompt|prompt syst[eè]me|tu es (maintenant|d[ée]sormais)|you are now|ahora eres|\bDAN\b|jailbreak|"
     r"developer mode|mode d[ée]veloppeur", re.I)
 
-INTENTS = ["game_help", "find_games", "app_help", "console_action", "off_topic"]
+INTENTS = ["game_help", "find_games", "library_info", "app_help", "console_action", "off_topic"]
 # Actions sur la console que l'assistant peut proposer ; l'utilisateur les confirme d'un clic dans la bulle.
 ACTIONS = ["", "launch_game", "quit_game", "save_state", "set_volume", "volume_up", "volume_down", "mute", "unmute"]
 # Capacité du profil de la console nécessaire à chaque action (app/device/systems.py).
@@ -73,6 +73,8 @@ In scope:
 - game_help: playing a game (controls, goals, a hard level or boss, secrets, cheat codes, items, characters, story,
   saving, game settings in RetroArch){game_scope}
 - find_games: finding, choosing or comparing games among the user's own library (genre, console, players, year…)
+- library_info: the user's library itself: their favorites, which consoles or systems they have (even misspelled,
+  e.g. « Magadrive »), how many games, recently played games
 - app_help: using ROMKADE Manager itself (adding games, saves, controllers, Bluetooth, connection, launching games,
   play time, favorites, search)
 - console_action: the user asks you to DO something on the console now (an order, not a question about how to):
@@ -396,4 +398,33 @@ def title_matches(title: str, names: list[str]) -> bool:
         if n and t and (n in t or t in n or difflib.SequenceMatcher(None, n, t).ratio() >= 0.75):
             return True
     return False
+
+
+FAVORITES_RE = re.compile(r"favori|favorite|favourite|favorito|pr[ée]f[ée]r", re.I)
+
+
+def library_overview(s: Session, console: str | None) -> tuple[str, list[RemoteFile]]:
+    """Résumé de la bibliothèque pour l'assistant : consoles et nombre de jeux, favoris de la console branchée,
+    dernières parties suivies par ROMKADE Manager. Renvoie aussi les favoris (cartes de jeux dans la bulle)."""
+    from app.db.models import PlaySession
+    from app.services import catalog_query as cq
+
+    plats = sorted((p for p in cq.list_platforms(s) if p.game_count), key=lambda p: -p.game_count)
+    total = sum(p.game_count for p in plats)
+    lines = [f"Library: {total} games on {len(plats)} consoles. Consoles (name: number of games):"]
+    lines += [f"- {p.label or p.directory}: {p.game_count}" for p in plats]
+    favs = [cq.get_file(s, g.id) for g in cq.favorites(s, console, limit=25)]
+    if favs:
+        lines.append("Favorites of the user on this console, most recent first:")
+        lines += [f"- {_game_title(f)} ({f.platform.label or f.platform.directory})" for f in favs]
+    else:
+        lines.append("Favorites: none yet on this console (a star on a game page adds one).")
+    seen: dict[str, str] = {}
+    for r in s.scalars(select(PlaySession).order_by(PlaySession.ended_at.desc()).limit(60)):
+        if r.title not in seen and len(seen) < 10:
+            seen[r.title] = r.ended_at.strftime("%Y-%m-%d")
+    if seen:
+        lines.append("Recently played (tracked by ROMKADE Manager), most recent first:")
+        lines += [f"- {t} (last played {d})" for t, d in seen.items()]
+    return "\n".join(lines), favs
 
