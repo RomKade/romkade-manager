@@ -22,6 +22,8 @@ type State = {
   /** Jeu détecté : fiche ouverte (prioritaire) ou jeu en cours sur la console. */
   sheetGame: AssistantGame | null;
   sheetOpen: boolean;
+  /** Jeu dont la proposition « Discuter de ce jeu ? » a été fermée (elle revient pour un autre jeu). */
+  dismissedOffer: number | null;
   conversations: Record<string, ChatMessage[]>;
 };
 
@@ -29,7 +31,7 @@ const STORAGE = "romkade-assistant";
 const HIDDEN = "romkade-assistant-hidden";
 const loadHidden = () => { try { return localStorage.getItem(HIDDEN) === "1"; } catch { return false; } };
 let state: State = { open: false, hidden: loadHidden(), scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
-  conversations: load() };
+  dismissedOffer: null, conversations: load() };
 const listeners = new Set<() => void>();
 
 function load(): Record<string, ChatMessage[]> {
@@ -61,13 +63,15 @@ export const assistant = {
     set({ hidden, open: hidden ? false : state.open });
   },
   setScope: (scope: Scope) => set({ scope }),
+  dismissOffer: (gameId: number) => set({ dismissedOffer: gameId }),
   /** La fiche d'un jeu s'ouvre (ou se ferme : null). */
   setSheet: (game: AssistantGame | null) => set({ sheetGame: game, sheetOpen: game != null }),
   messages: (scope: Scope) => state.conversations[scopeKey(scope)] ?? [],
   setMessages: (scope: Scope, messages: ChatMessage[]) =>
     set({ conversations: { ...state.conversations, [scopeKey(scope)]: messages } }),
   /** Tests : état de départ. */
-  reset: () => set({ open: false, hidden: false, scope: { kind: "library" }, sheetGame: null, sheetOpen: false, conversations: {} }),
+  reset: () => set({ open: false, hidden: false, scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
+    dismissedOffer: null, conversations: {} }),
 };
 
 export function useAssistant() {

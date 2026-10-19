@@ -57,7 +57,8 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   useEffect(() => { endRef.current?.scrollIntoView?.({ block: "end" }); }, [messages.length, messages.at(-1)]);
   useEffect(() => () => abort.current?.abort(), []);
 
-  const offer = detected && !(scope.kind === "game" && scope.game.id === detected.id) ? detected : null;
+  const offer = detected && !(scope.kind === "game" && scope.game.id === detected.id) && st.dismissedOffer !== detected.id
+    ? detected : null;
   const userTurns = messages.filter((m) => m.role === "user").length;
   const gameScope = scope.kind === "game" ? scope.game : null;
 
@@ -135,6 +136,10 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
 
       {offer && (
         <div className="assistant__offer">
+          <button type="button" className="assistant__offer-close" aria-label={t("assistant.offerClose")} title={t("assistant.offerClose")}
+            onClick={() => assistant.dismissOffer(offer.id)}>
+            <X size={14} aria-hidden />
+          </button>
           <p>{t("assistant.offer", { title: offer.title })}</p>
           <div className="assistant__offer-actions">
             <button type="button" className="button button--primary button--small"

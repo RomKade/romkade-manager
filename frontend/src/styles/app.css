@@ -1355,7 +1355,11 @@ kbd {
 .assistant__body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .assistant__offer { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin: 10px 14px 0; border-radius: 10px;
   border: 1px dashed color-mix(in srgb, var(--accent-2) 60%, var(--line)); background: color-mix(in srgb, var(--accent-2) 7%, transparent); font-size: var(--fs-sm); }
-.assistant__offer p { margin: 0; }
+.assistant__offer { position: relative; }
+.assistant__offer p { margin: 0; padding-right: 26px; }
+.assistant__offer-close { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 26px; height: 26px;
+  border: none; border-radius: 50%; background: none; color: var(--ink-2); cursor: pointer; }
+.assistant__offer-close:hover, .assistant__offer-close:focus-visible { background: color-mix(in srgb, var(--accent-2) 22%, transparent); color: var(--ink); }
 .assistant__offer-actions, .assistant__chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .assistant__note { margin: 0; color: var(--ink-2); font-size: var(--fs-sm); }
 .assistant__messages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }

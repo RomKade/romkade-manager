@@ -3,6 +3,7 @@ import type { Messages } from "../core";
 /** Assistant de jeu (bulle en bas à droite). */
 const messages: Messages = {
   fr: {
+    "offerClose": "Fermer la proposition",
     "fab": "Assistant IA",
     "title": "Assistant IA de jeu",
     "scope": "Sujet de la discussion",
@@ -40,6 +41,7 @@ const messages: Messages = {
     "refusal.unclear": "Je n'ai pas compris la question. Peux-tu la reformuler ?",
   },
   en: {
+    "offerClose": "Close this suggestion",
     "fab": "AI assistant",
     "title": "AI game assistant",
     "scope": "Conversation topic",
@@ -77,6 +79,7 @@ const messages: Messages = {
     "refusal.unclear": "I didn't understand the question. Could you rephrase it?",
   },
   es: {
+    "offerClose": "Cerrar la propuesta",
     "fab": "Asistente IA",
     "title": "Asistente IA de juego",
     "scope": "Tema de la conversación",

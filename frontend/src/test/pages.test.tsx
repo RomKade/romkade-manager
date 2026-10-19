@@ -534,7 +534,10 @@ describe("Assistant de jeu", () => {
     await userEvent.click(await within(dialog).findByRole("button", { name: /^Assistant IA$/ }));
     const panel = within(dialog).getByRole("region", { name: "Assistant IA de jeu" });
     expect(within(panel).getByText("Tu regardes Super Mario World. Discuter de ce jeu ?")).toBeInTheDocument();
-    await userEvent.click(within(panel).getByRole("button", { name: "Oui, ce jeu" }));
+    // La proposition se ferme d'une croix ; le jeu reste au choix dans l'en-tête du panneau.
+    await userEvent.click(within(panel).getByRole("button", { name: "Fermer la proposition" }));
+    expect(within(panel).queryByText("Tu regardes Super Mario World. Discuter de ce jeu ?")).not.toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Super Mario World" }));
     expect(within(panel).getByRole("button", { name: "Super Mario World" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.type(within(panel).getByRole("textbox", { name: "Ta question" }), "Je bloque au château");
     await userEvent.click(within(panel).getByRole("button", { name: "Envoyer" }));
