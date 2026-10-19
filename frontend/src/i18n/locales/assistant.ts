@@ -3,10 +3,10 @@ import type { Messages } from "../core";
 /** Assistant de jeu (bulle en bas à droite). */
 const messages: Messages = {
   fr: {
+    "persona.ken": "Maître des combos et des jeux de combat",
+    "persona.mario": "Roi des jeux de plateforme, saute plus haut que tout le monde",
+    "persona.luigi": "L'éternel second, expert des niveaux cachés",
     "persona.iris": "Gardienne des secrets et des passages cachés",
-    "persona.sam": "Speedrunner, connaît tous les raccourcis",
-    "persona.zoe": "Reine des énigmes et des casse-tête",
-    "persona.kenji": "Maître des combos et des jeux de combat",
     "persona.rex": "Chasseur de boss, ne lâche jamais rien",
     "persona.luna": "Exploratrice de donjons et de jeux de rôle",
     "persona.max": "Pilote de course, toujours à fond",
@@ -50,10 +50,10 @@ const messages: Messages = {
     "refusal.unclear": "Je n'ai pas compris la question. Peux-tu la reformuler ?",
   },
   en: {
+    "persona.ken": "Master of combos and fighting games",
+    "persona.mario": "King of platformers, jumps higher than anyone",
+    "persona.luigi": "The eternal sidekick, expert in hidden levels",
     "persona.iris": "Keeper of secrets and hidden passages",
-    "persona.sam": "Speedrunner, knows every shortcut",
-    "persona.zoe": "Queen of riddles and puzzles",
-    "persona.kenji": "Master of combos and fighting games",
     "persona.rex": "Boss hunter, never gives up",
     "persona.luna": "Explorer of dungeons and role-playing games",
     "persona.max": "Racing driver, always flat out",
@@ -97,10 +97,10 @@ const messages: Messages = {
     "refusal.unclear": "I didn't understand the question. Could you rephrase it?",
   },
   es: {
+    "persona.ken": "Maestro de los combos y los juegos de lucha",
+    "persona.mario": "Rey de los juegos de plataformas, salta más alto que nadie",
+    "persona.luigi": "El eterno segundón, experto en niveles ocultos",
     "persona.iris": "Guardiana de los secretos y los pasajes ocultos",
-    "persona.sam": "Speedrunner, conoce todos los atajos",
-    "persona.zoe": "Reina de los enigmas y los rompecabezas",
-    "persona.kenji": "Maestro de los combos y los juegos de lucha",
     "persona.rex": "Cazador de jefes, nunca se rinde",
     "persona.luna": "Exploradora de mazmorras y juegos de rol",
     "persona.max": "Piloto de carreras, siempre a fondo",

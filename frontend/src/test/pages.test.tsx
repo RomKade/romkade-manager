@@ -497,7 +497,7 @@ describe("Paramètres : assistant et connaissances", () => {
     expect(screen.queryByRole("heading", { name: /Descriptions des jeux/ })).not.toBeInTheDocument();  // dans Connaissances
     // Prénom : Duke par défaut, l'un des dix personnages au choix ; la bulle prend ce prénom.
     expect(screen.getByRole("button", { name: /^Duke$/ })).toBeInTheDocument();
-    expect(screen.getAllByRole("radio", { name: /Duke|Axel|Nova|Max|Luna|Rex|Kenji|Zoé|Sam|Iris/ })).toHaveLength(10);
+    expect(screen.getAllByRole("radio", { name: /Duke|Axel|Nova|Max|Luna|Rex|Ken|Mario|Luigi|Iris/ })).toHaveLength(10);
     await userEvent.click(screen.getByRole("radio", { name: /Luna/ }));
     expect(screen.getByRole("button", { name: /^Luna$/ })).toBeInTheDocument();
     // La bulle peut être masquée.

@@ -11,9 +11,9 @@ export const PERSONAS = [
   { name: "Max", key: "max" },
   { name: "Luna", key: "luna" },
   { name: "Rex", key: "rex" },
-  { name: "Kenji", key: "kenji" },
-  { name: "Zoé", key: "zoe" },
-  { name: "Sam", key: "sam" },
+  { name: "Ken", key: "ken" },
+  { name: "Mario", key: "mario" },
+  { name: "Luigi", key: "luigi" },
   { name: "Iris", key: "iris" },
 ] as const;
 
