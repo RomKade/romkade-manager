@@ -1,0 +1,26 @@
+# ROMKADE Cloud sur la droplet : joint le réseau du Caddy commun (licenses_web), aucun port publié.
+# Caddy (bloc www.likyly.com) : handle_path /romkade/* -> romkade-cloud:8787 (voir caddy.snippet).
+services:
+  romkade-cloud:
+    container_name: romkade-cloud
+    image: romkade-cloud
+    build:
+      context: ../..
+      dockerfile: cloud/deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      ROMKADE_PUBLIC_URL: ${ROMKADE_PUBLIC_URL:-https://www.likyly.com/romkade}
+    volumes:
+      - romkade_data:/data
+    networks: [licenses_web]
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  romkade_data: {}
+
+networks:
+  licenses_web:
+    external: true

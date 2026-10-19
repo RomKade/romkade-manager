@@ -56,6 +56,23 @@ d'appairage à donner à l'assistant : « Connecte ma console, code ABC123 ».
 Essayé sur RG35XX Pro (firmware Anbernic + Stock OS Mod) : détection, état, volume et inventaire (5 696
 fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, sans essai.
 
+## Déploiement (droplet)
+
+En ligne sur **https://www.likyly.com/romkade/** (connecteur : `https://www.likyly.com/romkade/mcp/<jeton>`).
+
+- `deploy/Dockerfile`, `deploy/compose.yaml` : conteneur `romkade-cloud`, sans port publié, sur le réseau
+  `licenses_web` du Caddy commun de la droplet ; données (base, cheats, jaquettes) dans le volume
+  `deploy_romkade_data`.
+- `deploy/deploy.sh` : envoie les sources (hôte SSH `do-deployer`, dossier `~/app/romkade-cloud`) et reconstruit.
+- `deploy/caddy.snippet` : route ajoutée au bloc `www.likyly.com` du Caddyfile commun
+  (`~/app/licenses/caddy/Caddyfile`, image `caddy-edge`) ; le préfixe `/romkade` est retiré avant le serveur.
+  Le Caddyfile sert aussi d'autres sites (xp-flightdeck, licences, datatoform…) : sauvegarde, `caddy validate`,
+  puis `caddy reload` à chaud. Le disque système de la droplet est presque plein ; Docker est sur
+  `/mnt/volume_add_1`.
+
+Pas de sous-domaine pour l'instant (romkade.com est sur l'hébergement mutualisé OVH du site). Un domaine à nous
+(`mcp.romkade.com` ou autre) sera nécessaire pour les annuaires ChatGPT et Claude.
+
 ## Licence
 
 Propriétaire : © 2026 ROMKADE, tous droits réservés ([LICENSE](../LICENSE), composants tiers dans [NOTICE](../NOTICE)).

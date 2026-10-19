@@ -342,7 +342,8 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                        ("romkade-logo.webp", "image/webp"), ("icon-192.webp", "image/webp")):
         html = html.replace(f"__ROMKADE_BASE__/{name}", data_uri(STATIC / name, mime))
     html = html.replace("__ROMKADE_BASE__", base).replace("__ROMKADE_VERSION__", VERSION)
-    csp = ResourceCsp(resource_domains=[base], connect_domains=[base]) if base else None
+    origin = "/".join(base.split("/")[:3])  # la CSP ne prend que des origines (sans le chemin /romkade)
+    csp = ResourceCsp(resource_domains=[origin], connect_domains=[origin]) if base else None
     apps.add_html_resource(UI, html, name="romkade", title="ROMKADE", description="Interface ROMKADE", csp=csp,
                            prefers_border=False)
 

@@ -18,7 +18,7 @@ from app.services import gameinfo, genres
 from app.services.classify import (classify_directory, display_title, normalize_title, region_of, search_key,
                                    stem_of)
 
-VERSION = 2  # change quand build() change : les catalogues gardés sont recalculés
+VERSION = 4  # change quand build() change : les catalogues gardés sont recalculés
 MAX_FILES = 50_000
 EXCLUDED_KINDS = {"apps", "ports"}  # programmes, pas des jeux
 SKIPPED_FOLDERS = IMAGE_DIR_NAMES | MEDIA_DIR_NAMES  # jaquettes, vidéos… rangées à côté des jeux
