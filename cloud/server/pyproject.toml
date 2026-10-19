@@ -1,0 +1,13 @@
+[project]
+name = "romkade-cloud"
+version = "0.1.0"
+description = "Cloud ROMKADE : serveur MCP (ChatGPT, Claude…) et relais vers les consoles"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp==2.3.0",
+    "uvicorn[standard]>=0.30",
+    "anbernic-game-manager",  # backend du Manager (../../backend) : plateformes, tri des fichiers, cheats
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
