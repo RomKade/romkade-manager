@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpenText, BookOpen, Bot, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpenText, BookOpen, Bot, Check, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
-import { api, ApiError, type Capabilities, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
+import { api, ApiError, type Capabilities, type DescriptionDraft, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
 import {
   useDetectSystem, useDeviceStatus, useGame, useLlmSettings, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
@@ -598,43 +598,76 @@ function DescriptionsPanel() {
   );
 }
 
-/** Descriptions, un seul jeu : voir la description actuelle, la faire rédiger (ou rédiger à nouveau) par l'IA. Sert
- * aussi de test avant de lancer tous les jeux. */
+/** Descriptions, un seul jeu : voir la description de la fiche, demander une proposition à l'IA, puis la valider
+ * (elle remplace alors celle de la fiche) ou l'ignorer. Sert aussi de test avant de lancer tous les jeux. */
 function DescribeOne() {
   const t = useT();
   const qc = useQueryClient();
   const [picked, setPicked] = useState<PickedGame | null>(null);
+  const [saved, setSaved] = useState(false);
   const game = useGame(picked?.id ?? null);
-  const describe = useMutation({
-    mutationFn: (id: number) => api.describeGame(id),
+  const draft = useMutation({ mutationFn: (id: number) => api.draftDescription(id), onMutate: () => setSaved(false) });
+  const save = useMutation({
+    mutationFn: ({ id, d }: { id: number; d: DescriptionDraft }) => api.saveDescription(id, d),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["game", picked?.id] });
+      draft.reset();
+      setSaved(true);
+      qc.invalidateQueries({ queryKey: ["game"] });
       qc.invalidateQueries({ queryKey: ["descriptions"] });
     },
   });
   const lang = getLang();
-  const texts = game.data?.descriptions ?? {};
-  const text = (texts[lang] ?? texts.en) as { text: string; origin: string } | undefined;
+  // Comme la fiche : la description de l'IA dans la langue de l'interface, sinon le résumé d'origine en anglais.
+  const mine = game.data?.descriptions?.[lang] as { text: string; origin: string } | undefined;
+  const current = mine ?? (game.data?.description ? { text: game.data.description, origin: "source" } : undefined);
+  const proposal = draft.data ? draft.data.texts[lang] ?? draft.data.texts.en : undefined;
+  const pick = (g: PickedGame) => { setPicked(g); draft.reset(); save.reset(); setSaved(false); };
   return (
     <div className="knowledge__test">
       <h3>{t("settings.desc.oneTitle")}</h3>
-      <GamePicker id="desc-pick" onPick={(g) => { setPicked(g); describe.reset(); }} />
+      <GamePicker id="desc-pick" onPick={pick} />
       {picked && (
         <div className="knowledge__game">
           <p><strong>{picked.title}</strong> <span className="muted">· {picked.platform}</span></p>
-          {game.isPending ? <Spinner label={t("common.loading")} /> : text ? (
+          <p className="field__label">{t("settings.desc.oneCurrent")}</p>
+          {game.isPending ? <Spinner label={t("common.loading")} /> : current ? (
             <blockquote className="desc-one__text">
-              {text.text}
-              <span className="muted small"> · {t(`settings.desc.origin.${text.origin}`)}</span>
+              {current.text}
+              <span className="muted small"> · {t(`settings.desc.origin.${current.origin}`)}</span>
             </blockquote>
           ) : <p className="muted">{t("settings.desc.oneNone")}</p>}
-          <div className="form__actions">
-            <button type="button" className="button button--small" disabled={describe.isPending} onClick={() => describe.mutate(picked.id)}>
-              {describe.isPending ? <Loader2 size={14} aria-hidden className="spin" /> : <Sparkles size={14} aria-hidden />}{" "}
-              {describe.isPending ? t("settings.desc.oneWriting") : t(text && text.origin !== "source" ? "settings.desc.oneAgain" : "settings.desc.oneWrite")}
-            </button>
-          </div>
-          {describe.isError && <ErrorNotice error={describe.error} />}
+          {saved && <p className="text-ok" role="status">{t("settings.desc.oneSaved")}</p>}
+
+          {proposal && draft.data ? (
+            <div className="desc-one__draft" role="group" aria-label={t("settings.desc.oneProposal")}>
+              <p className="field__label">{t("settings.desc.oneProposal")}</p>
+              <blockquote className="desc-one__text">
+                {proposal.text}
+                <span className="muted small"> · {t(`settings.desc.origin.${proposal.origin}`)}</span>
+              </blockquote>
+              <p className="small muted">{current ? t("settings.desc.oneReplaces") : t("settings.desc.oneFirst")}</p>
+              <div className="form__actions">
+                <button type="button" className="button button--primary button--small" disabled={save.isPending}
+                  onClick={() => save.mutate({ id: picked.id, d: draft.data! })}>
+                  <Check size={14} aria-hidden /> {t("settings.desc.oneAccept")}
+                </button>
+                <button type="button" className="button button--small" disabled={draft.isPending || save.isPending}
+                  onClick={() => draft.mutate(picked.id)}>
+                  {draft.isPending ? <Loader2 size={14} aria-hidden className="spin" /> : <Sparkles size={14} aria-hidden />}{" "}
+                  {draft.isPending ? t("settings.desc.oneWriting") : t("settings.desc.oneAgain")}
+                </button>
+                <button type="button" className="link-button" onClick={() => draft.reset()}>{t("settings.desc.oneDiscard")}</button>
+              </div>
+            </div>
+          ) : (
+            <div className="form__actions">
+              <button type="button" className="button button--small" disabled={draft.isPending} onClick={() => draft.mutate(picked.id)}>
+                {draft.isPending ? <Loader2 size={14} aria-hidden className="spin" /> : <Sparkles size={14} aria-hidden />}{" "}
+                {draft.isPending ? t("settings.desc.oneWriting") : t("settings.desc.oneWrite")}
+              </button>
+            </div>
+          )}
+          {(draft.isError || save.isError) && <ErrorNotice error={draft.error ?? save.error} />}
         </div>
       )}
     </div>

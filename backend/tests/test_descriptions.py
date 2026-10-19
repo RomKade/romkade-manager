@@ -64,7 +64,7 @@ async def test_api_key_and_start(app_factory, monkeypatch, no_llm_env):
         assert st["estimate_usd"] is not None
 
 
-async def test_describe_one_game_replaces_ai_texts(app_factory, monkeypatch):
+async def test_describe_one_game_proposes_then_saves_once_validated(app_factory, monkeypatch):
     """Un seul jeu, tout de suite (test avant le lot) ; modèle local sans réflexion préalable."""
     import json as _json
 
@@ -92,9 +92,20 @@ async def test_describe_one_game_replaces_ai_texts(app_factory, monkeypatch):
         game = (await c.get("/api/games", params={"platform": "SFC"})).json()["items"][0]
         r = await c.post(f"/api/games/{game['id']}/description")
         assert r.status_code == 200, r.text
-        assert r.json() == {"texts": 3, "mode": "translate"} and seen[0]["reasoning_effort"] == "none"
+        draft = r.json()
+        assert draft["mode"] == "translate" and seen[0]["reasoning_effort"] == "none"
+        assert draft["texts"]["fr"] == {"text": "Un jeu de plateforme.", "origin": "translated"}
+        assert draft["texts"]["en"]["origin"] == "source"
+        # Une proposition n'est pas enregistrée : la fiche ne change qu'une fois validée.
+        with app.state.sessions() as s:
+            assert s.query(GameText).count() == 0
+        save = {"mode": draft["mode"], "model": draft["model"], "known": draft["known"],
+                "texts": {k: v["text"] for k, v in draft["texts"].items()}}
+        assert (await c.put(f"/api/games/{game['id']}/description", json=save)).json() == {"texts": 3}
         # À nouveau : le français et l'espagnol de l'IA sont remplacés, le résumé anglais d'origine est gardé.
-        assert (await c.post(f"/api/games/{game['id']}/description")).json()["texts"] == 2
+        draft = (await c.post(f"/api/games/{game['id']}/description")).json()
+        save["texts"] = {k: v["text"] for k, v in draft["texts"].items()}
+        assert (await c.put(f"/api/games/{game['id']}/description", json=save)).json() == {"texts": 2}
     with app.state.sessions() as s:
         texts = {t.lang: (t.text, t.origin) for t in s.query(GameText)}
     assert texts["fr"] == ("La quête de Mario.", "translated") and texts["en"][1] == "source" and len(texts) == 3

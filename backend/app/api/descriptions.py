@@ -3,7 +3,7 @@
 import asyncio
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app import errors
 from app.services import descriptions as d
@@ -119,18 +119,46 @@ async def descriptions_start(request: Request) -> dict:
     return await asyncio.to_thread(_status, request)
 
 
-class DescribeOneOut(BaseModel):
-    texts: int
+class DraftText(BaseModel):
+    text: str
+    origin: str  # source | translated | written | cautious
+
+
+class DraftOut(BaseModel):
     mode: str  # translate (résumé anglais traduit) | write (rédigé)
+    model: str
+    known: bool
+    texts: dict[str, DraftText]
 
 
-@router.post("/games/{game_id}/description", response_model=DescribeOneOut)
-async def describe_game(game_id: int, request: Request) -> dict:
-    """Décrit ce jeu tout de suite avec l'IA réglée (remplace les textes de l'IA) : un jeu, ou un test avant le lot."""
+class SaveIn(BaseModel):
+    mode: str = Field(pattern="^(translate|write)$")
+    model: str = Field(max_length=40)
+    known: bool = True
+    texts: dict[str, str] = Field(max_length=3)
+
+
+class SaveOut(BaseModel):
+    texts: int
+
+
+@router.post("/games/{game_id}/description", response_model=DraftOut)
+async def draft_description(game_id: int, request: Request) -> dict:
+    """Propose une description de ce jeu avec l'IA réglée, sans l'enregistrer : elle n'ira dans la fiche qu'une
+    fois validée (PUT). Sert aussi de test avant le lot."""
     llm = llm_mod.resolve(request.app.state)
     try:
-        return await asyncio.to_thread(d.describe_one, request.app.state.sessions, llm, game_id)
+        return await asyncio.to_thread(d.draft_one, request.app.state.sessions, llm, game_id)
     except errors.AppError:
         raise
     except Exception as exc:  # noqa: BLE001
         raise errors.AppError("description_failed", f"{llm.provider.label} n'a pas pu répondre : {exc}", 502) from exc
+
+
+@router.put("/games/{game_id}/description", response_model=SaveOut)
+async def save_description(game_id: int, body: SaveIn, request: Request) -> dict:
+    """Met dans la fiche la description proposée et validée : elle remplace celle de l'IA (le résumé d'origine,
+    en anglais, est gardé)."""
+    data = {lang: text[:2000] for lang, text in body.texts.items() if lang in d.LANGS} | {"known": body.known}
+    n = await asyncio.to_thread(d.save_one, request.app.state.sessions, game_id, body.mode, data, body.model)
+    return {"texts": n}

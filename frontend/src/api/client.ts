@@ -1,6 +1,10 @@
 import type { components } from "./schema";
 
 type S = components["schemas"];
+export type DescriptionDraft = {
+  mode: "translate" | "write"; model: string; known: boolean; texts: Record<string, { text: string; origin: string }>;
+};
+
 export type Game = S["GameOut"];
 export type GameDetail = S["GameDetailOut"];
 export type GamesPage = S["GamesPageOut"];
@@ -141,7 +145,10 @@ export const api = {
   youtubeSettings: () => request<{ configured: boolean }>("GET", "/settings/youtube"),
   saveYoutubeKey: (api_key: string) => request<void>("PUT", "/settings/youtube", { api_key }),
   deleteYoutubeKey: () => request<void>("DELETE", "/settings/youtube"),
-  describeGame: (id: number) => request<{ texts: number; mode: string }>("POST", `/games/${id}/description`),
+  /** Proposition de l'IA, pas encore enregistrée ; saveDescription la met dans la fiche. */
+  draftDescription: (id: number) => request<DescriptionDraft>("POST", `/games/${id}/description`),
+  saveDescription: (id: number, d: DescriptionDraft) => request<{ texts: number }>("PUT", `/games/${id}/description`,
+    { mode: d.mode, model: d.model, known: d.known, texts: Object.fromEntries(Object.entries(d.texts).map(([k, v]) => [k, v.text])) }),
   descriptions: () => request<DescriptionsStatus>("GET", "/descriptions"),
   startDescriptions: () => request<DescriptionsStatus>("POST", "/descriptions/start"),
   llmSettings: () => request<LlmSettings>("GET", "/settings/llm"),

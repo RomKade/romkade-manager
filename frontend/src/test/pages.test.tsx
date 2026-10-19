@@ -40,6 +40,7 @@ let assistantBodies: Record<string, unknown>[] = [];
 let controlsSourced = false;
 let sheetImages: { boxart_url?: string | null; image_url?: string | null } = {};
 let knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null as string | null, stopping: false };
+let savedDescription: unknown = null;
 type FakeLlm = { provider: string | null; model: string | null; base_url: string | null; key: boolean; tested: boolean };
 const NO_LLM: FakeLlm = { provider: null, model: null, base_url: null, key: false, tested: false };
 let llm: FakeLlm = { ...NO_LLM };
@@ -172,7 +173,12 @@ function mockFetch() {
       ].join("");
       return new Response(sse, { status: 200, headers: { "Content-Type": "text/event-stream" } });
     }
-    if (/^\/api\/games\/\d+\/description/.test(url)) return json({ texts: 2, mode: "translate" });
+    if (/^\/api\/games\/\d+\/description/.test(url)) {
+      if (init?.method === "PUT") { savedDescription = JSON.parse(String(init.body)); return json({ texts: 2 }); }
+      return json({ mode: "translate", model: "qwen", known: true, texts: {
+        en: { text: "Mario's quest to save the princess.", origin: "source" },
+        fr: { text: "Mario doit délivrer la princesse Peach.", origin: "translated" } } });
+    }
     if (url.startsWith("/api/knowledge")) {
       if (url === "/api/knowledge/start") knowledgeJob = { running: true, total: 1, done: 0, found: 0, current: "zelda", stopping: false };
       return json({ games: 2, found: 1, not_found: 0, errors: 0, pending: knowledgeJob.running ? 1 : 1, chunks: 30,
@@ -240,6 +246,7 @@ function renderAt(path: string) {
 }
 
 beforeEach(() => {
+  savedDescription = null;
   localStorage.removeItem("agm-recent-searches");
   localStorage.removeItem("romkade-assistant-name");
   localStorage.removeItem("romkade-assistant-hidden");
@@ -561,14 +568,20 @@ describe("Assistant de jeu", () => {
 });
 
 describe("Connaissances : descriptions d'un seul jeu", () => {
-  it("montre la description actuelle et la fait rédiger à nouveau par l'IA", async () => {
+  it("montre la description de la fiche, propose celle de l'IA et ne la met dans la fiche qu'une fois validée", async () => {
     renderAt("/parametres/connaissances");
     const section = (await screen.findByRole("heading", { name: /Descriptions des jeux/ })).closest("section")!;
     await userEvent.type(await within(section).findByRole("searchbox", { name: "Jeu" }), "mario");
     await userEvent.click(await within(section).findByRole("button", { name: /Super Mario World/ }));
     expect(await within(section).findByText(/Mario part sauver la princesse\./)).toBeInTheDocument();
-    await userEvent.click(within(section).getByRole("button", { name: /Rédiger à nouveau avec l'IA/ }));
-    await waitFor(() => expect(calls).toContain("/api/games/1/description"));
+    await userEvent.click(within(section).getByRole("button", { name: /Proposer une description avec l'IA/ }));
+    const draft = await within(section).findByRole("group", { name: /Proposition de l'IA/ });
+    expect(within(draft).getByText(/Mario doit délivrer la princesse Peach\./)).toBeInTheDocument();
+    expect(within(draft).getByText(/déjà une description : si tu valides, la proposition la remplace/)).toBeInTheDocument();
+    expect(savedDescription).toBeNull();  // rien d'enregistré avant validation
+    await userEvent.click(within(draft).getByRole("button", { name: /Mettre dans la fiche/ }));
+    expect(await within(section).findByText("Description mise dans la fiche du jeu.")).toBeInTheDocument();
+    expect(savedDescription).toMatchObject({ mode: "translate", texts: { fr: "Mario doit délivrer la princesse Peach." } });
   });
 });
 

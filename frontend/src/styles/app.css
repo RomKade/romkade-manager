@@ -1444,3 +1444,8 @@ kbd {
 .llm-head__title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; font-size: var(--fs-lg); }
 .llm-head__title svg { align-self: center; color: var(--accent); }
 .llm-head__lead { font-family: var(--font-text, inherit); font-size: var(--fs-sm); font-weight: 500; color: var(--ink-2); }
+
+/* Connaissances > Descriptions, un seul jeu : proposition de l'IA à valider */
+.desc-one__draft { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-control); border: 1px dashed var(--line-strong); }
+.desc-one__draft .desc-one__text { border-left-color: var(--accent-2, var(--accent)); }
+.text-ok { color: var(--ok); font-weight: 600; margin: 0; }

@@ -165,9 +165,10 @@ def game_for(f: RemoteFile) -> dict:
             "summary": f.description}
 
 
-def describe_one(sessions, llm: LLM, file_id: int) -> dict:
-    """Décrit (ou décrit à nouveau) un seul jeu tout de suite, avec `llm` : sert aussi de test avant le lot.
-    Les textes rédigés ou traduits par l'IA sont remplacés ; le résumé d'origine (« source ») est gardé."""
+def draft_one(sessions, llm: LLM, file_id: int) -> dict:
+    """Propose une description pour un seul jeu, sans l'enregistrer : l'utilisateur la valide ensuite (save_one).
+    Sert aussi de test avant le lot. Renvoie {mode, model, known, texts: {lang: {text, origin}}} : en traduction,
+    l'anglais reste le résumé d'origine (« source »)."""
     from app.services import catalog_query as cq
 
     with sessions() as s:
@@ -175,14 +176,26 @@ def describe_one(sessions, llm: LLM, file_id: int) -> dict:
     mode, prompt, schema = request_for(game)
     data = llm.complete_json(SYSTEM, prompt, schema, max_tokens=MAX_TOKENS, effort=EFFORT, name="description",
                              reasoning="none" if llm.provider.id == "local" else None)
-    if data is None:
+    texts = _texts(game, mode, data or {}, llm.model)
+    if not any(origin != "source" for _, origin, _ in texts.values()):
         raise AppError("description_unreadable", f"{llm.label} n'a pas rendu de description utilisable pour ce jeu.", 502)
+    return {"mode": mode, "model": llm.model[:40], "known": bool((data or {}).get("known", True)),
+            "texts": {lang: {"text": text, "origin": origin} for lang, (text, origin, _) in texts.items()}}
+
+
+def save_one(sessions, file_id: int, mode: str, data: dict, model: str) -> int:
+    """Met dans la fiche la description validée : remplace les textes de l'IA (le résumé d'origine est gardé).
+    Renvoie le nombre de textes écrits."""
+    from app.services import catalog_query as cq
+
     with sessions.begin() as s:
+        game = game_for(cq.get_file(s, file_id))
+        if mode == "translate" and not game["summary"]:
+            mode = "write"
         s.execute(delete(GameText).where(GameText.platform_id == game["platform_id"],
                                          GameText.normalized_title == game["normalized_title"],
                                          GameText.origin != "source"))
-        written = store(s, game, mode, data, llm.model)
-    return {"texts": written, "mode": mode}
+        return store(s, game, mode, data, model)
 
 
 def request_for(game: dict) -> tuple[str, str, dict]:
@@ -222,20 +235,26 @@ def store(s: Session, game: dict, mode: str, data: dict, model: str = MODEL) -> 
     """Enregistre les langues manquantes d'un jeu. Renvoie le nombre de textes écrits."""
     have = set(s.scalars(select(GameText.lang).where(GameText.platform_id == game["platform_id"],
                                                      GameText.normalized_title == game["normalized_title"])))
+    written = 0
+    for lang, (text, origin, model) in _texts(game, mode, data, model).items():
+        if lang in have:
+            continue
+        s.add(GameText(platform_id=game["platform_id"], normalized_title=game["normalized_title"], lang=lang,
+                       text=text, origin=origin, model=model))
+        written += 1
+    return written
+
+
+def _texts(game: dict, mode: str, data: dict, model: str) -> dict[str, tuple[str, str, str | None]]:
+    """{lang: (texte, origine, modèle)} pour les langues dont le texte est utilisable."""
     if mode == "translate":
         texts = {"en": (game["summary"], "source", None), "fr": (data.get("fr"), "translated", model[:40]),
                  "es": (data.get("es"), "translated", model[:40])}
     else:
         origin = "written" if data.get("known") else "cautious"
         texts = {lang: (data.get(lang), origin, model[:40]) for lang in LANGS}
-    written = 0
-    for lang, (text, origin, model) in texts.items():
-        if lang in have or not isinstance(text, str) or not text.strip():
-            continue
-        s.add(GameText(platform_id=game["platform_id"], normalized_title=game["normalized_title"], lang=lang,
-                       text=text.strip(), origin=origin, model=model))
-        written += 1
-    return written
+    return {lang: (text.strip(), origin, m) for lang, (text, origin, m) in texts.items()
+            if isinstance(text, str) and text.strip()}
 
 
 # ---------- lot ----------
