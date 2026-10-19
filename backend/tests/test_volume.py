@@ -36,10 +36,16 @@ def test_asoundrc():
 
 
 class FakeConsole:
-    def __init__(self, raw=42, game="retroarch", agm=True):
+    def __init__(self, raw=42, game="retroarch", agm=True, locked=False):
         self.commands, self.raw, self.on, self.game, self.agm, self.hw, self.saved = [], raw, True, game, agm, 63, ""
+        self.locked = locked
 
     async def __call__(self, client, command, timeout=20):
+        if command.startswith("{ ") and command.endswith("; } 2>&1"):  # réglage : sortie d'erreur lue
+            command = command[2:-len("; } 2>&1")]
+            if self.locked:
+                self.commands.append(command)
+                return 1, "amixer: Control sysdefault:0 element write error: Operation not permitted"
         self.commands.append(command)
         if command.startswith("echo @@VOL"):
             return 0, sample(self.raw, self.on, self.game, self.agm, self.hw, self.saved)
@@ -95,3 +101,16 @@ async def test_volume_retroarch_from_console_menu(app_factory):
         assert r.status_code == 200 and r.json()["muted"] and "MUTE" in console.commands[-2]
         r = await c.put("/api/volume", json={"percent": 50})
         assert r.status_code == 409 and r.json()["error"]["code"] == "volume_not_ready"
+
+
+async def test_volume_locked_by_running_game(app_factory):
+    """Réglage verrouillé par le RetroArch en cours : message clair au lieu d'un curseur qui revient en arrière."""
+    console = FakeConsole(locked=True)
+    async with client_for(app_factory, console) as c:
+        r = await c.put("/api/volume", json={"percent": 40})
+        assert r.status_code == 409 and r.json()["error"]["code"] == "volume_locked"
+
+
+def test_launch_creates_volume_control_before_the_game():
+    """Premier jeu depuis le démarrage : réglage créé par aplay (qui se ferme), pas par RetroArch (qui le verrouille)."""
+    assert "aplay -q -D default" in launcher.LAUNCH_SCRIPT and "cset \"$VOL\" 60,60" in launcher.LAUNCH_SCRIPT

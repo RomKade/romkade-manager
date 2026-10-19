@@ -96,14 +96,16 @@ RACFG=/.config/retroarch/retroarch.cfg
 [ -n "$AGM_PLAYERS" ] && log "$(bash -c "$AGM_PLAYERS")"
 
 # Volume des jeux (voir app/device/volume.py) : notre réglage « Game Manager » (/.asoundrc) fait le volume,
-# celui de RetroArch reste à 0 dB. Premier jeu depuis le démarrage : le réglage naît au maximum (+12 dB), on le
-# met à 0 dB (valeur 60 sur 84, de -30 à +12 dB par pas de 0,5 dB).
+# celui de RetroArch reste à 0 dB. Premier jeu depuis le démarrage : le réglage n'existe pas encore. Créé par
+# RetroArch, il resterait verrouillé par lui tout le jeu (le curseur et les touches Vol+/Vol- ne pourraient rien
+# changer) : on le crée avant, par une seconde de silence jouée avec aplay, qui se ferme et ne garde aucun verrou.
+# Puis 0 dB (valeur 60 sur 84, de -30 à +12 dB par pas de 0,5 dB).
 if grep -q agm_vol /.asoundrc 2>/dev/null && [ -f "$RACFG" ]; then
     sed -i -e 's/^audio_volume = .*/audio_volume = "0.000000"/' -e 's/^audio_mute_enable = .*/audio_mute_enable = "false"/' "$RACFG"
     VOL="name='Game Manager Playback Volume'"
     if ! env -u LD_LIBRARY_PATH amixer -c 0 cget "$VOL" >/dev/null 2>&1; then
-        ( for _ in $(seq 1 100); do env -u LD_LIBRARY_PATH amixer -q -c 0 cset "$VOL" 60,60 2>/dev/null && break
-          sleep 0.2; done ) &
+        env -u LD_LIBRARY_PATH timeout 3 aplay -q -D default -f S16_LE -r 48000 -c 2 -d 1 /dev/zero >/dev/null 2>&1
+        env -u LD_LIBRARY_PATH amixer -q -c 0 cset "$VOL" 60,60 2>/dev/null && log "réglage de volume créé avant le jeu"
     fi
     log "volume des jeux par Game Manager"
     # Touches Vol+ / Vol- de la console sur ce volume (app/device/volume_keys.py), le temps du jeu.

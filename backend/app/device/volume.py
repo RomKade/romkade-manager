@@ -182,7 +182,12 @@ async def set_volume(run: Runner, client: DeviceClient, percent: int | None, mut
     else:
         raise errors.AppError("volume_not_ready", "Le volume de ce jeu se règle avec les touches de la console. "
                               "Lancé depuis Game Manager, il se règle aussi ici.", 409, {"mode": st["mode"]})
-    await run(client, cmd)
+    code, out = await run(client, f"{{ {cmd}; }} 2>&1")
+    if code != 0 and re.search(r"not permitted", out, re.I):
+        # Réglage créé par le RetroArch en cours (premier jeu depuis le démarrage, avant que launch.sh ne le crée
+        # lui-même) : verrouillé par lui jusqu'à la fin du jeu.
+        raise errors.AppError("volume_locked", "Le jeu en cours a verrouillé le volume : quitte-le et relance-le "
+                              "depuis Game Manager, le curseur répondra.", 409)
     st = await status(run, client)
     if cmd == RA_MUTE:
         st["muted"] = bool(muted)  # RetroArch ne dit pas s'il est coupé : on renvoie ce qu'on a demandé

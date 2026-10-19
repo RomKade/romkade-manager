@@ -391,8 +391,10 @@ Lo que no funciona en esta consola, y de ahí esta elección:
 
 Por eso Game Manager añade su propio volumen por software ALSA: `/.asoundrc` (que leen los juegos lanzados desde Game
 Manager, `HOME=/`) hace pasar la salida «default» por dos `softvol` (volumen «Game Manager» y luego silencio),
-antes de los altavoces o de la salida Bluetooth `agm_bt`. El control «Game Manager» aparece en la tarjeta 0 con el
-primer juego tras un arranque (ajustado entonces al 60 %) y después se regula con `amixer`, incluso en plena partida. Al
+antes de los altavoces o de la salida Bluetooth `agm_bt`. El control «Game Manager» se crea en la tarjeta 0 antes
+del primer juego tras un arranque, con un segundo de silencio reproducido con `aplay` (ajustado entonces al 60 %):
+creado por RetroArch, quedaba bloqueado por él durante toda esa partida (control deslizante y teclas Vol+/Vol- sin
+efecto). Después se regula con `amixer`, incluso en plena partida. Al
 lanzar, `launch.sh` pone el volumen propio de RetroArch (`audio_volume`, a menudo muy bajo) a 0 dB.
 Un juego lanzado desde el menú de la consola no usa `/.asoundrc`: solo funciona el silencio (`MUTE`).
 
