@@ -629,6 +629,12 @@ sous Android).
 - Logo et icônes ROMKADE Manager (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), tirés des fichiers de
   marque du dépôt romkade-website.
 
+## Licence
+
+Propriétaire : © 2026 ROMKADE, tous droits réservés (voir [LICENSE](LICENSE)). Le code est publié pour lecture et
+évaluation ; tout autre usage (copie, redistribution, intégration à un produit ou à un firmware, service hébergé)
+demande l'accord écrit de ROMKADE. Les composants tiers gardent leur propre licence ([NOTICE](NOTICE)).
+
 ## Sources et crédits
 
 ROMKADE Manager ne fournit aucun jeu. Ce qu'il reprend d'ailleurs est cité dans l'interface

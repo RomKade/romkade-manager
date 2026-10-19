@@ -82,8 +82,9 @@ def save_config(cfg: dict) -> None:
 
 
 def write_status(**status) -> None:
+    """Complète l'état lu par l'écran de l'app ROMKADE (screen.py)."""
     try:
-        STATUS.write_text(json.dumps({**status, "at": time.time()}))
+        STATUS.write_text(json.dumps({**_read_status(), **status, "at": time.time()}))
     except OSError:
         pass
 
@@ -196,7 +197,9 @@ class Agent:
         if r.get("secret"):
             self.cfg["secret"] = r["secret"]
             save_config(self.cfg)
-        write_status(paired=r.get("paired", False), code=r.get("pairing_code"), name=r.get("name"), online=True)
+        expires = r.get("pairing_expires_in")
+        write_status(paired=r.get("paired", False), code=r.get("pairing_code"), name=r.get("name"), online=True,
+                     code_until=time.time() + expires if expires else None)
         log.info("connecté au cloud : console %s, %s", r.get("console_id"),
                  "appairée" if r.get("paired") else f"code d'appairage {r.get('pairing_code')}")
         return r
@@ -208,6 +211,7 @@ class Agent:
             return
         r = await http(self.cfg, "POST", "/agent/catalog", {"files": files}, timeout=120, compress=True)
         self.catalog_digest = digest
+        write_status(games=r.get("games"))
         log.info("catalogue envoyé : %s fichiers, %s jeux", len(files), r.get("games"))
 
     # ---------- ordres ----------
@@ -307,9 +311,14 @@ class Agent:
                     r = await http(self.cfg, "GET", f"/agent/poll?wait={POLL_WAIT}", timeout=POLL_WAIT + 15)
                     if r.get("command"):
                         asyncio.ensure_future(self.handle(r["command"]))
+                    elif r.get("resync"):
+                        await self.sync_catalog(force=True)  # le cloud n'a plus la liste (mise à jour du serveur)
                     elif "paired" in r:
-                        if _read_status().get("paired") != r["paired"]:
+                        status = _read_status()
+                        if status.get("paired") != r["paired"]:
                             await self.hello()  # appairée (ou détachée) depuis : l'écran de l'app suit
+                        elif not r["paired"] and (status.get("code_until") or 0) < time.time() + 30:
+                            await self.hello()  # code bientôt expiré : le cloud en donne un nouveau
                     if time.time() - last_scan > RESCAN_EVERY:
                         last_scan = time.time()
                         await self.sync_catalog()

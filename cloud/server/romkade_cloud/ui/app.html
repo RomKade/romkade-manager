@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROMKADE</title>
+<!--
+  Interface ROMKADE dans ChatGPT, Claude… (extension MCP Apps). © 2026 ROMKADE, tous droits réservés.
+  Même charte que ROMKADE Manager (frontend/src/styles/tokens.css) : bleu nuit, cyan et rose néon, vert lime pour
+  la console active ; Archivo (titres) et Atkinson Hyperlegible Next (texte), SIL OFL 1.1.
+  Le serveur remplace __ROMKADE_BASE__ par son adresse publique (polices, jaquettes, illustrations des consoles).
+-->
+<style>
+@font-face { font-family: "Archivo RK"; src: url("__ROMKADE_BASE__/fonts/archivo.woff2") format("woff2-variations");
+  font-weight: 100 900; font-stretch: 62% 125%; font-display: swap; }
+/* Atkinson barre le zéro (« 2Ø26 ») : comme le Manager, les chiffres viennent d'Archivo. */
+@font-face { font-family: "Digits RK"; src: url("__ROMKADE_BASE__/fonts/archivo.woff2") format("woff2-variations");
+  font-weight: 100 900; font-stretch: 62% 125%; unicode-range: U+0030-0039; font-display: swap; }
+@font-face { font-family: "Atkinson RK"; src: url("__ROMKADE_BASE__/fonts/atkinson.woff2") format("woff2-variations");
+  font-weight: 200 800; font-display: swap; }
+
+:root {
+  color-scheme: dark;
+  --shell: #050c1c; --panel: #0b1c35; --panel-2: #102642; --line: #234362; --line-strong: #31597f;
+  --ink: #f5f8ff; --ink-2: #a9bdd3; --ink-3: #8aa1bb;
+  --screen: #081730; --screen-2: #102642; --screen-ink: #f5f8ff; --screen-ink-2: #a9bdd3;
+  --accent: #11d9f5; --accent-hover: #63e7f9; --accent-soft: #0c3550; --accent-ink: #03141f; --accent-2: #ff43b5;
+  --live: #b7ec4b; --ok: #34de95; --warn: #f5b84a; --err: #f56a84; --err-soft: #3a1529;
+  --danger: #d8365c; --danger-ink: #fff;
+  --neon-gradient: linear-gradient(90deg, #11d9f5, #ff43b5);
+  --glow-cyan: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 22px color-mix(in srgb, var(--accent) 22%, transparent);
+  --surface: linear-gradient(180deg, #0c1f3b, #0a1830);
+  --grid-line: rgb(17 217 245 / 0.045);
+  --ambient: radial-gradient(700px 300px at 90% -20%, rgb(17 217 245 / 0.12), transparent 70%),
+             radial-gradient(600px 300px at 20% -30%, rgb(255 67 181 / 0.10), transparent 70%);
+  --shadow-raised: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px rgb(0 0 0 / 0.35);
+  --font-display: "Archivo RK", system-ui, sans-serif;
+  --font-text: "Digits RK", "Atkinson RK", system-ui, sans-serif;
+  --fs-xs: 0.75rem; --fs-sm: 0.8125rem; --fs-md: 0.9375rem; --fs-lg: 1.125rem; --fs-xl: 1.5rem;
+  --r-panel: 14px; --r-control: 10px; --r-cover: 8px; --r-pill: 999px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1); --dur: 180ms;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --shell: #eef3fa; --panel: #ffffff; --panel-2: #f2f6fc; --line: #cfdbea; --line-strong: #a3b6cd;
+  --ink: #0b1630; --ink-2: #33486a; --ink-3: #566b8a;
+  --screen: #0b1c35; --screen-2: #102642; --screen-ink: #f5f8ff; --screen-ink-2: #a9bdd3;
+  --accent: #007a96; --accent-hover: #006880; --accent-soft: #d6f3f9; --accent-ink: #fff; --accent-2: #c81f84;
+  --live: #4f7f0c; --ok: #0f7a4f; --warn: #8a5a00; --err: #c0294b; --err-soft: #fbe3e9; --danger: #c0294b;
+  --neon-gradient: linear-gradient(90deg, #0aa6c2, #d23b97);
+  --glow-cyan: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent), 0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent);
+  --surface: linear-gradient(180deg, #ffffff, #f6f9fd);
+  --grid-line: rgb(0 122 150 / 0.06);
+  --ambient: radial-gradient(700px 300px at 90% -20%, rgb(0 160 200 / 0.10), transparent 70%),
+             radial-gradient(600px 300px at 20% -30%, rgb(210 40 140 / 0.06), transparent 70%);
+  --shadow-raised: 0 1px 2px rgb(11 22 48 / 0.06), 0 4px 14px rgb(11 22 48 / 0.06);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; }
+body { font-family: var(--font-text); font-size: var(--fs-md); line-height: 1.45; color: var(--ink); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+.rk {
+  position: relative; overflow: hidden; border-radius: 18px; border: 1px solid var(--line);
+  background: var(--ambient), linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 28px 28px,
+              linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 28px 28px, var(--shell);
+  padding: 14px 16px 12px;
+}
+.rk-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand { padding: 3px 8px 3px 4px; border-radius: 10px; }
+:root[data-theme="light"] .brand { background: #0b1c35; }
+.brand img { height: 30px; width: auto; display: block; filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 35%, transparent)); }
+.console-pill { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 85%, transparent); font-size: var(--fs-xs); color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+.led { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); flex: none; }
+.led--live { background: var(--live); box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 22%, transparent), 0 0 10px var(--live); }
+.led--off { background: var(--ink-3); }
+
+h1, h2, h3 { margin: 0; font-family: var(--font-display); }
+h1 { font-size: var(--fs-xl); font-weight: 750; font-stretch: 118%; letter-spacing: -0.01em; line-height: 1.15; }
+h2 { font-size: var(--fs-lg); font-weight: 680; font-stretch: 108%; }
+.muted { color: var(--ink-2); }
+.small { font-size: var(--fs-sm); }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 2px 2px 12px; flex-wrap: wrap; }
+.section-head .muted { font-size: var(--fs-sm); }
+
+/* Héros « 4 838 jeux sur 34 consoles » (tableau de bord du Manager) */
+.hero { font-family: var(--font-display); font-weight: 800; font-stretch: 112%; font-size: clamp(1.6rem, 1rem + 3vw, 2.4rem);
+  line-height: 1.05; letter-spacing: -0.02em; margin: 2px 0 6px; }
+.hero .n1 { color: var(--accent); text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent); }
+.hero .n2 { color: var(--accent-2); text-shadow: 0 0 22px color-mix(in srgb, var(--accent-2) 45%, transparent); }
+
+/* Boutons (Manager : .button, --primary, --neon, --danger) */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 14px;
+  border-radius: var(--r-control); border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+  font-weight: 650; font-size: var(--fs-sm); cursor: pointer; transition: box-shadow var(--dur) var(--ease), border-color var(--dur), background var(--dur), transform 80ms; white-space: nowrap; }
+.btn:hover:not(:disabled) { border-color: var(--accent); box-shadow: var(--glow-cyan); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 30%, transparent); }
+.btn--primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn--neon { background: color-mix(in srgb, var(--panel) 80%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.btn--neon svg { color: var(--accent); }
+.btn--danger { background: var(--danger); border-color: var(--danger); color: var(--danger-ink); }
+.btn--danger:hover:not(:disabled) { border-color: var(--accent-2); box-shadow: 0 0 18px color-mix(in srgb, var(--accent-2) 40%, transparent); }
+.btn--ghost { background: transparent; border-color: transparent; color: var(--ink-2); padding: 0 8px; }
+.btn--ghost:hover:not(:disabled) { color: var(--ink); box-shadow: none; border-color: var(--line); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Badges console (Manager : .console-badge) et puces */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 6px; font-size: 0.6875rem; font-weight: 700;
+  letter-spacing: 0.02em; background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--ink-2); font-size: var(--fs-sm); cursor: pointer; transition: border-color var(--dur), color var(--dur); }
+.chip:hover { border-color: var(--accent); color: var(--ink); }
+.chip b { color: var(--ink); font-weight: 700; }
+.live-tag { display: inline-flex; align-items: center; gap: 7px; padding: 3px 9px; border-radius: 6px; font-size: 0.6875rem; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--live); background: color-mix(in srgb, var(--live) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--live) 35%, transparent); }
+
+/* Dalle sombre et jaquettes (Manager : .screen, .cover, .tile) */
+.screen { border-radius: var(--r-panel); background: var(--screen); border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line)); padding: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 16px 12px; }
+.tile { display: flex; flex-direction: column; gap: 7px; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; color: var(--screen-ink); min-width: 0; }
+.cover { position: relative; overflow: hidden; aspect-ratio: 3 / 4; border-radius: var(--r-cover); background: var(--screen-2);
+  border: 1px solid rgb(255 255 255 / 0.07); transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.cover__backdrop { position: absolute; inset: -10%; width: 120%; height: 120%; object-fit: cover; filter: blur(16px) saturate(1.2) brightness(0.55); opacity: 0; transition: opacity 200ms; }
+.cover__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 200ms; }
+.cover.is-loaded .cover__img, .cover.is-loaded .cover__backdrop { opacity: 1; }
+.cover__empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 4px; padding: 8px;
+  background: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%), var(--screen-2); }
+.cover__initials { font-family: var(--font-display); font-weight: 800; font-stretch: 125%; font-size: 1.6rem; color: var(--screen-ink-2); }
+.cover__platform { font-size: var(--fs-xs); color: var(--screen-ink-2); opacity: 0.8; }
+.cover.is-loaded .cover__empty { display: none; }
+.tile:hover .cover, .tile:focus-visible .cover { transform: translateY(-2px);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 40%, transparent), 0 8px 18px rgb(0 0 0 / 0.45); }
+.tile:focus-visible { outline: none; }
+.play-dot { position: absolute; right: 7px; bottom: 7px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: rgb(5 12 28 / 0.72); border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); color: var(--accent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent); opacity: 0; transform: scale(0.9); transition: opacity var(--dur), transform var(--dur); }
+.play-dot svg { width: 15px; height: 15px; margin-left: 2px; }
+.tile:hover .play-dot, .tile:focus-visible .play-dot { opacity: 1; transform: none; }
+@media (hover: none) { .play-dot { opacity: 1; transform: none; } }
+.tile__title { font-weight: 650; font-size: var(--fs-sm); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tile__meta { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--screen-ink-2); min-width: 0; }
+.tile__meta span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen .badge { background: rgb(17 217 245 / 0.12); color: var(--screen-ink); border-color: rgb(17 217 245 / 0.28); }
+.more { display: flex; justify-content: center; margin-top: 14px; }
+
+/* Fiche du jeu (Manager : GameSheet) */
+.sheet { display: grid; grid-template-columns: minmax(130px, 210px) 1fr; gap: 18px; align-items: start; }
+.sheet .cover { aspect-ratio: 3 / 4; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 14px 34px rgb(0 0 0 / 0.45); }
+.sheet__body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--fs-sm); color: var(--ink-2); }
+.facts b { color: var(--ink); font-weight: 650; }
+.desc { font-size: var(--fs-sm); color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
+.desc.is-open { -webkit-line-clamp: unset; display: block; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: var(--fs-sm); font-weight: 650; }
+.back { margin: -4px 0 10px -6px; }
+@media (max-width: 460px) { .sheet { grid-template-columns: 1fr; } .sheet .cover { max-width: 190px; } }
+
+/* Carte « En cours sur la console » (Manager : NowPlayingCard) */
+.now { position: relative; overflow: hidden; border-radius: var(--r-panel); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent), 0 0 34px color-mix(in srgb, var(--accent) 16%, transparent); background: var(--surface); }
+.now__art { position: absolute; inset: 0; }
+.now__art img { position: absolute; inset: -20%; width: 140%; height: 140%; object-fit: cover; filter: blur(30px) saturate(1.3) brightness(0.45); }
+.now__art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--panel) 92%, transparent) 30%, color-mix(in srgb, var(--panel) 55%, transparent)); }
+.now__art--abstract { background: var(--ambient); }
+.now__inner { position: relative; display: grid; grid-template-columns: 116px 1fr; gap: 18px; padding: 16px; align-items: center; }
+.now__inner .cover { box-shadow: 0 10px 26px rgb(0 0 0 / 0.5); }
+.now__body { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.now__sub { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: var(--fs-sm); }
+.idle { display: flex; align-items: center; gap: 14px; padding: 16px; }
+.idle svg { width: 38px; height: 38px; color: var(--accent); flex: none; }
+.volume { display: flex; align-items: center; gap: 10px; max-width: 340px; }
+.volume svg { width: 18px; height: 18px; color: var(--ink-2); flex: none; }
+.volume output { font-variant-numeric: tabular-nums; font-size: var(--fs-sm); color: var(--ink-2); min-width: 40px; text-align: right; }
+input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 6px; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)) 0 0 / var(--pct, 50%) 100% no-repeat, var(--panel-2); outline: none; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-2); border: 3px solid var(--panel); box-shadow: 0 0 12px var(--accent-2); }
+input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent-2); border: 3px solid var(--panel); box-shadow: 0 0 12px var(--accent-2); }
+.pulse { animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.45; } }
+@media (max-width: 460px) { .now__inner { grid-template-columns: 84px 1fr; gap: 12px; } }
+
+/* Bibliothèque : tuiles de consoles (Manager : page Bibliothèque) */
+.systems { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; }
+.system { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); cursor: pointer; text-align: left; transition: border-color var(--dur), box-shadow var(--dur), transform var(--dur); min-width: 0; }
+.system:hover { border-color: var(--accent); box-shadow: var(--glow-cyan); transform: translateY(-1px); }
+.system__art { height: 62px; display: grid; place-items: center; margin-bottom: 4px; }
+.system__art img { max-height: 62px; max-width: 100%; object-fit: contain; filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.35)); }
+.system__code { font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.06em; color: var(--ink-3); }
+.system__name { font-family: var(--font-display); font-weight: 680; font-stretch: 104%; font-size: var(--fs-sm); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--ink-2); }
+.bar i { flex: 1; height: 4px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
+.bar i::before { content: ""; display: block; height: 100%; width: var(--w); background: var(--neon-gradient); border-radius: 99px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+
+/* Cheats */
+.cheat-head { display: grid; grid-template-columns: 56px 1fr; gap: 12px; align-items: center; margin-bottom: 12px; }
+.filter { width: 100%; height: 38px; border-radius: var(--r-control); border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+  padding: 0 12px; font: inherit; font-size: var(--fs-sm); margin-bottom: 10px; outline: none; }
+.filter:focus { border-color: var(--accent); box-shadow: var(--glow-cyan); }
+.cheats { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.cheats li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--line); }
+.cheats li:first-child { border-top: 0; }
+.cheats .d { flex: 1; min-width: 0; font-size: var(--fs-sm); }
+.code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.8125rem; padding: 3px 8px; border-radius: 6px; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+  max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: all; }
+.copy { width: 30px; height: 30px; padding: 0; }
+
+/* Consoles */
+.console-card { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+.console-card + .console-card { margin-top: 8px; }
+.console-card .icon { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line); }
+.console-card .icon img { width: 40px; height: 40px; border-radius: 9px; }
+.console-card .num { font-family: var(--font-display); font-weight: 800; font-stretch: 112%; font-size: 1.35rem; color: var(--accent); text-align: right; line-height: 1; }
+.console-card .num small { display: block; font-family: var(--font-text); font-weight: 500; font-size: var(--fs-xs); color: var(--ink-2); }
+.banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; margin-bottom: 10px; font-weight: 650; font-size: var(--fs-sm);
+  background: color-mix(in srgb, var(--live) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--live) 40%, var(--line)); color: var(--ink); }
+.banner svg { width: 18px; height: 18px; color: var(--live); flex: none; }
+
+/* Messages, chargement, pied */
+.notice { margin-top: 10px; padding: 9px 12px; border-radius: 10px; font-size: var(--fs-sm); }
+.notice--err { background: var(--err-soft); color: var(--ink); border: 1px solid color-mix(in srgb, var(--err) 45%, transparent); }
+.notice--ok { background: color-mix(in srgb, var(--ok) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent); }
+.loading { display: flex; align-items: center; gap: 10px; color: var(--ink-2); padding: 18px 4px; font-size: var(--fs-sm); }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.skeleton .cover { animation: pulse 1.4s ease-in-out infinite; }
+.foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  font-size: 0.6875rem; color: var(--ink-3); }
+.foot button { background: none; border: 0; padding: 0; color: var(--ink-3); cursor: pointer; font-size: inherit; }
+.foot button:hover { color: var(--accent); }
+.empty { text-align: center; padding: 22px 10px; color: var(--ink-2); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<main class="rk" id="root" aria-live="polite">
+  <div class="loading"><span class="spin" aria-hidden="true"></span><span>ROMKADE…</span></div>
+</main>
+<script>
+"use strict";
+(() => {
+const BASE = "__ROMKADE_BASE__";
+const VERSION = "__ROMKADE_VERSION__";
+const root = document.getElementById("root");
+
+/* ---------- textes (fr, en, es) ---------- */
+const TEXT = {
+  fr: { games: (n) => `${fmt(n)} jeu${n > 1 ? "x" : ""}`, of: "sur", consoles: (n) => `console${n > 1 ? "s" : ""}`,
+    play: "Jouer", resume: "Reprendre", cheats: "Codes de triche", back: "Retour", more: "Afficher plus", readMore: "Lire la suite",
+    nowPlaying: "En cours sur la console", launching: "Lancement sur la console", save: "Sauvegarder maintenant", quit: "Quitter le jeu",
+    saved: "Partie sauvegardée.", idle: "Aucun jeu en cours", idleHint: "La console est sur son menu. Choisis un jeu à lancer.",
+    refresh: "Actualiser", volume: "Volume", muted: "Son coupé", online: "En ligne", offline: "Hors ligne ou en veille",
+    seen: (m) => m == null ? "" : m < 1 ? "vue à l'instant" : `vue il y a ${fmtAgo(m)}`, paired: "Console connectée à ROMKADE",
+    noGames: "Aucun jeu trouvé.", noCheats: "Aucun code connu pour ce jeu dans la base libretro.", filter: "Filtrer les codes…",
+    copy: "Copier", copied: "Copié", codesOf: (n) => `${fmt(n)} code${n > 1 ? "s" : ""}`, otherVersions: "Autres versions",
+    developer: "Développeur", publisher: "Éditeur", year: "Année", genre: "Genre", region: "Région",
+    libraryOf: "Bibliothèque de", genresTitle: "Genres", systemsTitle: "Consoles", updated: (m) => `Catalogue mis à jour il y a ${fmtAgo(m)}`,
+    sentToConsole: "Envoyé à la console.", error: "Erreur", loading: "Chargement…", rights: "© 2026 ROMKADE · Tous droits réservés",
+    covers: "Jaquettes : libretro-thumbnails", cheatSource: "Codes : libretro-database, CC BY-SA 4.0" },
+  en: { games: (n) => `${fmt(n)} game${n > 1 ? "s" : ""}`, of: "on", consoles: (n) => `system${n > 1 ? "s" : ""}`,
+    play: "Play", resume: "Resume", cheats: "Cheat codes", back: "Back", more: "Show more", readMore: "Read more",
+    nowPlaying: "Now playing on the console", launching: "Launching on the console", save: "Save now", quit: "Quit game",
+    saved: "Game saved.", idle: "No game running", idleHint: "The console is on its menu. Pick a game to launch.",
+    refresh: "Refresh", volume: "Volume", muted: "Muted", online: "Online", offline: "Offline or asleep",
+    seen: (m) => m == null ? "" : m < 1 ? "seen just now" : `seen ${fmtAgo(m)} ago`, paired: "Console connected to ROMKADE",
+    noGames: "No game found.", noCheats: "No known code for this game in the libretro database.", filter: "Filter codes…",
+    copy: "Copy", copied: "Copied", codesOf: (n) => `${fmt(n)} code${n > 1 ? "s" : ""}`, otherVersions: "Other versions",
+    developer: "Developer", publisher: "Publisher", year: "Year", genre: "Genre", region: "Region",
+    libraryOf: "Library of", genresTitle: "Genres", systemsTitle: "Systems", updated: (m) => `Catalog updated ${fmtAgo(m)} ago`,
+    sentToConsole: "Sent to the console.", error: "Error", loading: "Loading…", rights: "© 2026 ROMKADE · All rights reserved",
+    covers: "Box art: libretro-thumbnails", cheatSource: "Codes: libretro-database, CC BY-SA 4.0" },
+  es: { games: (n) => `${fmt(n)} juego${n > 1 ? "s" : ""}`, of: "en", consoles: (n) => `consola${n > 1 ? "s" : ""}`,
+    play: "Jugar", resume: "Continuar", cheats: "Trucos", back: "Volver", more: "Mostrar más", readMore: "Leer más",
+    nowPlaying: "Jugando en la consola", launching: "Iniciando en la consola", save: "Guardar ahora", quit: "Salir del juego",
+    saved: "Partida guardada.", idle: "Ningún juego en curso", idleHint: "La consola está en su menú. Elige un juego.",
+    refresh: "Actualizar", volume: "Volumen", muted: "Silenciado", online: "En línea", offline: "Desconectada o en reposo",
+    seen: (m) => m == null ? "" : m < 1 ? "vista ahora" : `vista hace ${fmtAgo(m)}`, paired: "Consola conectada a ROMKADE",
+    noGames: "Ningún juego encontrado.", noCheats: "Ningún código conocido para este juego en la base libretro.", filter: "Filtrar códigos…",
+    copy: "Copiar", copied: "Copiado", codesOf: (n) => `${fmt(n)} código${n > 1 ? "s" : ""}`, otherVersions: "Otras versiones",
+    developer: "Desarrollador", publisher: "Editor", year: "Año", genre: "Género", region: "Región",
+    libraryOf: "Biblioteca de", genresTitle: "Géneros", systemsTitle: "Consolas", updated: (m) => `Catálogo actualizado hace ${fmtAgo(m)}`,
+    sentToConsole: "Enviado a la consola.", error: "Error", loading: "Cargando…", rights: "© 2026 ROMKADE · Todos los derechos reservados",
+    covers: "Carátulas: libretro-thumbnails", cheatSource: "Códigos: libretro-database, CC BY-SA 4.0" },
+};
+const GENRE = {
+  fr: { action: "Action", aventure: "Aventure", beat: "Beat'em up", combat: "Combat", course: "Course", plateforme: "Plateforme", rpg: "Jeu de rôle", shmup: "Shoot'em up", tir: "Tir", sport: "Sport", reflexion: "Réflexion", labyrinthe: "Labyrinthe", strategie: "Stratégie", simulation: "Simulation", flipper: "Flipper", societe: "Société et casino", quiz: "Quiz", musique: "Musique et rythme", educatif: "Éducatif", compilation: "Compilation", autre: "Autre" },
+  en: { action: "Action", aventure: "Adventure", beat: "Beat 'em up", combat: "Fighting", course: "Racing", plateforme: "Platformer", rpg: "Role-playing", shmup: "Shoot 'em up", tir: "Shooter", sport: "Sports", reflexion: "Puzzle", labyrinthe: "Maze", strategie: "Strategy", simulation: "Simulation", flipper: "Pinball", societe: "Board and casino", quiz: "Quiz", musique: "Music and rhythm", educatif: "Educational", compilation: "Compilation", autre: "Other" },
+  es: { action: "Acción", aventure: "Aventura", beat: "Beat 'em up", combat: "Lucha", course: "Carreras", plateforme: "Plataformas", rpg: "Rol", shmup: "Shoot 'em up", tir: "Disparos", sport: "Deportes", reflexion: "Puzle", labyrinthe: "Laberinto", strategie: "Estrategia", simulation: "Simulación", flipper: "Pinball", societe: "Mesa y casino", quiz: "Preguntas", musique: "Música y ritmo", educatif: "Educativo", compilation: "Recopilación", autre: "Otros" },
+};
+let lang = "fr";
+const t = (k, ...a) => { const v = (TEXT[lang] || TEXT.fr)[k]; return typeof v === "function" ? v(...a) : v; };
+const genreName = (g) => g ? ((GENRE[lang] || GENRE.fr)[g] || g) : "";
+function fmt(n) { try { return new Intl.NumberFormat(lang).format(n); } catch { return String(n); } }
+function fmtAgo(m) { if (m < 60) return `${m} min`; const h = Math.round(m / 60); if (h < 48) return `${h} h`; return `${Math.round(h / 24)} j`.replace(" j", lang === "en" ? " d" : lang === "es" ? " d" : " j"); }
+function setLang(locale) { const l = String(locale || navigator.language || "fr").slice(0, 2).toLowerCase(); lang = TEXT[l] ? l : "en"; document.documentElement.lang = lang; }
+
+/* ---------- icônes (Lucide, ISC) ---------- */
+const P = {
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>', save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+  stop: '<rect width="14" height="14" x="5" y="5" rx="2" fill="currentColor"/>', back: '<path d="m15 18-6-6 6-6"/>',
+  rotate: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  wand: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>',
+  volume: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/>',
+  mute: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  check: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+  pad: '<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>',
+};
+const icon = (n, fill) => `<svg viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const initials = (title) => String(title || "?").replace(/^(the|le|la|les)\s+/i, "").split(/[\s:\-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+
+/* ---------- pont MCP Apps (postMessage JSON-RPC), repli window.openai ---------- */
+const pending = new Map();
+let nextId = 1;
+let hostCaps = {};
+function post(msg) { window.parent.postMessage(msg, "*"); }
+function request(method, params, timeout = 90000) {
+  const id = nextId++;
+  post({ jsonrpc: "2.0", id, method, params });
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error("timeout")); }, timeout);
+    pending.set(id, { resolve: (v) => { clearTimeout(timer); resolve(v); }, reject: (e) => { clearTimeout(timer); reject(e); } });
+  });
+}
+function notify(method, params) { post({ jsonrpc: "2.0", method, params }); }
+window.addEventListener("message", (event) => {
+  if (event.source !== window.parent) return;
+  const m = event.data;
+  if (!m || m.jsonrpc !== "2.0") return;
+  if (m.id != null && (m.result !== undefined || m.error !== undefined) && !m.method) {
+    const p = pending.get(m.id);
+    if (!p) return;
+    pending.delete(m.id);
+    m.error ? p.reject(new Error(m.error.message || "error")) : p.resolve(m.result);
+    return;
+  }
+  switch (m.method) {
+    case "ui/notifications/tool-input": showLoading(m.params?.arguments); break;
+    case "ui/notifications/tool-result": receive(m.params); break;
+    case "ui/notifications/tool-cancelled": if (!state) render(errorView(m.params?.reason || "")); break;
+    case "ui/notifications/host-context-changed": applyContext(m.params || {}); break;
+    case "ui/resource-teardown": post({ jsonrpc: "2.0", id: m.id, result: {} }); break;
+    case "ping": post({ jsonrpc: "2.0", id: m.id, result: {} }); break;
+  }
+});
+
+async function callTool(name, args) {
+  let result;
+  if (window.openai?.callTool && !bridged) result = await window.openai.callTool(name, args);
+  else result = await request("tools/call", { name, arguments: args });
+  if (result?.isError) throw new Error(textOf(result) || t("error"));
+  return result?.structuredContent || parseText(result);
+}
+function textOf(r) { return (r?.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").replace(/^Error executing tool \w+: /, ""); }
+function parseText(r) { try { return JSON.parse(textOf(r)); } catch { return null; } }
+function openLink(url) { if (bridged) request("ui/open-link", { url }).catch(() => {}); else window.open(url, "_blank", "noopener"); }
+
+function applyContext(ctx) {
+  if (ctx.theme) document.documentElement.dataset.theme = ctx.theme;
+  if (ctx.locale) setLang(ctx.locale);
+  if (state && ctx.locale) render(state);
+}
+
+/* ---------- état et rendu ---------- */
+let state = null;     // dernier résultat affiché
+let history = [];     // pour « Retour »
+let bridged = false;
+
+function receive(result) {
+  if (!result) return;
+  if (result.isError) { render(errorView(textOf(result))); return; }
+  const data = result.structuredContent || parseText(result);
+  if (data) show(data, false);
+}
+function show(data, push = true) {
+  if (push && state) history.push(state);
+  state = data;
+  render(data);
+}
+function back() { const prev = history.pop(); if (prev) { state = prev; render(prev); } }
+
+function shell(body, opts = {}) {
+  const c = opts.console;
+  const pill = c ? `<span class="console-pill" title="${esc(c.model || "")}"><span class="led ${c.online ? "led--live" : "led--off"}"></span>${esc(c.console)}</span>` : "";
+  const credits = [t("rights"), ...(opts.credits || [])].map(esc).join(" · ");
+  return `<header class="rk-top"><div class="brand"><img src="${BASE}/romkade-logo.webp" alt="ROMKADE" height="30"></div>${pill}</header>
+    ${body}
+    <div id="notice"></div>
+    <footer class="foot"><span>${credits}</span><button type="button" data-link="https://romkade.com">romkade.com</button></footer>`;
+}
+function render(data) {
+  const views = { games: gamesView, game: gameView, now: nowView, library: libraryView, cheats: cheatsView, consoles: consolesView };
+  const view = views[data?.view] || (() => shell(`<div class="empty">${esc(JSON.stringify(data)).slice(0, 400)}</div>`));
+  root.innerHTML = typeof data === "string" ? data : view(data);
+  wire(data);
+  reportSize();
+}
+function setNotice(text, kind = "ok") {
+  const el = document.getElementById("notice");
+  if (el) el.innerHTML = text ? `<div class="notice notice--${kind}">${esc(text)}</div>` : "";
+  reportSize();
+}
+function showLoading(args) {
+  if (state) return;
+  root.innerHTML = shell(`<div class="screen skeleton"><div class="grid">${Array.from({ length: 6 }, () => '<div class="tile"><div class="cover"></div></div>').join("")}</div></div>`);
+  reportSize();
+}
+function errorView(msg) { return shell(`<div class="notice notice--err">${esc(msg || t("error"))}</div>`); }
+
+function cover(g, cls = "", large = false) {
+  const src = large ? (g.cover_large || g.cover) : g.cover;
+  const img = src ? `<img class="cover__backdrop" src="${esc(src)}" alt="" aria-hidden="true" loading="lazy"><img class="cover__img" src="${esc(src)}" alt="" loading="lazy" data-cover>` : "";
+  return `<div class="cover ${cls}">${img}<div class="cover__empty"><span class="cover__initials">${esc(initials(g.title))}</span><span class="cover__platform">${esc(g.platform_code || "")}</span></div>${cls.includes("tile-cover") ? `<span class="play-dot">${icon("play", true)}</span>` : ""}</div>`;
+}
+
+/* Jeux : grille de jaquettes */
+function gamesView(d) {
+  const context = [d.query && `« ${d.query} »`, d.platform, d.genre && genreName(d.genre) || d.genre].filter(Boolean).join(" · ");
+  const tiles = (d.games || []).map((g) => `
+    <button type="button" class="tile" data-game="${g.game_id}" title="${esc(g.title)}">
+      ${cover(g, "tile-cover")}
+      <span class="tile__title">${esc(g.title)}</span>
+      <span class="tile__meta"><span class="badge">${esc(g.platform_code)}</span><span>${esc([g.year, genreName(g.genre)].filter(Boolean).join(" · "))}</span></span>
+    </button>`).join("");
+  const more = d.total > d.shown && d.shown < 60 ? `<div class="more"><button type="button" class="btn btn--neon" data-more>${esc(t("more"))}</button></div>` : "";
+  return shell(`
+    <div class="section-head"><h2>${esc(t("games", d.total))}</h2><span class="muted">${esc(context)}</span></div>
+    <div class="screen">${tiles ? `<div class="grid">${tiles}</div>${more}` : `<div class="empty">${esc(t("noGames"))}</div>`}</div>`,
+    { credits: [t("covers")] });
+}
+
+/* Fiche du jeu */
+function gameView(d) {
+  const g = d.game || {};
+  const caps = d.console?.capabilities || {};
+  const facts = [
+    g.year && `<span>${esc(t("year"))} <b>${esc(g.year)}</b></span>`,
+    g.genre && `<span>${esc(t("genre"))} <b>${esc(genreName(g.genre))}</b></span>`,
+    g.developer && `<span>${esc(t("developer"))} <b>${esc(g.developer)}</b></span>`,
+    g.publisher && g.publisher !== g.developer && `<span>${esc(t("publisher"))} <b>${esc(g.publisher)}</b></span>`,
+    g.region && `<span>${esc(t("region"))} <b>${esc(g.region)}</b></span>`,
+  ].filter(Boolean).join("");
+  return shell(`
+    ${history.length ? `<button type="button" class="btn btn--ghost back" data-back>${icon("back")} ${esc(t("back"))}</button>` : ""}
+    <div class="sheet">
+      ${cover(g, "", true)}
+      <div class="sheet__body">
+        <div class="now__sub"><span class="badge">${esc(g.platform_code)}</span>${esc(g.platform)}</div>
+        <h1>${esc(g.title)}</h1>
+        ${facts ? `<div class="facts">${facts}</div>` : ""}
+        ${g.description ? `<p class="desc" id="desc">${esc(g.description)}</p><button type="button" class="link" data-readmore>${esc(t("readMore"))}</button>` : ""}
+        <div class="actions">
+          <button type="button" class="btn btn--primary" data-launch="${g.game_id}">${icon("play", true)} ${esc(t("play"))}</button>
+          ${caps.resume_slot !== false ? `<button type="button" class="btn btn--neon" data-resume="${g.game_id}">${icon("rotate")} ${esc(t("resume"))}</button>` : ""}
+          <button type="button" class="btn btn--neon" data-cheats="${g.game_id}">${icon("wand")} ${esc(t("cheats"))}</button>
+        </div>
+      </div>
+    </div>`, { console: d.console, credits: [t("covers")] });
+}
+
+/* En cours sur la console */
+function nowView(d) {
+  const g = d.game;
+  const caps = d.console?.capabilities || {};
+  if (!d.playing || !g) {
+    return shell(`<div class="now"><div class="now__art now__art--abstract"></div><div class="idle" style="position:relative">${icon("pad")}
+      <div><h2>${esc(t("idle"))}</h2><p class="muted small" style="margin:4px 0 0">${esc(t("idleHint"))}</p></div></div></div>
+      <div class="actions" style="margin-top:10px"><button type="button" class="btn btn--ghost" data-refresh>${icon("rotate")} ${esc(t("refresh"))}</button></div>`,
+      { console: d.console });
+  }
+  const v = d.volume;
+  const vol = v && v.adjustable !== false ? `
+    <div class="volume"><button type="button" class="btn btn--ghost copy" data-mute aria-label="${esc(v.muted ? t("muted") : t("volume"))}">${icon(v.muted ? "mute" : "volume")}</button>
+      <input type="range" min="0" max="100" step="5" value="${v.percent ?? 50}" style="--pct:${v.percent ?? 50}%" aria-label="${esc(t("volume"))}" data-volume>
+      <output>${v.muted ? "—" : `${v.percent ?? 0} %`}</output></div>` : "";
+  const art = g.cover_large || g.cover;
+  return shell(`
+    <section class="now">
+      <div class="now__art ${art ? "" : "now__art--abstract"}">${art ? `<img src="${esc(art)}" alt="">` : ""}</div>
+      <div class="now__inner">
+        ${cover(g, "", true)}
+        <div class="now__body">
+          <span class="live-tag ${d.launching ? "pulse" : ""}"><span class="led led--live"></span>${esc(d.launching ? t("launching") : t("nowPlaying"))}</span>
+          <h1>${esc(g.title)}</h1>
+          <div class="now__sub">${g.platform_code ? `<span class="badge">${esc(g.platform_code)}</span>` : ""}${esc(g.platform || "")}</div>
+          ${vol}
+          <div class="actions">
+            ${caps.save_state !== false ? `<button type="button" class="btn" data-save>${icon("save")} ${esc(t("save"))}</button>` : ""}
+            ${caps.quit !== false ? `<button type="button" class="btn btn--danger" data-quit>${icon("stop")} ${esc(t("quit"))}</button>` : ""}
+          </div>
+        </div>
+      </div>
+    </section>
+    ${d.saved ? `<div class="notice notice--ok">${esc(t("saved"))}</div>` : ""}`, { console: d.console });
+}
+
+/* Bibliothèque : héros + consoles + genres */
+function libraryView(d) {
+  const systems = d.systems || [];
+  const max = Math.max(1, ...systems.map((s) => s.games));
+  const tiles = systems.map((s) => `
+    <button type="button" class="system" data-platform="${esc(s.code)}" title="${esc(s.platform)}">
+      <div class="system__art">${s.art ? `<img src="${esc(s.art)}" alt="" loading="lazy">` : icon("pad")}</div>
+      <span class="system__code">${esc(s.code)}</span>
+      <span class="system__name">${esc(s.platform)}</span>
+      <span class="bar"><i style="--w:${Math.max(4, Math.round((s.games / max) * 100))}%"></i>${esc(fmt(s.games))}</span>
+    </button>`).join("");
+  const genres = (d.genres || []).slice(0, 14).map((g) => `<button type="button" class="chip" data-genre="${esc(g.genre)}">${esc(genreName(g.genre))} <b>${esc(fmt(g.games))}</b></button>`).join("");
+  const n = d.games || 0;
+  return shell(`
+    <div class="hero"><span class="n1">${esc(fmt(n))}</span> ${esc(lang === "fr" ? (n > 1 ? "jeux" : "jeu") : lang === "es" ? "juegos" : "games")} ${esc(t("of"))} <span class="n2">${esc(fmt(systems.length))}</span> ${esc(t("consoles", systems.length))}</div>
+    <p class="muted small" style="margin:0 0 14px">${esc([d.model, d.firmware].filter(Boolean).join(" · "))}${d.catalog_updated_minutes_ago != null ? ` · ${esc(t("updated", d.catalog_updated_minutes_ago))}` : ""}</p>
+    <div class="systems">${tiles}</div>
+    ${genres ? `<div class="chips">${genres}</div>` : ""}`, { console: d, credits: ["retroarch-assets, CC BY 4.0"] });
+}
+
+/* Codes de triche */
+function cheatsView(d) {
+  const g = d.game || {};
+  const rows = (d.cheats || []).map((c, i) => `
+    <li data-row="${esc((c.description || "").toLowerCase())}"><span class="d">${esc(c.description)}</span><span class="code" title="${esc(c.code)}">${esc(c.code)}</span>
+      <button type="button" class="btn btn--ghost copy" data-copy="${i}" aria-label="${esc(t("copy"))}">${icon("copy")}</button></li>`).join("");
+  return shell(`
+    ${history.length ? `<button type="button" class="btn btn--ghost back" data-back>${icon("back")} ${esc(t("back"))}</button>` : ""}
+    <div class="cheat-head">${cover(g)}<div><h2>${esc(g.title)}</h2>
+      <div class="muted small">${esc([t("codesOf", d.total || 0), d.version].filter(Boolean).join(" · "))}</div></div></div>
+    ${rows ? `${(d.cheats || []).length > 6 ? `<input class="filter" type="search" placeholder="${esc(t("filter"))}" data-filter>` : ""}<ul class="cheats">${rows}</ul>` : `<div class="empty">${esc(d.note || t("noCheats"))}</div>`}
+    ${d.other_versions?.length ? `<p class="muted small" style="margin:10px 2px 0">${esc(t("otherVersions"))} : ${esc(d.other_versions.join(", "))}</p>` : ""}`,
+    { credits: [t("cheatSource")] });
+}
+
+/* Consoles */
+function consolesView(d) {
+  const cards = (d.consoles || []).map((c) => `
+    <div class="console-card">
+      <div class="icon"><img src="${BASE}/icon-192.webp" alt=""></div>
+      <div style="min-width:0"><h2 style="display:flex;align-items:center;gap:8px"><span class="led ${c.online ? "led--live" : "led--off"}"></span>${esc(c.console)}</h2>
+        <div class="muted small">${esc([c.model, c.firmware].filter(Boolean).join(" · "))}</div>
+        <div class="muted small">${esc(c.online ? t("online") : `${t("offline")}${c.last_seen_minutes_ago != null ? " · " + t("seen", c.last_seen_minutes_ago) : ""}`)}</div></div>
+      <div class="num">${esc(fmt(c.games || 0))}<small>${esc(lang === "fr" ? "jeux" : lang === "es" ? "juegos" : "games")}</small></div>
+    </div>`).join("");
+  return shell(`${d.paired ? `<div class="banner">${icon("check")} ${esc(t("paired"))}</div>` : ""}${cards || `<div class="empty">—</div>`}`);
+}
+
+/* ---------- interactions ---------- */
+async function act(button, work) {
+  const label = button?.innerHTML;
+  if (button) { button.disabled = true; button.innerHTML = `<span class="spin" aria-hidden="true"></span>`; }
+  setNotice("");
+  try { await work(); }
+  catch (e) { if (button && document.body.contains(button)) { button.disabled = false; button.innerHTML = label; } setNotice(e.message || t("error"), "err"); }
+}
+function wire(data) {
+  root.querySelectorAll("img[data-cover]").forEach((img) => {
+    const box = img.closest(".cover");
+    const ok = () => box.classList.add("is-loaded");
+    if (img.complete && img.naturalWidth) ok(); else img.addEventListener("load", ok, { once: true });
+    img.addEventListener("error", () => box.querySelectorAll("img").forEach((i) => i.remove()), { once: true });
+  });
+  root.querySelectorAll("[data-link]").forEach((b) => b.addEventListener("click", () => openLink(b.dataset.link)));
+  root.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", back));
+  root.querySelectorAll("[data-game]").forEach((b) => b.addEventListener("click", () =>
+    act(null, async () => show(await callTool("game_details", { game_id: Number(b.dataset.game) })))));
+  root.querySelectorAll("[data-launch],[data-resume]").forEach((b) => b.addEventListener("click", () => act(b, async () => {
+    const id = Number(b.dataset.launch || b.dataset.resume);
+    show(await callTool("launch_game", { game_id: id, resume: !!b.dataset.resume }));
+    setTimeout(refreshNow, 15000);
+  })));
+  root.querySelectorAll("[data-cheats]").forEach((b) => b.addEventListener("click", () =>
+    act(b, async () => show(await callTool("get_cheats", { game_id: Number(b.dataset.cheats) })))));
+  root.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("click", () =>
+    act(b, async () => show(await callTool("save_state", {}), false))));
+  root.querySelectorAll("[data-quit]").forEach((b) => b.addEventListener("click", () =>
+    act(b, async () => show(await callTool("quit_game", {}), false))));
+  root.querySelectorAll("[data-refresh]").forEach((b) => b.addEventListener("click", () =>
+    act(b, async () => show(await callTool("console_status", {}), false))));
+  root.querySelectorAll("[data-more]").forEach((b) => b.addEventListener("click", () => act(b, async () =>
+    show(await callTool("search_games", { query: data.query || "", platform: data.platform || undefined, genre: data.genre || undefined, limit: 60 }), false))));
+  root.querySelectorAll("[data-platform]").forEach((b) => b.addEventListener("click", () =>
+    act(null, async () => show(await callTool("search_games", { platform: b.dataset.platform, limit: 60 })))));
+  root.querySelectorAll("[data-genre]").forEach((b) => b.addEventListener("click", () =>
+    act(null, async () => show(await callTool("search_games", { genre: b.dataset.genre, limit: 60 })))));
+  root.querySelectorAll("[data-readmore]").forEach((b) => b.addEventListener("click", () => { document.getElementById("desc")?.classList.add("is-open"); b.remove(); reportSize(); }));
+  root.querySelectorAll("[data-filter]").forEach((input) => input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    root.querySelectorAll("[data-row]").forEach((li) => { li.hidden = q && !li.dataset.row.includes(q); });
+    reportSize();
+  }));
+  root.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+    const code = data.cheats?.[Number(b.dataset.copy)]?.code || "";
+    try { await navigator.clipboard.writeText(code); } catch { const s = b.previousElementSibling; const r = document.createRange(); r.selectNodeContents(s); getSelection().removeAllRanges(); getSelection().addRange(r); }
+    b.innerHTML = icon("check"); setTimeout(() => { b.innerHTML = icon("copy"); }, 1400);
+  }));
+  const range = root.querySelector("[data-volume]");
+  if (range) {
+    let timer;
+    range.addEventListener("input", () => { range.style.setProperty("--pct", `${range.value}%`); range.nextElementSibling.textContent = `${range.value} %`;
+      clearTimeout(timer); timer = setTimeout(() => act(null, async () => { state = await callTool("set_volume", { percent: Number(range.value) }); }), 450); });
+  }
+  root.querySelectorAll("[data-mute]").forEach((b) => b.addEventListener("click", () =>
+    act(null, async () => show(await callTool("set_volume", { muted: !data.volume?.muted }), false))));
+}
+async function refreshNow() {
+  if (state?.view !== "now" || !state.launching) return;
+  try { show(await callTool("console_status", {}), false); } catch { /* console occupée à lancer : on garde la carte */ }
+}
+
+/* ---------- taille ---------- */
+let lastH = 0;
+function reportSize() {
+  requestAnimationFrame(() => {
+    const h = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    if (Math.abs(h - lastH) < 2) return;
+    lastH = h;
+    if (bridged) notify("ui/notifications/size-changed", { width: Math.ceil(document.documentElement.scrollWidth), height: h });
+    window.openai?.notifyIntrinsicHeight?.(h);
+  });
+}
+new ResizeObserver(reportSize).observe(document.body);
+
+/* ---------- démarrage ---------- */
+async function start() {
+  setLang(navigator.language);
+  try {
+    const r = await request("ui/initialize", { appInfo: { name: "romkade", version: VERSION },
+      appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] }, protocolVersion: "2026-01-26" }, 4000);
+    bridged = true;
+    hostCaps = r?.hostCapabilities || {};
+    applyContext(r?.hostContext || {});
+    notify("ui/notifications/initialized", {});
+  } catch {
+    // Hôte sans MCP Apps standard : API ChatGPT historique (window.openai), si elle est là.
+    const o = window.openai;
+    if (o) {
+      if (o.theme) document.documentElement.dataset.theme = o.theme;
+      if (o.locale) setLang(o.locale);
+      if (o.toolOutput) show(o.toolOutput, false);
+      window.addEventListener("openai:set_globals", () => { if (window.openai?.toolOutput) show(window.openai.toolOutput, false); });
+    }
+  }
+}
+start();
+})();
+</script>
+</body>
+</html>

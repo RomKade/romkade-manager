@@ -4,6 +4,7 @@ Les secrets (jeton du compte, secret de la console) ne sont gardés que sous for
 seule ne permet ni de parler au MCP au nom d'un compte, ni de se faire passer pour une console.
 """
 
+import gzip
 import hashlib
 import json
 import secrets
@@ -28,9 +29,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS consoles_pairing ON consoles(pairing_code) WHE
 CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY, console_id TEXT NOT NULL REFERENCES consoles(id) ON DELETE CASCADE,
     platform_dir TEXT NOT NULL, platform_code TEXT NOT NULL, platform_label TEXT NOT NULL,
-    relative_path TEXT NOT NULL, title TEXT NOT NULL, normalized TEXT NOT NULL, region TEXT, size INTEGER,
+    relative_path TEXT NOT NULL, title TEXT NOT NULL, full_title TEXT, normalized TEXT NOT NULL, search TEXT NOT NULL,
+    region TEXT, size INTEGER, genre TEXT, year INTEGER, developer TEXT, publisher TEXT, description TEXT,
+    art_key TEXT NOT NULL,
     UNIQUE(console_id, platform_dir, relative_path));
 CREATE INDEX IF NOT EXISTS games_console ON games(console_id, platform_code);
+CREATE INDEX IF NOT EXISTS games_art ON games(art_key);
+CREATE TABLE IF NOT EXISTS catalogs (
+    console_id TEXT PRIMARY KEY REFERENCES consoles(id) ON DELETE CASCADE, version INTEGER NOT NULL,
+    files BLOB NOT NULL, received REAL NOT NULL);
 """
 
 
@@ -66,6 +73,9 @@ class Store:
         self._db = sqlite3.connect(self.path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA foreign_keys = ON")
+        cols = {r[1] for r in self._db.execute("PRAGMA table_info(games)")}
+        if cols and "art_key" not in cols:  # ancien schéma du prototype : recalculé depuis la liste brute
+            self._db.execute("DROP TABLE games")
         self._db.executescript(SCHEMA)
         self._lock = threading.Lock()
 
@@ -151,39 +161,60 @@ class Store:
             self._db.execute("DELETE FROM consoles WHERE id = ?", (console_id,))
 
     # ---------- catalogue ----------
-    def replace_catalog(self, console_id: str, games: list[dict]) -> int:
+    def replace_catalog(self, console_id: str, games: list[dict], files: list | None = None,
+                        version: int | None = None) -> int:
+        """Remplace les jeux d'une console ; garde aussi la liste brute pour les recalculer plus tard."""
+        cols = ("platform_dir", "platform_code", "platform_label", "relative_path", "title", "full_title",
+                "normalized", "search", "region", "size", "genre", "year", "developer", "publisher", "description",
+                "art_key")
         with self._lock, self._db:
             self._db.execute("DELETE FROM games WHERE console_id = ?", (console_id,))
             self._db.executemany(
-                "INSERT OR IGNORE INTO games (console_id, platform_dir, platform_code, platform_label, relative_path, "
-                "title, normalized, region, size) VALUES (:console_id, :platform_dir, :platform_code, "
-                ":platform_label, :relative_path, :title, :normalized, :region, :size)",
-                [{**g, "console_id": console_id} for g in games])
+                f"INSERT OR IGNORE INTO games (console_id, {', '.join(cols)}) "
+                f"VALUES (:console_id, {', '.join(':' + c for c in cols)})",
+                [{**{c: g.get(c) for c in cols}, "console_id": console_id} for g in games])
+            if files is not None:
+                self._db.execute("INSERT OR REPLACE INTO catalogs VALUES (?, ?, ?, ?)",
+                                 (console_id, version or 0, gzip.compress(json.dumps(files).encode()), time.time()))
+            elif version is not None:
+                self._db.execute("UPDATE catalogs SET version = ? WHERE console_id = ?", (version, console_id))
             self._db.execute("UPDATE consoles SET catalog_at = ? WHERE id = ?", (time.time(), console_id))
         return len(games)
+
+    def raw_catalogs(self, older_than: int) -> list[tuple[str, list]]:
+        """(console, liste brute) des catalogues calculés par une version plus ancienne que `older_than`."""
+        rows = self._db.execute("SELECT console_id, files FROM catalogs WHERE version < ?", (older_than,)).fetchall()
+        return [(r["console_id"], json.loads(gzip.decompress(r["files"]))) for r in rows]
+
+    def has_raw_catalog(self, console_id: str) -> bool:
+        return self._db.execute("SELECT 1 FROM catalogs WHERE console_id = ?", (console_id,)).fetchone() is not None
 
     def game(self, game_id: int, account_id: str) -> sqlite3.Row | None:
         return self._db.execute("SELECT g.* FROM games g JOIN consoles c ON c.id = g.console_id "
                                 "WHERE g.id = ? AND c.account_id = ?", (game_id, account_id)).fetchone()
 
     @staticmethod
-    def _filter(console_ids: list[str], words: list[str], platform_codes: list[str] | None) -> tuple[str, list]:
+    def _filter(console_ids: list[str], words: list[str], platform_codes: list[str] | None,
+                genre: str | None = None) -> tuple[str, list]:
         sql = f"FROM games WHERE console_id IN ({','.join('?' * len(console_ids))})"
         args: list = list(console_ids)
         for w in words:
-            sql += " AND normalized LIKE ?"
-            args.append(f"%{w}%")
+            sql += " AND (normalized LIKE ? OR search LIKE ?)"
+            args += [f"%{w}%", f"%{w}%"]
         if platform_codes:
             sql += f" AND platform_code IN ({','.join('?' * len(platform_codes))})"
             args += platform_codes
+        if genre:
+            sql += " AND genre = ?"
+            args.append(genre)
         return sql, args
 
     def search(self, console_ids: list[str], words: list[str], platform_codes: list[str] | None,
-               limit: int) -> tuple[list[sqlite3.Row], int]:
+               limit: int, genre: str | None = None) -> tuple[list[sqlite3.Row], int]:
         """(jeux trouvés, les plus courts d'abord ; nombre total de résultats)."""
         if not console_ids:
             return [], 0
-        where, args = self._filter(console_ids, words, platform_codes)
+        where, args = self._filter(console_ids, words, platform_codes, genre)
         rows = self._db.execute(f"SELECT * {where} ORDER BY length(normalized), title LIMIT ?", [*args, limit])
         return rows.fetchall(), self._db.execute(f"SELECT count(*) {where}", args).fetchone()[0]
 
@@ -195,3 +226,11 @@ class Store:
     def game_by_path(self, console_id: str, platform_dir: str, relative_path: str) -> sqlite3.Row | None:
         return self._db.execute("SELECT * FROM games WHERE console_id = ? AND platform_dir = ? AND relative_path = ?",
                                 (console_id, platform_dir, relative_path)).fetchone()
+
+    def game_for_art(self, key: str) -> sqlite3.Row | None:
+        return self._db.execute("SELECT platform_dir, relative_path, full_title FROM games WHERE art_key = ? LIMIT 1",
+                                (key,)).fetchone()
+
+    def genres(self, console_id: str) -> list[sqlite3.Row]:
+        return self._db.execute("SELECT genre, count(*) AS games FROM games WHERE console_id = ? AND genre IS NOT NULL "
+                                "GROUP BY genre ORDER BY games DESC", (console_id,)).fetchall()

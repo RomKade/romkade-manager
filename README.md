@@ -620,6 +620,12 @@ ROMs folder (RetroArch's default folders on Android).
 - ROMKADE Manager logo and icons (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), from the brand files
   of the romkade-website repository.
 
+## License
+
+Proprietary: © 2026 ROMKADE, all rights reserved (see [LICENSE](LICENSE)). The code is published for reading and
+evaluation; any other use (copy, redistribution, integration into a product or firmware, hosted service) requires
+ROMKADE's written permission. Third-party components keep their own licenses ([NOTICE](NOTICE)).
+
 ## Sources and credits
 
 ROMKADE Manager does not provide any games. What it takes from elsewhere is credited in the interface

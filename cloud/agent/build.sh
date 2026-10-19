@@ -1,6 +1,7 @@
 #!/bin/sh
 # Prépare le paquet ROMKADE pour la carte SD (dist/sd, à copier à la racine de la carte) :
-#   romkade/           l'agent, ses modules (ceux du Manager : lancement, volume, détection du firmware)
+#   romkade/           l'agent, l'écran de l'app (screen.py, assets/), ses modules (ceux du Manager : lancement,
+#                      volume, détection du firmware), LICENSE et NOTICE
 #   Roms/APPS/         l'app ROMKADE du menu de la console et son icône
 #
 #   ./build.sh https://adresse-du-cloud
@@ -12,7 +13,10 @@ OUT="$HERE/dist/sd"
 rm -rf "$HERE/dist"
 mkdir -p "$OUT/romkade/vendor/app/device" "$OUT/Roms/APPS/Imgs"
 
-cp "$HERE/romkade_agent.py" "$HERE/start.sh" "$HERE/uninstall.sh" "$OUT/romkade/"
+cp "$HERE/romkade_agent.py" "$HERE/screen.py" "$HERE/start.sh" "$HERE/uninstall.sh" "$OUT/romkade/"
+cp -R "$HERE/assets" "$OUT/romkade/assets"
+rm -f "$OUT/romkade/assets/apps-icon.png"
+cp "$HERE/../../LICENSE" "$HERE/../../NOTICE" "$OUT/romkade/"
 cp -R "$HERE/stubs/." "$OUT/romkade/vendor/"
 cp "$APP/__init__.py" "$APP/errors.py" "$OUT/romkade/vendor/app/"
 cp "$APP/device/__init__.py" "$APP/device/launcher.py" "$APP/device/volume.py" "$APP/device/systems.py" \
@@ -21,6 +25,7 @@ cp "$APP/device/__init__.py" "$APP/device/launcher.py" "$APP/device/volume.py" "
 printf '{"server": "%s"}\n' "$1" > "$OUT/romkade/agent.json"
 
 cp "$HERE/RomKade.sh" "$OUT/Roms/APPS/ROMKADE.sh"
-cp "$HERE/../server/romkade_cloud/static/icon.png" "$OUT/Roms/APPS/Imgs/ROMKADE.png"
-chmod +x "$OUT/romkade/romkade_agent.py" "$OUT/romkade/start.sh" "$OUT/romkade/uninstall.sh" "$OUT/Roms/APPS/ROMKADE.sh"
+cp "$HERE/assets/apps-icon.png" "$OUT/Roms/APPS/Imgs/ROMKADE.png"
+find "$OUT" -name .DS_Store -delete
+chmod +x "$OUT/romkade/romkade_agent.py" "$OUT/romkade/screen.py" "$OUT/romkade/start.sh" "$OUT/romkade/uninstall.sh" "$OUT/Roms/APPS/ROMKADE.sh"
 echo "paquet prêt : $OUT"

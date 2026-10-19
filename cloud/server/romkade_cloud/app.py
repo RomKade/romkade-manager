@@ -5,7 +5,8 @@
     /agent/hello             l'agent se présente (et reçoit son secret et un code d'appairage la première fois)
     /agent/catalog           l'agent envoie la liste des fichiers de son dossier de ROMs
     /agent/poll, /result     ordres pour la console et leurs résultats (voir relay.py)
-    /icon.png                logo ROMKADE (fiche du connecteur)
+    /icon.png, /romkade-logo.webp, /fonts/…, /consoles/…   logo, polices et illustrations de l'interface
+    /art/<clé>.webp          jaquette d'un jeu (libretro-thumbnails, mise en cache)
 
 Variables : ROMKADE_CLOUD_DB (base SQLite), ROMKADE_DATA_DIR (paquet de cheats), ROMKADE_PUBLIC_URL (adresse
 publique, pour le logo), ROMKADE_ALLOWED_HOSTS (noms d'hôte acceptés par le MCP, séparés par des virgules).
@@ -17,23 +18,27 @@ import json
 import logging
 import os
 import re
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, Response
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from app.services import cheats as cheat_db
 
 from . import catalog
+from .art import Art
 from .relay import Relay
 from .store import Store
 from .tools import build
 
 log = logging.getLogger("romkade.cloud")
 STATIC = Path(__file__).parent / "static"
+PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp"}
 MAX_BODY = 8 * 1024 * 1024
 TOKEN_PATH = re.compile(r"^/mcp/([A-Za-z0-9_-]{20,})/?$")
 WEB_CLIENTS = ["https://claude.ai", "https://chatgpt.com", "https://chat.openai.com", "https://www.perplexity.ai",
@@ -66,7 +71,8 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     store = store or Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3"))
     relay = relay or Relay()
     public_url = (public_url or os.environ.get("ROMKADE_PUBLIC_URL", "")).rstrip("/")
-    mcp = build(store, relay, f"{public_url}/icon.png" if public_url else None)
+    mcp = build(store, relay, public_url)
+    art = Art(store)
 
     hosts = [h.strip() for h in os.environ.get("ROMKADE_ALLOWED_HOSTS", "").split(",") if h.strip()]
     if public_url:
@@ -112,6 +118,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
             out["secret"] = secret
         if c.account_id is None:
             out["pairing_code"] = store.pairing_code(c.id)
+            out["pairing_expires_in"] = max(0, int((store.console(c.id).pairing_expires or 0) - time.time()))
         return JSONResponse(out)
 
     async def upload_catalog(request: Request) -> Response:
@@ -122,8 +129,9 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
             payload = await body_json(request)
         except ValueError:
             return JSONResponse({"error": "bad_request"}, 400)
-        games = await asyncio.to_thread(catalog.build, payload.get("files") or [])
-        count = await asyncio.to_thread(store.replace_catalog, c.id, games)
+        files = payload.get("files") or []
+        games = await asyncio.to_thread(catalog.build, files)
+        count = await asyncio.to_thread(store.replace_catalog, c.id, games, files, catalog.VERSION)
         return JSONResponse({"games": count})
 
     async def poll(request: Request) -> Response:
@@ -133,8 +141,10 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         store.touch(c.id)
         command = await relay.poll(c.id, wait=min(float(request.query_params.get("wait", 25)), 25.0))
         if command is None:
-            # L'agent s'appuie sur « paired » pour savoir s'il doit encore afficher son code.
-            return JSONResponse({"paired": store.console(c.id).account_id is not None})
+            # L'agent s'appuie sur « paired » pour savoir s'il doit encore afficher son code ; « resync » : le cloud
+            # n'a pas (ou plus) sa liste de fichiers, il la renvoie.
+            return JSONResponse({"paired": store.console(c.id).account_id is not None,
+                                 "resync": not store.has_raw_catalog(c.id)})
         return JSONResponse({"command": command})
 
     async def result(request: Request) -> Response:
@@ -148,9 +158,23 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         accepted = relay.result(c.id, str(payload.get("id")), payload)
         return JSONResponse({"accepted": accepted})
 
-    async def icon(_: Request) -> Response:
-        return FileResponse(STATIC / "icon.png", media_type="image/png",
-                            headers={"Cache-Control": "public, max-age=86400"})
+    async def static_file(request: Request) -> Response:
+        name = request.path_params["name"]
+        if name not in PUBLIC_FILES:
+            return JSONResponse({"error": "not_found"}, 404)
+        return FileResponse(STATIC / name, headers={"Cache-Control": "public, max-age=86400"})
+
+    async def cover(request: Request) -> Response:
+        key = request.path_params["key"]
+        if not re.fullmatch(r"[0-9a-f]{20}", key):
+            return JSONResponse({"error": "not_found"}, 404)
+        try:
+            path = await art.path(key, "full" if request.query_params.get("size") == "full" else "thumb")
+        except Exception:  # noqa: BLE001 — banque de jaquettes injoignable : l'interface affiche les initiales
+            path = None
+        if path is None:
+            return JSONResponse({"error": "not_found"}, 404, headers={"Cache-Control": "public, max-age=3600"})
+        return FileResponse(path, headers={"Cache-Control": "public, max-age=604800, immutable"})
 
     async def health(_: Request) -> Response:
         return JSONResponse({"ok": True})
@@ -160,8 +184,11 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/agent/catalog", upload_catalog, methods=["POST"]),
         Route("/agent/poll", poll, methods=["GET"]),
         Route("/agent/result", result, methods=["POST"]),
-        Route("/icon.png", icon),
+        Route("/art/{key}.webp", cover),
         Route("/healthz", health),
+        Mount("/fonts", StaticFiles(directory=STATIC / "fonts")),
+        Mount("/consoles", StaticFiles(directory=STATIC / "consoles")),
+        Route("/{name}", static_file),
     ])
 
     # Paquet de cheats libretro : téléchargé une fois au démarrage s'il manque.
@@ -169,6 +196,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
 
     @asynccontextmanager
     async def lifespan(a):
+        await asyncio.to_thread(rebuild_catalogs, store)
         if cheat_db.index() is None and os.environ.get("ROMKADE_FETCH_CHEATS", "1") == "1":
             asyncio.get_running_loop().create_task(_fetch_cheats())
         async with inner_lifespan(a) as state:
@@ -176,7 +204,34 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
 
     app.router.lifespan_context = lifespan
     app.state.store, app.state.relay = store, relay
-    return AccountPath(app, store)
+    return AccountPath(CrossOrigin(app), store)
+
+
+class CrossOrigin:
+    """Polices et images de l'interface : chargées depuis le cadre isolé de l'assistant (autre origine)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["path"].startswith(("/mcp", "/agent")):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_cors(message):
+            if message["type"] == "http.response.start":
+                message.setdefault("headers", []).append((b"access-control-allow-origin", b"*"))
+            await send(message)
+
+        await self.app(scope, receive, send_with_cors)
+
+
+def rebuild_catalogs(store: Store) -> None:
+    """Recalcule les catalogues faits par une version plus ancienne de catalog.build (nouvel enrichissement)."""
+    for console_id, files in store.raw_catalogs(older_than=catalog.VERSION):
+        games = catalog.build(files)
+        store.replace_catalog(console_id, games, version=catalog.VERSION)
+        log.info("catalogue recalculé : console %s, %s jeux", console_id, len(games))
 
 
 async def _fetch_cheats() -> None:

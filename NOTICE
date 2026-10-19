@@ -1,0 +1,27 @@
+ROMKADE — Third-party notices / Composants tiers
+
+ROMKADE is proprietary software (see LICENSE). It uses or displays the following third-party material, which keeps
+its own license. ROMKADE provides no games.
+
+Data
+- libretro-database (https://github.com/libretro/libretro-database): genres, release, developer, publisher,
+  franchise, arcade titles; cheat codes (cht folder, CC BY-SA 4.0), shown with their source.
+- OpenVGDB (https://github.com/OpenVGDB/OpenVGDB): summaries, dates, genres. MIT License.
+- catver.ini, progettoSNAPS (https://www.progettosnaps.net/catver/): arcade categories.
+- MAME, FBNeo, HBMAME game lists (via libretro-database): full titles, year, manufacturer.
+- libretro-thumbnails (https://github.com/libretro-thumbnails/libretro-thumbnails): box art, fetched on demand.
+  Images © their respective publishers.
+- retroarch-assets (https://github.com/libretro/retroarch-assets): console illustrations. CC BY 4.0.
+
+Fonts and icons
+- Atkinson Hyperlegible, Atkinson Hyperlegible Next (Braille Institute of America): SIL Open Font License 1.1.
+- Archivo (Omnibus-Type): SIL Open Font License 1.1.
+- Lucide icons (https://lucide.dev): ISC License.
+
+Software
+- Python packages and npm packages listed in backend/pyproject.toml, cloud/server/pyproject.toml and
+  frontend/package.json, under their own licenses (MIT, BSD, Apache 2.0, ISC…).
+- Model Context Protocol SDK (https://github.com/modelcontextprotocol/python-sdk): MIT License.
+
+Trademarks: Anbernic, RetroArch, ChatGPT, Claude and other names belong to their owners. ROMKADE is not affiliated
+with them.

@@ -13,10 +13,18 @@ ordres. Rien à ouvrir sur la box, pas d'IP, pas de SSH.
 ## Serveur (`server/`)
 
 - `romkade_cloud/tools.py` : outils MCP (`pair_console`, `list_consoles`, `rename_console`, `search_games`,
-  `library_overview`, `get_cheats`, `console_status`, `launch_game`, `quit_game`, `save_state`, `set_volume`).
+  `game_details`, `library_overview`, `get_cheats`, `console_status`, `launch_game`, `quit_game`, `save_state`,
+  `set_volume`). Chacun renvoie une vue (`view`) de l'interface ROMKADE.
+- `romkade_cloud/ui/app.html` : interface ROMKADE dans ChatGPT, Claude… (extension **MCP Apps**, ressource
+  `ui://romkade/app.html`). Même charte que le Manager : grille de jaquettes, fiche du jeu, carte « En cours sur la
+  console » (volume, sauvegarder, quitter), bibliothèque par console, cheats, consoles. Boutons reliés aux outils
+  (`tools/call`), thème clair ou sombre et langue (fr, en, es) de l'assistant.
+- `art.py` : jaquettes (`/art/<clé>.webp`, libretro-thumbnails comme le Manager, mises en cache sur le serveur).
+  `static/` : polices (OFL), illustrations des consoles (retroarch-assets, CC BY 4.0), logo.
 - `relay.py` : file d'ordres par console, long polling, résultats.
-- `catalog.py` : tri de la liste de fichiers envoyée par l'agent (règles du Manager : `app.platforms`,
-  `app.services.classify`). Les cheats viennent de la base libretro (`app.services.cheats`).
+- `catalog.py` : tri et enrichissement de la liste de fichiers envoyée par l'agent, avec les règles et les bases du
+  Manager : vrai titre des jeux d'arcade, genre, année, développeur, éditeur, résumé. La liste brute est gardée et
+  recalculée au démarrage quand `catalog.VERSION` change. Les cheats viennent de la base libretro.
 - `store.py` : comptes, consoles, catalogues (SQLite ; secrets gardés en empreinte SHA-256).
 
 ```sh
@@ -40,9 +48,15 @@ actions nommées (`status`, `launch`, `quit`, `save_state`, `volume`, `rescan`),
 cd cloud/agent && ./build.sh https://adresse-du-cloud   # -> dist/sd, à copier à la racine de la carte SD
 ```
 
-Sur la console : menu **APPS → ROMKADE**. L'app démarre l'agent, l'ajoute au démarrage de la console (une ligne
+Sur la console : menu **APPS → ROMKADE**. L'écran ROMKADE (`screen.py`, Pillow écrit dans `/dev/fb0` comme l'app
+Horloge du firmware) montre le code d'appairage en grand, puis « Console connectée » et le nombre de jeux. L'app démarre l'agent, l'ajoute au démarrage de la console (une ligne
 marquée `# ROMKADE` dans `/mnt/mod/ctrl/autostart`, retirée par `romkade/uninstall.sh`) et affiche le code
 d'appairage à donner à l'assistant : « Connecte ma console, code ABC123 ».
 
 Essayé sur RG35XX Pro (firmware Anbernic + Stock OS Mod) : détection, état, volume et inventaire (5 696
 fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, sans essai.
+
+## Licence
+
+Propriétaire : © 2026 ROMKADE, tous droits réservés ([LICENSE](../LICENSE), composants tiers dans [NOTICE](../NOTICE)).
+La mention figure aussi dans l'interface MCP Apps et sur l'écran de la console.

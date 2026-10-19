@@ -626,6 +626,13 @@ rápido, volumen, Bluetooth, mandos por jugador, hora de la consola (requiere ro
 - Logo e iconos de ROMKADE Manager (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), tomados de los
   archivos de marca del repositorio romkade-website.
 
+## Licencia
+
+Propietaria: © 2026 ROMKADE, todos los derechos reservados (ver [LICENSE](LICENSE)). El código se publica para
+lectura y evaluación; cualquier otro uso (copia, redistribución, integración en un producto o firmware, servicio
+alojado) requiere la autorización escrita de ROMKADE. Los componentes de terceros conservan su propia licencia
+([NOTICE](NOTICE)).
+
 ## Fuentes y créditos
 
 ROMKADE Manager no proporciona ningún juego. Lo que toma de otras fuentes se cita en la interfaz

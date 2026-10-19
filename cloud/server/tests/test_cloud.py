@@ -26,6 +26,7 @@ FILES = [
     ["PS", "Final Fantasy VII (Europe).m3u", 100],
     ["PS", "Final Fantasy VII (Europe) (Disc 1).chd", 1],
     ["APPS", "Horloge.sh", 100],
+    ["FBNEO", "atetris.zip", 50000],
 ]
 
 CHT = """cheats = 2
@@ -56,11 +57,13 @@ def free_port() -> int:
 
 async def serving(store: Store, relay: Relay):
     port = free_port()
-    server = uvicorn.Server(uvicorn.Config(create_app(store, relay), host="127.0.0.1", port=port, log_level="warning"))
+    base = f"http://127.0.0.1:{port}"
+    app = create_app(store, relay, public_url=base)
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
     task = asyncio.create_task(server.serve())
     while not server.started:
         await asyncio.sleep(0.02)
-    return f"http://127.0.0.1:{port}", server, task
+    return base, server, task
 
 
 class FakeAgent:
@@ -127,22 +130,37 @@ def test_pairing_catalog_cheats_and_play(env):
         try:
             first = await agent.hello()
             assert first["paired"] is False and len(first["pairing_code"]) == 6 and agent.secret
-            assert (await agent.upload(FILES))["games"] == 4  # ni image, ni sauvegarde, ni piste du .m3u, ni app
+            assert (await agent.upload(FILES))["games"] == 5  # ni image, ni sauvegarde, ni piste du .m3u, ni app
             loop = asyncio.create_task(agent.serve())
 
             async with Client(f"{base}/mcp/{token}") as mcp:
                 assert mcp.server_info.title == "ROMKADE"
-                names = {t.name for t in (await mcp.list_tools()).tools}
-                assert {"pair_console", "search_games", "launch_game", "get_cheats", "set_volume"} <= names
+                tools = (await mcp.list_tools()).tools
+                assert {"pair_console", "search_games", "game_details", "launch_game", "get_cheats",
+                        "set_volume"} <= {t.name for t in tools}
+                # Chaque outil affiche l'interface ROMKADE (MCP Apps).
+                assert all((t.meta or {}).get("ui", {}).get("resourceUri") == "ui://romkade/app.html" for t in tools)
+                ui = (await mcp.read_resource("ui://romkade/app.html")).contents[0]
+                assert ui.mime_type == "text/html;profile=mcp-app" and "ui/initialize" in ui.text
+                assert "__ROMKADE_BASE__" not in ui.text and "Tous droits réservés" in ui.text
 
                 assert "Aucune console" in error_text(await mcp.call_tool("search_games", {"query": "sonic"}))
                 assert "Code inconnu" in error_text(await mcp.call_tool("pair_console", {"code": "ZZZZZZ"}))
                 paired = data(await mcp.call_tool("pair_console", {"code": first["pairing_code"].lower(),
                                                                     "name": "Ma RG35XX"}))
-                assert paired["console"] == "Ma RG35XX" and paired["online"] and paired["games"] == 4
+                mine = paired["consoles"][0]
+                assert paired["view"] == "consoles" and mine["console"] == "Ma RG35XX" and mine["games"] == 5
 
                 found = data(await mcp.call_tool("search_games", {"query": "Sonic", "platform": "Mega Drive"}))
-                assert found["total"] == 2 and found["games"][0]["title"] == "Sonic The Hedgehog"
+                assert found["view"] == "games" and found["total"] == 2
+                assert found["games"][0]["title"] == "Sonic The Hedgehog"
+                assert found["games"][0]["cover"].startswith(base + "/art/")
+                # Arcade : vrai titre (et toujours trouvé par le nom du fichier), genre, année.
+                tetris = data(await mcp.call_tool("search_games", {"query": "atetris"}))["games"][0]
+                assert tetris["title"] == "Tetris" and tetris["year"] == 1988 and tetris["genre"] == "reflexion"
+                assert data(await mcp.call_tool("search_games", {"genre": "puzzle"}))["total"] == 1
+                sheet = data(await mcp.call_tool("game_details", {"game_id": tetris["game_id"]}))
+                assert sheet["view"] == "game" and sheet["game"]["developer"] == "Atari Games"
                 sonic = found["games"][0]["game_id"]
                 assert data(await mcp.call_tool("search_games", {"platform": "snes"}))["total"] == 1
 
@@ -153,14 +171,17 @@ def test_pairing_catalog_cheats_and_play(env):
                 assert cheats["cheats"] == [{"description": "Infinite Lives", "code": "ACJT-AA3G"}]
 
                 launched = data(await mcp.call_tool("launch_game", {"game_id": sonic, "resume": True}))
-                assert launched["launched"] == "Sonic The Hedgehog"
+                assert launched["game"]["title"] == "Sonic The Hedgehog"
                 assert agent.received[-1]["params"] == {"platform_dir": "MD", "slot": "auto",
                                                         "relative_path": "Sonic The Hedgehog (USA, Europe).md"}
+                assert launched["view"] == "now" and launched["launching"]
                 st = data(await mcp.call_tool("console_status", {}))
-                assert st["playing"] and st["game"]["title"] == "Sonic The Hedgehog"
+                assert st["playing"] and st["game"]["title"] == "Sonic The Hedgehog" and st["volume"]["percent"] == 40
 
                 assert "RetroArch" in error_text(await mcp.call_tool("save_state", {}))
                 assert data(await mcp.call_tool("quit_game", {}))["result"] == "quit"
+                lib = data(await mcp.call_tool("library_overview", {}))
+                assert lib["view"] == "library" and lib["games"] == 5
 
             # Le jeton d'un autre compte ne voit rien ; une adresse sans jeton valide n'existe pas.
             _, other = store.create_account("autre")
@@ -168,6 +189,11 @@ def test_pairing_catalog_cheats_and_play(env):
                 assert data(await mcp.call_tool("list_consoles", {}))["consoles"] == []
                 assert "introuvable" in error_text(await mcp.call_tool("launch_game", {"game_id": sonic}))
             async with httpx.AsyncClient() as h:
+                font = await h.get(f"{base}/fonts/archivo.woff2")
+                assert font.status_code == 200 and font.headers["access-control-allow-origin"] == "*"
+                assert (await h.get(f"{base}/consoles/MD.webp")).status_code == 200
+                assert (await h.get(f"{base}/romkade-logo.webp")).status_code == 200
+                assert (await h.get(f"{base}/app.py")).status_code == 404
                 assert (await h.post(f"{base}/mcp/{'x' * 30}", json={})).status_code == 404
                 assert (await h.post(f"{base}/mcp", json={})).status_code == 404
                 assert (await h.get(f"{base}/agent/poll", headers={"Authorization": "Bearer nope"})).status_code == 401
