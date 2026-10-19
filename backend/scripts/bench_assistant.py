@@ -48,8 +48,8 @@ EN = {"the", "you", "to", "and", "is", "of", "in", "it", "for", "with", "your", 
 ES = {"el", "los", "las", "es", "tú", "para", "una", "en", "con", "que", "y", "del", "puedes", "por", "tu"}
 CODE_RE = re.compile(r"\b(?:[0-9A-F]{3}-[0-9A-F]{3}-[0-9A-F]{3}|[0-9A-Z]{4}-[0-9A-Z]{3,4}|[0-9A-F]{6}:[0-9A-F]{2}|"
                      r"00[0-9A-F]{6}|\d{3,6}=\d{1,3})\b")
-REFUSAL_RE = re.compile(r"(je ne peux pas|je ne réponds|seulement|uniquement|only|can't help|cannot help|"
-                        r"no puedo|solo puedo|hors sujet|off topic)", re.I)
+REFUSAL_RE = re.compile(r"(je ne peux|je ne réponds|seulement|uniquement|only|can't help|cannot help|"
+                        r"no puedo|solo puedo|hors sujet|off topic|autre source)", re.I)
 
 
 class Recording(llm_mod.LLM):
@@ -320,6 +320,8 @@ def main() -> int:
     m = sub.add_parser("modeles")
     m.add_argument("provider")
     m.add_argument("--local-url", default="http://localhost:1234/v1")
+    rp = sub.add_parser("rapport", help="refait les contrôles et le rapport d'un banc déjà passé")
+    rp.add_argument("dossier")
     r = sub.add_parser("lancer")
     r.add_argument("--moteurs", default=DEFAULT_ENGINES)
     r.add_argument("--questions", default="")
@@ -331,6 +333,20 @@ def main() -> int:
 
         engine = build_engine(f"{args.provider}:?", default_store(), args.local_url)
         print("\n".join(sorted(engine.list_models())))
+        return 0
+    if args.cmd == "rapport":
+        path = Path(args.dossier) / "results.json"
+        results = json.loads(path.read_text())
+        spec = {q["id"]: q for q in json.loads(QUESTIONS.read_text())["questions"]}
+        codes = set()  # contrôles refaits sauf les codes (gardés tels quels)
+        for a in results["answers"]:
+            q = spec.get(a["id"])
+            if q:
+                a["checks"] = {**checks(q, a["answer"], {"in_scope": a["in_scope"], "sources": a["sources"]}, codes),
+                               **{k: a["checks"][k] for k in ("codes", "invented_codes") if k in a["checks"]}}
+        path.write_text(json.dumps(results, ensure_ascii=False, indent=1))
+        (path.parent / "rapport.html").write_text(report(results))
+        print(path.parent / "rapport.html")
         return 0
     out = asyncio.run(run(args))
     print(f"\nRapport : {out / 'rapport.html'}")
