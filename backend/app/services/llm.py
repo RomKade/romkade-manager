@@ -193,6 +193,12 @@ class LLM:
         return f"{self.provider.label} · {self.model}"
 
     @property
+    def default_reasoning(self) -> str | None:
+        """Mistral Large 4 réfléchit avant de répondre et peut épuiser tous ses jetons sans rien écrire : réflexion
+        coupée (« none »), retirée d'office si un modèle la refuse."""
+        return "none" if self.provider.id == "mistral" else None
+
+    @property
     def local(self) -> bool:
         return self.provider.id == "local" and is_local_url(self.base_url)
 
@@ -212,6 +218,7 @@ class LLM:
                       effort: str | None = None, name: str = "answer", reasoning: str | None = None) -> dict | None:
         """Réponse JSON conforme à `schema`, ou None (refus, réponse tronquée ou illisible).
         Lève AppError (llm_unreachable, llm_rejected) si le fournisseur ne répond pas ou refuse la demande."""
+        reasoning = reasoning or self.default_reasoning
         if self.provider.protocol == "anthropic":
             return self._anthropic_json(system, prompt, schema, max_tokens, effort)
         return self._openai_json(system, prompt, schema, max_tokens, name, reasoning)
@@ -261,7 +268,7 @@ class LLM:
         msg = choice.get("message") or {}
         if choice.get("finish_reason") == "length" or msg.get("refusal"):
             return None
-        return parse_json_text(msg.get("content") or "")
+        return parse_json_text(content_text(msg.get("content")))
 
     def stream_chat(self, system: str, messages: list[dict], *, max_tokens: int = 800, reasoning: str | None = None):
         """Réponse en texte libre, morceau par morceau (générateur). `messages` : [{role: user|assistant, content}].
@@ -269,6 +276,7 @@ class LLM:
         llm_rejected) avant le premier morceau si le fournisseur ne répond pas ou refuse la demande.
         `reasoning` (compatible OpenAI) : « none » coupe la réflexion préalable des modèles à raisonnement (Gemma 4,
         Qwen 3… : sans lui, LM Studio peut épuiser les jetons à réfléchir et ne rien répondre) ; retiré si refusé."""
+        reasoning = reasoning or self.default_reasoning
         if self.provider.protocol == "anthropic":
             yield from self._anthropic_stream(system, messages, max_tokens)
         else:
@@ -318,8 +326,8 @@ class LLM:
                                 delta = json.loads(data)["choices"][0].get("delta") or {}
                             except (ValueError, KeyError, IndexError, TypeError):
                                 continue
-                            if delta.get("content"):
-                                yield delta["content"]
+                            if text := content_text(delta.get("content")):
+                                yield text
             except httpx.HTTPError as exc:
                 raise errors.AppError("llm_unreachable", _unreachable(self.provider, self.base_url, exc), 502) from exc
             if fallback == "no-reasoning":
@@ -332,7 +340,7 @@ class LLM:
                     raise errors.AppError("llm_rejected", _status_message(self.provider, r.status_code, r.text), 502,
                                           {"status": r.status_code})
                 try:
-                    yield r.json()["choices"][0]["message"].get("content") or ""
+                    yield content_text(r.json()["choices"][0]["message"].get("content"))
                 except (ValueError, KeyError, IndexError, TypeError):
                     return
 
@@ -389,6 +397,16 @@ def _status_message(provider: Provider, status: int, text: str) -> str:
     if status == 429:
         return f"{provider.label} limite les demandes ou le crédit est épuisé (erreur 429)."
     return f"{provider.label} a refusé la demande (erreur {status}) : {text[:300]}"
+
+
+def content_text(content) -> str:
+    """Texte d'un message compatible OpenAI. Certains modèles (Mistral Large 4, Magistral…) envoient une liste de
+    morceaux, réflexion comprise : [{"type": "thinking", …}, {"type": "text", "text": "…"}] ; seul le texte compte."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(c.get("text") or "" for c in content if isinstance(c, dict) and c.get("type") == "text")
+    return ""
 
 
 def parse_json_text(text: str) -> dict | None:
