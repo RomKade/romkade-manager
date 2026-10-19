@@ -5,7 +5,7 @@ import { Link, NavLink, useParams } from "react-router-dom";
 
 import { api, ApiError, type Capabilities, type DescriptionDraft, type DeviceSettings, type HostKey, type PlaySettings, type Settings } from "../api/client";
 import {
-  useDetectSystem, useDeviceStatus, useGame, useLlmSettings, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
+  useCaps, useDetectSystem, useDeviceStatus, useGame, useLlmSettings, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
 import { GitHubStar } from "../components/GitHubStar";
 import { GamePicker, type PickedGame } from "../components/GamePicker";
@@ -35,6 +35,7 @@ const TABS = [
 
 export function SettingsPage() {
   const t = useT();
+  const caps = useCaps();  // heure de la console : réglable sauf sous Android
   const llm = useLlmSettings().data;  // voyant de l'onglet Assistant IA, visible depuis tous les onglets
   const settings = useSettings();
   const { tab: raw = "" } = useParams();
@@ -71,7 +72,7 @@ export function SettingsPage() {
         <>
           <CapabilitiesPanel />
           <SystemPanel settings={settings.data} />
-          <ClockPanel />
+          {caps.clock && <ClockPanel />}
         </>
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}

@@ -38,6 +38,7 @@ def test_lookup_uses_aliases():
     ("m=spruce\nroot=/mnt/SDCARD/Roms\n", "spruce"),
     ("m=minui\nroot=/mnt/SDCARD/Roms\n", "minui"),
     ("os.NAME=Ubuntu\n", "generic"),
+    ("m=bash\nm=android\nos.NAME=Android 13 (Retroid Pocket 5)\nroot=/storage/emulated/0/ROMs\n", "android"),
 ])
 def test_detection(out, profile):
     d = parse_detection(out)
@@ -194,3 +195,51 @@ async def test_onion_launch():
     assert "VECTREX" in e.value.message
     with pytest.raises(errors.AppError):
         await launcher.launch(run, None, "GBA", "/mnt/SDCARD/Roms/GBA/x.zip", "auto", onion)
+
+
+def test_android_profile():
+    d = parse_detection("m=android\nos.NAME=Android 13 (Retroid Pocket 5)\nroot=/storage/1A2B-3C4D/ROMs\n")
+    assert d.os_name == "Android 13 (Retroid Pocket 5)" and d.roms_roots == ["/storage/1A2B-3C4D/ROMs"]
+    caps = PROFILES["android"].capabilities()
+    assert caps["launch"] and caps["quit"] and caps["save_state"] and caps["now_playing"]
+    assert not caps["resume_slot"] and not caps["bluetooth"] and not caps["volume"] and not caps["clock"]
+    assert PROFILES["anbernic-stock-mod"].capabilities()["clock"]
+
+
+def test_android_launch_command():
+    cmd = launcher.android_launch_command("snes", "/storage/emulated/0/ROMs/snes/Super Mario World (USA).sfc")
+    assert "snes9x_libretro_android.so" in cmd and "'/storage/emulated/0/ROMs/snes/Super Mario World (USA).sfc'" in cmd
+    assert "com.retroarch.aarch64" in cmd and launcher.ANDROID_ACTIVITY in cmd
+    assert launcher.android_launch_command("PORTS", "/x/y.sh") is None  # pas de cœur : on ne devine pas
+
+
+@pytest.mark.parametrize("line,state,label", [
+    ("GET_STATUS PLAYING super_nes,Super Mario World (USA),crc32=b19ed489", "PLAYING", "Super Mario World (USA)"),
+    ("GET_STATUS PAUSED genesis,Sonic, the Hedgehog,crc32=12ab", "PAUSED", "Sonic, the Hedgehog"),
+    ("GET_STATUS CONTENTLESS", "CONTENTLESS", None),
+    ("", None, None),
+])
+def test_retroarch_status(line, state, label):
+    assert launcher.parse_ra_status(line) == (state, label)
+
+
+async def test_android_status_finds_the_rom_once():
+    from types import SimpleNamespace
+
+    calls = []
+
+    async def run(_client, command, timeout=20):
+        calls.append(command)
+        if command.startswith("find "):
+            return 0, "/storage/emulated/0/ROMs/snes/Zelda [!].sfc\n"
+        return 0, "ra=GET_STATUS PLAYING super_nes,Zelda [!],crc32=1\n"
+
+    client = SimpleNamespace(settings=SimpleNamespace(roms_root="/storage/emulated/0/ROMs"))
+    launcher._android_paths.clear()
+    st = await launcher.status(run, client, PROFILES["android"])
+    assert st == {"playing": True, "process": "retroarch", "rom_path": "/storage/emulated/0/ROMs/snes/Zelda [!].sfc",
+                  "menu": False}
+    assert "'Zelda \\[!\\].*'" in calls[1]  # crochets échappés pour find -name
+    await launcher.status(run, client, PROFILES["android"])
+    assert len(calls) == 3  # chemin gardé en mémoire : pas de second find
+    assert launcher.quit_command(PROFILES["android"]) == launcher.ANDROID_QUIT_COMMAND

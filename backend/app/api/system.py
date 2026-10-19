@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from app import errors
 from app.device import clock
 from app.device.ssh_client import DeviceClient
 from app.device.systems import PROFILES, profile_out
@@ -23,6 +24,7 @@ class CapabilitiesOut(BaseModel):
     players: bool
     volume: bool
     on_screen_message: bool
+    clock: bool
 
 
 class SystemProfileOut(BaseModel):
@@ -103,4 +105,8 @@ async def device_clock(request: Request) -> dict:
 @router.post("/device/clock/sync", response_model=ClockOut)
 async def device_clock_sync(body: ClockSyncIn, request: Request) -> dict:
     """Met la console à l'heure du Mac (horloge système et matérielle) et, si donné, au fuseau du Mac."""
+    profile = await request.app.state.system.ensure()
+    if not profile.capabilities()["clock"]:
+        raise errors.AppError("clock_unsupported", f"L'heure de la console ne se règle pas à distance sur "
+                              f"{profile.label} : elle suit l'heure du réseau.", 409, {"system": profile.id})
     return await clock.sync(*_clock_ctx(request), body.timezone)

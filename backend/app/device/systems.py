@@ -6,6 +6,11 @@ quelques `test -d`) ou choisi dans les Paramètres.
 
 Seul le firmware Anbernic avec « Stock OS Mod » a été essayé sur une vraie console (RG35XX Pro) ; les autres
 profils suivent la documentation de leur firmware et sont marqués « experimental ».
+
+Android (Retroid, AYN, Anbernic sous Android…) : pas de SSH d'origine. L'application Termux en fournit un (port
+8022, SFTP compris), si bien que la bibliothèque, l'ajout de jeux et les sauvegardes marchent comme ailleurs. Les
+jeux se lancent dans RetroArch par une intention Android (`am start`), et l'état du jeu se lit par les commandes
+réseau de RetroArch (GET_STATUS) : Android cache aux autres applications les processus de RetroArch.
 """
 
 import re
@@ -33,8 +38,9 @@ class SystemProfile:
     label: str
     status: str                       # tested | experimental
     roms_roots: tuple[str, ...]       # emplacements habituels du dossier des ROMs, dans l'ordre
-    launcher: str | None              # stock-mod | es-http | onion | None (lancement à distance impossible)
-    quit: str                         # ra-udp (Anbernic) | es-http (repli : generic) | generic (QUIT puis SIGTERM) | none
+    launcher: str | None              # stock-mod | es-http | onion | android | None (lancement à distance impossible)
+    quit: str                         # ra-udp (Anbernic) | es-http (repli : generic) | generic (QUIT puis SIGTERM)
+                                      # | ra-cmd (CLOSE_CONTENT de RetroArch, Android) | none
     save_sources: tuple[SaveSource, ...] = ()
     states_in_rom_folder: bool = False  # sauvegardes instantanées rangées à côté des jeux
     ra_config: str | None = None
@@ -44,9 +50,10 @@ class SystemProfile:
     notes: str = ""
     makers: tuple[str, ...] = field(default=())
     ra_network: bool = False          # commandes réseau de RetroArch actives (SAVE_STATE, SHOW_MSG)
+    clock: bool = True                # heure de la console réglable (root nécessaire : pas sur Android)
 
     def capabilities(self, es_http: bool = False) -> dict[str, bool]:
-        launch = self.launcher in ("stock-mod", "onion") or (self.launcher == "es-http" and es_http)
+        launch = self.launcher in ("stock-mod", "onion", "android") or (self.launcher == "es-http" and es_http)
         return {
             "launch": launch,
             "resume_slot": self.launcher == "stock-mod",
@@ -60,6 +67,7 @@ class SystemProfile:
             "players": self.bluetooth == "stock",
             "volume": self.bluetooth == "stock",  # mixeur de la puce son du firmware d'origine (app/device/volume.py)  # firmware d'origine : config RetroArch fixe (app/device/players.py)
             "on_screen_message": self.ra_network,
+            "clock": self.clock,
         }
 
 
@@ -127,6 +135,14 @@ PROFILES: dict[str, SystemProfile] = {p.id: p for p in [
         notes="Dossiers « Game Boy (GB) » : la console est lue entre parenthèses. Pas de RetroArch.",
         makers=("Miyoo", "TrimUI", "Anbernic")),
     SystemProfile(
+        "android", "Android + RetroArch", "experimental",
+        ("/storage/emulated/0/ROMs", "/storage/emulated/0/Roms", "/storage/emulated/0/roms"), "android", "ra-cmd",
+        (("RetroArch/saves", "retroarch", 3), ("RetroArch/states", "retroarch", 3)), ra_network=True, clock=False,
+        notes="Retroid Pocket, AYN Odin/Thor, Anbernic et Ayaneo sous Android. Sur la console : Termux (serveur SSH, "
+              "port 8022, « Afficher par-dessus les autres applis » autorisé) et RetroArch avec les commandes réseau "
+              "activées. Les jeux se lancent dans RetroArch, avec le cœur installé pour chaque console.",
+        makers=("Retroid", "AYN", "Anbernic", "Ayaneo")),
+    SystemProfile(
         "generic", "Autre système (Linux + SSH)", "experimental", (), None, "generic", (),
         notes="Catalogue, jaquettes, ajout de jeux et sauvegardes rangées à côté des jeux.", makers=()),
 ]}
@@ -146,6 +162,11 @@ DETECT_COMMAND = (
     "test -d /mnt/SDCARD/.system && echo m=minui; "
     "command -v bluetoothctl >/dev/null 2>&1 && echo m=bluez; "
     "command -v bash >/dev/null 2>&1 && echo m=bash; "
+    # Android (Termux) : version, marque et modèle ; dossiers ROMs de la carte microSD (/storage/XXXX-XXXX).
+    "command -v getprop >/dev/null 2>&1 && { echo m=android; "
+    "echo \"os.NAME=Android $(getprop ro.build.version.release) ($(getprop ro.product.manufacturer) "
+    "$(getprop ro.product.model))\"; "
+    "for d in /storage/*/ROMs /storage/*/Roms /storage/*/roms; do test -d \"$d\" && echo root=$d; done; }; "
     f"(curl -s -m 2 {ES_HTTP}/caps || wget -q -T 2 -O - {ES_HTTP}/caps) >/dev/null 2>&1 && echo m=eshttp; "
     f"for d in {' '.join(shlex.quote(r) for r in ALL_ROOTS)}; do test -d \"$d\" && echo root=$d; done; true"
 )
@@ -173,7 +194,9 @@ def parse_detection(out: str) -> Detection:
             os_info[k] = v.strip().strip('"')
     os_id = " ".join(os_info.get(k, "") for k in ("ID", "NAME", "OS_NAME")).lower()  # ROCKNIX : OS_NAME seul
     m = set(markers)
-    if "stockmod" in m:
+    if "android" in m:
+        profile = "android"
+    elif "stockmod" in m:
         profile = "anbernic-stock-mod"
     elif "anbernic" in m:
         profile = "anbernic-stock"

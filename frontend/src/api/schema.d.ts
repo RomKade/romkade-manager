@@ -1190,12 +1190,18 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /**
-         * Describe Game
-         * @description Décrit ce jeu tout de suite avec l'IA réglée (remplace les textes de l'IA) : un jeu, ou un test avant le lot.
+         * Save Description
+         * @description Met dans la fiche la description proposée et validée : elle remplace celle de l'IA (le résumé d'origine,
+         *     en anglais, est gardé).
          */
-        post: operations["describe_game_api_games__game_id__description_post"];
+        put: operations["save_description_api_games__game_id__description_put"];
+        /**
+         * Draft Description
+         * @description Propose une description de ce jeu avec l'IA réglée, sans l'enregistrer : elle n'ira dans la fiche qu'une
+         *     fois validée (PUT). Sert aussi de test avant le lot.
+         */
+        post: operations["draft_description_api_games__game_id__description_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1218,6 +1224,80 @@ export interface paths {
          * @description Fait rédiger les commandes par le LLM configuré (un appel ; facturé chez le fournisseur, gratuit en local).
          */
         post: operations["generate_controls_api_games__game_id__controls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cheats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cheats Status */
+        get: operations["cheats_status_api_cheats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cheats/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cheats Download
+         * @description Télécharge ou met à jour le paquet des codes de triche de RetroArch (environ 37 Mo).
+         */
+        post: operations["cheats_download_api_cheats_download_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}/cheats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Cheats */
+        get: operations["game_cheats_api_games__game_id__cheats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}/cheats/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Cheats
+         * @description Copie le fichier de codes choisi dans le dossier des codes de RetroArch, sous le nom du jeu.
+         */
+        post: operations["install_cheats_api_games__game_id__cheats_install_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1732,6 +1812,11 @@ export interface components {
              * @enum {string}
              */
             lang: "fr" | "en" | "es";
+            /**
+             * Name
+             * @default Duke
+             */
+            name: string;
             /** Messages */
             messages: components["schemas"]["TurnIn"][];
         };
@@ -1879,6 +1964,8 @@ export interface components {
             volume: boolean;
             /** On Screen Message */
             on_screen_message: boolean;
+            /** Clock */
+            clock: boolean;
         };
         /** CatalogPlatformOut */
         CatalogPlatformOut: {
@@ -1988,6 +2075,41 @@ export interface components {
             /** Items */
             items: components["schemas"]["ChangeItemOut"][];
         };
+        /** CheatFileOut */
+        CheatFileOut: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** System */
+            system: string;
+            /** Count */
+            count: number;
+            /** Cheats */
+            cheats: components["schemas"]["CheatOut"][];
+        };
+        /** CheatOut */
+        CheatOut: {
+            /** Desc */
+            desc: string;
+            /** Code */
+            code: string;
+        };
+        /** CheatsStatusOut */
+        CheatsStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Files */
+            files: number;
+            /** Updated At */
+            updated_at: string | null;
+            /** Size */
+            size: number;
+            /** License */
+            license: string;
+            /** Source Url */
+            source_url: string;
+        };
         /** ClockOut */
         ClockOut: {
             /** Console Epoch */
@@ -2083,13 +2205,6 @@ export interface components {
         DeleteIn: {
             /** Path */
             path: string;
-        };
-        /** DescribeOneOut */
-        DescribeOneOut: {
-            /** Texts */
-            texts: number;
-            /** Mode */
-            mode: string;
         };
         /** DescriptionsStatusOut */
         DescriptionsStatusOut: {
@@ -2209,6 +2324,26 @@ export interface components {
             /** Message */
             message?: string | null;
         };
+        /** DraftOut */
+        DraftOut: {
+            /** Mode */
+            mode: string;
+            /** Model */
+            model: string;
+            /** Known */
+            known: boolean;
+            /** Texts */
+            texts: {
+                [key: string]: components["schemas"]["DraftText"];
+            };
+        };
+        /** DraftText */
+        DraftText: {
+            /** Text */
+            text: string;
+            /** Origin */
+            origin: string;
+        };
         /** DuplicateGroupOut */
         DuplicateGroupOut: {
             platform: components["schemas"]["PlatformRef"];
@@ -2253,6 +2388,19 @@ export interface components {
             page: components["schemas"]["Page"];
             /** Files */
             files: components["schemas"]["RemoteFileOut"][];
+        };
+        /** GameCheatsOut */
+        GameCheatsOut: {
+            /** Available */
+            available: boolean;
+            /** Files */
+            files: components["schemas"]["CheatFileOut"][];
+            /** Can Install */
+            can_install: boolean;
+            /** License */
+            license: string;
+            /** Source Url */
+            source_url: string;
         };
         /**
          * GameControlsIn
@@ -2530,6 +2678,16 @@ export interface components {
             action: "save_state" | "load_state" | "slot_next" | "slot_prev" | "quit" | "menu";
             /** Combo */
             combo: string[];
+        };
+        /** InstallIn */
+        InstallIn: {
+            /** Name */
+            name: string;
+        };
+        /** InstallOut */
+        InstallOut: {
+            /** Path */
+            path: string;
         };
         /** InventoryOut */
         InventoryOut: {
@@ -3034,38 +3192,26 @@ export interface components {
             /** Rel */
             rel: string;
         };
-        /** SaveOut */
-        SaveOut: {
-            /** Path */
-            path: string;
-            /** Rel */
-            rel: string;
+        /** SaveIn */
+        SaveIn: {
+            /** Mode */
+            mode: string;
+            /** Model */
+            model: string;
             /**
-             * Source
-             * @enum {string}
+             * Known
+             * @default true
              */
-            source: "retroarch" | "stock" | "nds" | "psp" | "rom-folder";
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "sram" | "state";
-            /** Slot */
-            slot: string | null;
-            /** Platform */
-            platform: string | null;
-            /** Name */
-            name: string;
-            /** Size */
-            size: number | null;
-            /** Modified At */
-            modified_at: string | null;
-            game: components["schemas"]["GameOut"] | null;
+            known: boolean;
+            /** Texts */
+            texts: {
+                [key: string]: string;
+            };
         };
         /** SavesOut */
         SavesOut: {
             /** Saves */
-            saves: components["schemas"]["SaveOut"][];
+            saves: components["schemas"]["app__catalog_schemas__SaveOut"][];
             /**
              * Scanned At
              * Format: date-time
@@ -3419,6 +3565,39 @@ export interface components {
         YouTubeSettingsOut: {
             /** Configured */
             configured: boolean;
+        };
+        /** SaveOut */
+        app__api__descriptions__SaveOut: {
+            /** Texts */
+            texts: number;
+        };
+        /** SaveOut */
+        app__catalog_schemas__SaveOut: {
+            /** Path */
+            path: string;
+            /** Rel */
+            rel: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "retroarch" | "stock" | "nds" | "psp" | "rom-folder";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sram" | "state";
+            /** Slot */
+            slot: string | null;
+            /** Platform */
+            platform: string | null;
+            /** Name */
+            name: string;
+            /** Size */
+            size: number | null;
+            /** Modified At */
+            modified_at: string | null;
+            game: components["schemas"]["GameOut"] | null;
         };
     };
     responses: never;
@@ -4832,7 +5011,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SaveOut"][];
+                    "application/json": components["schemas"]["app__catalog_schemas__SaveOut"][];
                 };
             };
             /** @description Validation Error */
@@ -5420,7 +5599,42 @@ export interface operations {
             };
         };
     };
-    describe_game_api_games__game_id__description_post: {
+    save_description_api_games__game_id__description_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__api__descriptions__SaveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_description_api_games__game_id__description_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -5437,7 +5651,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DescribeOneOut"];
+                    "application/json": components["schemas"]["DraftOut"];
                 };
             };
             /** @description Validation Error */
@@ -5535,6 +5749,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GameControlsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cheats_status_api_cheats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheatsStatusOut"];
+                };
+            };
+        };
+    };
+    cheats_download_api_cheats_download_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheatsStatusOut"];
+                };
+            };
+        };
+    };
+    game_cheats_api_games__game_id__cheats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameCheatsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_cheats_api_games__game_id__cheats_install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallOut"];
                 };
             };
             /** @description Validation Error */

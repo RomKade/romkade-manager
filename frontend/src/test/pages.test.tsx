@@ -862,7 +862,7 @@ describe("Connexion à une IA", () => {
 describe("Système de la console", () => {
   it("met en avant ce que la console sait faire, regroupé, avant le choix du système et l'horloge", async () => {
     systemCaps = { launch: true, resume_slot: false, quit: true, save_state: true, now_playing: true, saves: true,
-      retroarch_logs: true, bluetooth: false, bluetooth_audio: false, players: true, volume: true };
+      retroarch_logs: true, bluetooth: false, bluetooth_audio: false, players: true, volume: true, clock: true };
     renderAt("/parametres/systeme");
     const panel = (await screen.findByRole("heading", { name: "Ce que tu peux faire avec cette console" })).closest("section")!;
     expect(within(panel).getByRole("heading", { name: /Jeux/ })).toBeInTheDocument();
@@ -871,6 +871,14 @@ describe("Système de la console", () => {
     expect(within(panel).getByText("Bluetooth").closest("li")).toHaveClass("caps__no");
     const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(headings.indexOf("Ce que tu peux faire avec cette console")).toBeLessThan(headings.findIndex((h) => /Date et heure/.test(h ?? "")));
+  });
+
+  it("Android : pas de réglage de l'heure de la console", async () => {
+    systemCaps = { launch: true, resume_slot: false, quit: true, save_state: true, now_playing: true, saves: true,
+      retroarch_logs: false, bluetooth: false, bluetooth_audio: false, players: false, volume: false, clock: false };
+    renderAt("/parametres/systeme");
+    await screen.findByRole("heading", { name: "Ce que tu peux faire avec cette console" });
+    expect(screen.queryByRole("heading", { name: /Date et heure/ })).not.toBeInTheDocument();
   });
 });
 

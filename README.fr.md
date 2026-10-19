@@ -580,6 +580,7 @@ les ROMs et les sauvegardes, comment lancer et quitter un jeu, et ce qui est dis
 | Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | oui (comme le menu d'Onion), quitter | testé |
 | spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | quitter | expérimental |
 | MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | non | expérimental |
+| Android + RetroArch | Retroid Pocket, AYN Odin/Thor, Anbernic et Ayaneo sous Android | `/storage/emulated/0/ROMs` | oui (RetroArch), quitter, sauvegarder | expérimental |
 | Autre (Linux + SSH) | — | à régler | quitter (RetroArch) | expérimental |
 
 Noms de dossiers : chaque firmware a les siens (« snes », « SFC », « Super Nintendo Entertainment System (SFC) »,
@@ -596,6 +597,26 @@ de MainUI (émulateur de `Emu/<console>/config.json`), puis fermeture du menu (`
 coupe SSH au lancement des jeux, sauf avec « Keep services alive » (Tweaks > Network) : le script l'active
 (`.tmp_update/config/.keepServicesAlive_` renommé en `.keepServicesAlive`, comme le fait Tweaks), seule écriture
 sur la carte, pour garder la console joignable pendant la partie (jeu en cours, Quitter).
+
+Android (Retroid, AYN…) : Android n'a pas de serveur SSH, l'application gratuite **Termux** en fournit un (SFTP
+compris) ; la bibliothèque, l'ajout de jeux et les sauvegardes marchent alors comme sous Linux. Sur la console, une fois :
+
+1. Installer **Termux** (version F-Droid ou GitHub, pas celle du Play Store, trop ancienne) et **RetroArch**, puis
+   télécharger les cœurs utiles (RetroArch → Mise à jour en ligne → Téléchargement de cœurs).
+2. Dans Termux : `termux-setup-storage`, `pkg install openssh`, `passwd` (choisir un mot de passe), `sshd`.
+3. Réglages Android → Applications → Termux → autoriser **« Afficher par-dessus les autres applis »** (sans cela,
+   Android bloque un jeu lancé depuis l'ordinateur pendant que Termux est en arrière-plan).
+4. RetroArch → Réglages → Réseau → **Commandes réseau** activées (jeu en cours, quitter, sauvegarder).
+5. Dans ROMKADE Manager : l'adresse IP de la console, le port **8022**, un nom d'utilisateur quelconque, le mot de passe
+   de Termux.
+
+Les jeux se lancent par une intention Android (`am start` vers RetroArch, extras `ROM` et `LIBRETRO` ; un cœur par
+console, `ANDROID_CORES` dans `launcher.py`). Android cache aux autres applications les processus de RetroArch : le jeu
+en cours se lit par la commande réseau `GET_STATUS` de RetroArch (son fichier est ensuite retrouvé par son nom), et on
+quitte un jeu par `CLOSE_CONTENT` (RetroArch reste ouvert sur son menu). Indisponible sous Android : reprendre sur une
+sauvegarde instantanée, volume, Bluetooth, manettes par joueur, heure de la console (root nécessaire). Les sauvegardes
+sont lues dans `RetroArch/saves` et `RetroArch/states`, à côté du dossier des ROMs (dossiers par défaut de RetroArch
+sous Android).
 
 ## Version, conditions d'utilisation
 
