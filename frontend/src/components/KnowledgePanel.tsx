@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { BookOpenText, Download, ExternalLink, Loader2, Search, Square } from "lucide-react";
+import { BookOpenText, Download, ExternalLink, KeyRound, Loader2, Search, Square } from "lucide-react";
 import { useState } from "react";
 
 import { api, type GameKnowledge, type KnowledgeHit } from "../api/client";
-import { useKnowledge, useKnowledgeMutations, useQuickSearch } from "../api/queries";
+import { useCheatsStatus, useDownloadCheats, useKnowledge, useKnowledgeMutations, useQuickSearch } from "../api/queries";
 import { useT } from "../i18n";
 import { useDebounced } from "../lib/hooks";
 import { ErrorNotice, Meter, Spinner } from "./ui";
@@ -159,5 +159,37 @@ function KnowledgeTest() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Codes de triche de RetroArch : paquet téléchargé à la demande (sans IA), puis mis à jour quand on veut. */
+export function CheatsPanel() {
+  const t = useT();
+  const q = useCheatsStatus();
+  const download = useDownloadCheats();
+  const st = q.data;
+  return (
+    <section className="block knowledge" aria-labelledby="ch-h">
+      <h2 id="ch-h"><KeyRound size={18} aria-hidden /> {t("settings.ch.title")}</h2>
+      <p className="muted block__lead">{t("settings.ch.lead")}</p>
+      {q.isPending ? <Spinner label={t("common.loading")} /> : q.isError ? <ErrorNotice error={q.error} /> : st && (
+        <>
+          <p>{st.available && st.updated_at
+            ? t("settings.ch.status", { files: st.files.toLocaleString(), date: new Date(st.updated_at).toLocaleDateString() })
+            : t("settings.ch.none")}</p>
+          <div className="form__actions">
+            <button type="button" className={`button ${st.available ? "button--small" : "button--primary"}`}
+              disabled={download.isPending} onClick={() => download.mutate()}>
+              {download.isPending ? <Loader2 size={16} aria-hidden className="spin" /> : <Download size={16} aria-hidden />}{" "}
+              {download.isPending ? t("settings.ch.downloading") : t(st.available ? "settings.ch.update" : "settings.ch.download")}
+            </button>
+          </div>
+          {download.isError && <ErrorNotice error={download.error} />}
+          <p className="muted small">
+            <a href={st.source_url} target="_blank" rel="noreferrer noopener">libretro-database · {st.license} <ExternalLink size={11} aria-hidden /></a>
+          </p>
+        </>
+      )}
+    </section>
   );
 }

@@ -105,7 +105,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   };
   const submit = (e: FormEvent) => { e.preventDefault(); send(text); };
   const suggestions = gameScope
-    ? ["assistant.ask.controls", "assistant.ask.save", "assistant.ask.stuck", "assistant.ask.tip"]
+    ? ["assistant.ask.cheats", "assistant.ask.controls", "assistant.ask.stuck", "assistant.ask.tip"]
     : ["assistant.ask.twoPlayers", "assistant.ask.racing", "assistant.ask.addGames"];
   const last = messages.at(-1);
   const offerSolution = gameScope && !busy && last?.role === "assistant" && last.intent === "game_help" && last.content;
@@ -228,7 +228,7 @@ function Message({ m, game, onOpenGame }: { m: ChatMessage; game: AssistantGame 
         <span className="assistant__sources">
           {m.sources!.map((s) => (
             <a key={s.url} href={s.url} target="_blank" rel="noreferrer noopener">
-              {s.source === "wikipedia" ? "Wikipédia" : "StrategyWiki"} · {s.license} <ExternalLink size={11} aria-hidden />
+              {s.source === "wikipedia" ? "Wikipédia" : s.source === "retroarch" ? "RetroArch" : "StrategyWiki"} · {s.license} <ExternalLink size={11} aria-hidden />
             </a>
           ))}
         </span>

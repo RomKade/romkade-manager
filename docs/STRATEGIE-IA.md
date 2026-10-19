@@ -112,7 +112,10 @@ quel modèle, en ligne ou local, la lit au moment de répondre.
 
 1. **Connaissances** : récupération (Wikidata, Wikipédia, StrategyWiki), passages en base, index Typesense, pour un
    jeu ou tous, proposée après synchronisation ; onglet **Contenu IA** (renommage de « Descriptions »).
-2. **Codes de triche** depuis la base de RetroArch (sans IA), affichage et copie du `.cht` sur la console.
+2. **Codes de triche** depuis la base de RetroArch (sans IA), affichage et copie du `.cht` sur la console. *Fait :*
+   paquet officiel (`cheats.zip`, ~37 Mo) téléchargé depuis Paramètres > Connaissances, section « Codes de triche »
+   de la fiche, et l'assistant lit les codes de la meilleure version quand la question parle de triche
+   (`app/services/cheats.py`).
 3. **Astuces** par l'IA (même modèle de stockage que les commandes).
 4. **Assistant** multi-jeu (bibliothèque, ou un jeu détecté), RAG sur les connaissances, modèle en ligne ou local.
 5. Contenus en plus : *Pour bien démarrer*, *Jeux similaires dans ta bibliothèque*, *Nombre de joueurs*.

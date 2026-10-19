@@ -3,6 +3,7 @@ import type { Messages } from "../core";
 /** Assistant de jeu (bulle en bas à droite). */
 const messages: Messages = {
   fr: {
+    "ask.cheats": "Des codes de triche pour ce jeu ?",
     "subtitle": "Assistant IA de jeu",
     "offerClose": "Fermer la proposition",
     "scope": "Sujet de la discussion",
@@ -16,7 +17,6 @@ const messages: Messages = {
     "introLibrary": "Pose une question sur tes jeux (en trouver un, en comparer deux) ou sur l'application.",
     "introGame": "Pose une question sur {title} : commandes, objectifs, un passage difficile, un secret…",
     "ask.controls": "Quelles touches pour jouer ?",
-    "ask.save": "Comment sauvegarder ?",
     "ask.stuck": "Je suis bloqué, un indice ?",
     "ask.tip": "Une astuce pour bien démarrer ?",
     "ask.twoPlayers": "Un jeu à deux dans ma bibliothèque ?",
@@ -40,6 +40,7 @@ const messages: Messages = {
     "refusal.unclear": "Je n'ai pas compris la question. Peux-tu la reformuler ?",
   },
   en: {
+    "ask.cheats": "Any cheat codes for this game?",
     "subtitle": "AI game assistant",
     "offerClose": "Close this suggestion",
     "scope": "Conversation topic",
@@ -53,7 +54,6 @@ const messages: Messages = {
     "introLibrary": "Ask about your games (find one, compare two) or about the app.",
     "introGame": "Ask about {title}: controls, goals, a hard part, a secret…",
     "ask.controls": "Which buttons do I use?",
-    "ask.save": "How do I save?",
     "ask.stuck": "I'm stuck, a hint?",
     "ask.tip": "A tip to get started?",
     "ask.twoPlayers": "A two-player game in my library?",
@@ -77,6 +77,7 @@ const messages: Messages = {
     "refusal.unclear": "I didn't understand the question. Could you rephrase it?",
   },
   es: {
+    "ask.cheats": "¿Trucos para este juego?",
     "subtitle": "Asistente IA de juego",
     "offerClose": "Cerrar la propuesta",
     "scope": "Tema de la conversación",
@@ -90,7 +91,6 @@ const messages: Messages = {
     "introLibrary": "Pregunta sobre tus juegos (encontrar uno, comparar dos) o sobre la aplicación.",
     "introGame": "Pregunta sobre {title}: controles, objetivos, una parte difícil, un secreto…",
     "ask.controls": "¿Qué botones uso?",
-    "ask.save": "¿Cómo guardo la partida?",
     "ask.stuck": "Estoy atascado, ¿una pista?",
     "ask.tip": "¿Un consejo para empezar?",
     "ask.twoPlayers": "¿Un juego para dos en mi biblioteca?",

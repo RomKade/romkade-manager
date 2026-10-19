@@ -3,6 +3,13 @@ import type { Messages } from "../core";
 /** Paramètres : connexion, mot de passe, clé de la console, test, YouTube. */
 const messages: Messages = {
   fr: {
+    "ch.downloading": "Téléchargement…",
+    "ch.update": "Mettre à jour",
+    "ch.download": "Télécharger les codes",
+    "ch.status": "{files} fichiers de codes · mise à jour le {date}",
+    "ch.none": "Pas encore téléchargée (37 Mo).",
+    "ch.lead": "La base de codes de RetroArch, sans IA : affichée sur la fiche de chaque jeu, copiable sur la console, et lue par l'assistant quand tu lui demandes des codes.",
+    "ch.title": "Codes de triche (RetroArch)",
     "desc.oneSaved": "Description mise dans la fiche du jeu.",
     "desc.oneDiscard": "Ignorer",
     "desc.oneAccept": "Mettre dans la fiche",
@@ -333,6 +340,13 @@ const messages: Messages = {
     "yt.remove": "Retirer la clé",
   },
   en: {
+    "ch.downloading": "Downloading…",
+    "ch.update": "Update",
+    "ch.download": "Download the codes",
+    "ch.status": "{files} cheat files · updated on {date}",
+    "ch.none": "Not downloaded yet (37 MB).",
+    "ch.lead": "RetroArch's cheat database, no AI: shown on each game page, copyable to the console, and read by the assistant when you ask for codes.",
+    "ch.title": "Cheat codes (RetroArch)",
     "desc.oneSaved": "Description added to the game page.",
     "desc.oneDiscard": "Discard",
     "desc.oneAccept": "Put on the game page",
@@ -663,6 +677,13 @@ const messages: Messages = {
     "yt.remove": "Remove the key",
   },
   es: {
+    "ch.downloading": "Descargando…",
+    "ch.update": "Actualizar",
+    "ch.download": "Descargar los trucos",
+    "ch.status": "{files} archivos de trucos · actualizada el {date}",
+    "ch.none": "Aún no descargada (37 MB).",
+    "ch.lead": "La base de trucos de RetroArch, sin IA: se muestra en la ficha de cada juego, se puede copiar a la consola y el asistente la lee cuando le pides trucos.",
+    "ch.title": "Trucos (RetroArch)",
     "desc.oneSaved": "Descripción añadida a la ficha del juego.",
     "desc.oneDiscard": "Descartar",
     "desc.oneAccept": "Poner en la ficha",

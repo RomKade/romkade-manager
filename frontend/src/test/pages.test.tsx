@@ -41,6 +41,10 @@ let controlsSourced = false;
 let sheetImages: { boxart_url?: string | null; image_url?: string | null } = {};
 let knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null as string | null, stopping: false };
 let savedDescription: unknown = null;
+let cheatsReady = false;
+let installedCheat: string | null = null;
+const cheatsStatus = () => ({ available: cheatsReady, files: cheatsReady ? 27280 : 0, updated_at: cheatsReady ? "2026-10-19T09:00:00Z" : null,
+  size: 0, license: "CC BY-SA 4.0", source_url: "https://github.com/libretro/libretro-database/tree/master/cht" });
 type FakeLlm = { provider: string | null; model: string | null; base_url: string | null; key: boolean; tested: boolean };
 const NO_LLM: FakeLlm = { provider: null, model: null, base_url: null, key: false, tested: false };
 let llm: FakeLlm = { ...NO_LLM };
@@ -173,6 +177,18 @@ function mockFetch() {
       ].join("");
       return new Response(sse, { status: 200, headers: { "Content-Type": "text/event-stream" } });
     }
+    if (url === "/api/cheats/download") { cheatsReady = true; return json(cheatsStatus()); }
+    if (url === "/api/cheats") return json(cheatsStatus());
+    if (/^\/api\/games\/\d+\/cheats\/install/.test(url)) {
+      installedCheat = (JSON.parse(String(init!.body)) as { name: string }).name;
+      return json({ path: "/.config/retroarch/cheats/x/Super Mario World (USA).cht" });
+    }
+    if (/^\/api\/games\/\d+\/cheats/.test(url)) return json({ available: cheatsReady, can_install: true, license: "CC BY-SA 4.0",
+      source_url: "https://github.com/libretro/libretro-database/tree/master/cht", files: cheatsReady ? [
+        { name: "SNES/Super Mario World (USA).cht", label: "USA", system: "SNES", count: 10,
+          cheats: Array.from({ length: 10 }, (_, i) => ({ desc: i === 0 ? "Vies infinies" : `Code ${i}`, code: `7E0DBE:${i}` })) },
+        { name: "SNES/Super Mario World (USA) (Game Genie).cht", label: "USA · Game Genie", system: "SNES", count: 1,
+          cheats: [{ desc: "Start with 9 lives", code: "DD6A-1F0D" }] }] : [] });
     if (/^\/api\/games\/\d+\/description/.test(url)) {
       if (init?.method === "PUT") { savedDescription = JSON.parse(String(init.body)); return json({ texts: 2 }); }
       return json({ mode: "translate", model: "qwen", known: true, texts: {
@@ -247,6 +263,8 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   savedDescription = null;
+  cheatsReady = false;
+  installedCheat = null;
   localStorage.removeItem("agm-recent-searches");
   localStorage.removeItem("romkade-assistant-name");
   localStorage.removeItem("romkade-assistant-hidden");
@@ -564,6 +582,35 @@ describe("Assistant de jeu", () => {
     expect(within(panel).getByText(/modèle local : rien ne quitte cet ordinateur/)).toBeInTheDocument();
     expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr", name: "Duke",
       messages: [{ role: "user", content: "Je bloque au château" }] });
+  });
+});
+
+describe("Codes de triche (RetroArch)", () => {
+  it("fiche : télécharge la base, affiche les codes de la version choisie et copie le fichier sur la console", async () => {
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    const section = (await within(dialog).findByRole("heading", { name: "Codes de triche" })).closest("section")!;
+    await userEvent.click(within(section).getByRole("button", { name: /Télécharger les codes/ }));
+    expect(await within(section).findByText("Vies infinies")).toBeInTheDocument();
+    expect(within(section).getByText("7E0DBE:0")).toBeInTheDocument();
+    expect(within(section).queryByText("Code 9")).not.toBeInTheDocument();  // 8 premiers, puis « Tout afficher »
+    await userEvent.click(within(section).getByRole("button", { name: "Tout afficher (10)" }));
+    expect(within(section).getByText("Code 9")).toBeInTheDocument();
+    await userEvent.selectOptions(within(section).getByRole("combobox", { name: "Version" }), "1");
+    expect(within(section).getByText("DD6A-1F0D")).toBeInTheDocument();
+    await userEvent.click(within(section).getByRole("button", { name: "Copier sur la console" }));
+    expect(await within(section).findByText(/Fichier copié dans le dossier des codes de RetroArch/)).toBeInTheDocument();
+    expect(installedCheat).toBe("SNES/Super Mario World (USA) (Game Genie).cht");
+  });
+
+  it("paramètres : connaissances > codes de triche, téléchargement puis mise à jour", async () => {
+    renderAt("/parametres/connaissances");
+    const panel = (await screen.findByRole("heading", { name: "Codes de triche (RetroArch)" })).closest("section")!;
+    expect(await within(panel).findByText(/Pas encore téléchargée/)).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: /Télécharger les codes/ }));
+    expect(await within(panel).findByText(/fichiers de codes · mise à jour le/)).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /Mettre à jour/ })).toBeInTheDocument();
   });
 });
 

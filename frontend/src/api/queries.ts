@@ -78,6 +78,19 @@ export function useKnowledgeMutations() {
 }
 
 /** Commandes du jeu (quelle touche fait quoi) : rédigées par Claude à la demande ou corrigées à la main. */
+export const useCheatsStatus = () => useQuery({ queryKey: ["cheats"], queryFn: api.cheatsStatus });
+export const useGameCheats = (id: number) =>
+  useQuery({ queryKey: ["game-cheats", id], queryFn: () => api.gameCheats(id), staleTime: Infinity, retry: false });
+
+/** Téléchargement (ou mise à jour) du paquet des codes de triche de RetroArch. */
+export function useDownloadCheats() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: api.downloadCheats,
+    onSuccess: (d) => { qc.setQueryData(["cheats"], d); qc.invalidateQueries({ queryKey: ["game-cheats"] }); },
+  });
+}
+
 export const useGameControls = (id: number) =>
   useQuery({ queryKey: ["game-controls", id], queryFn: () => api.gameControls(id), staleTime: Infinity, retry: false });
 

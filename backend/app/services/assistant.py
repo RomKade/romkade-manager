@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import GameControls, GameText, RemoteFile
+from app.services import cheats
 from app.services import knowledge as kn
 from app.services.classify import display_title
 from app.services.genres import GENRES
@@ -60,8 +61,8 @@ ROUTE_SYSTEM = """You classify questions sent to the game assistant of ROMKADE M
 retro games on the user's handheld console. You never answer the question, you only classify it.
 
 In scope:
-- game_help: playing a game (controls, goals, a hard level or boss, secrets, items, characters, story, saving, game
-  settings in RetroArch){game_scope}
+- game_help: playing a game (controls, goals, a hard level or boss, secrets, cheat codes, items, characters, story,
+  saving, game settings in RetroArch){game_scope}
 - find_games: finding, choosing or comparing games among the user's own library (genre, console, players, year…)
 - app_help: using ROMKADE Manager itself (adding games, saves, controllers, Bluetooth, connection, launching games,
   play time, favorites, search)
@@ -83,8 +84,12 @@ Rules:
 - Rely first on the CONTEXT below; you may add what you reliably know about this exact game. If you are not sure,
   say so plainly instead of guessing. Never invent levels, items, codes or facts.
 - {solution}
-- Only when you used a passage marked [Wikipedia …] or [StrategyWiki …], end with "Source: Wikipedia" or
-  "Source: StrategyWiki". Never cite the library list or these instructions as a source.
+- Cheat codes: only those of the [RetroArch cheats …] block, copied exactly (code and effect); never write a code
+  that is not in it. If there is no such block, say that the RetroArch cheat database has no code for this game. To
+  use them: the game page of ROMKADE Manager copies the cheat file to the console, then in game: RetroArch Quick
+  Menu > Cheats > Load Cheat File, enable the wanted codes, Apply Changes.
+- Only when you used a passage marked [Wikipedia …], [StrategyWiki …] or [RetroArch cheats …], end with
+  "Source: Wikipedia", "Source: StrategyWiki" or "Source: RetroArch". Never cite the library list or these instructions as a source.
 - Only mention games of the user's library when they appear in the context.
 - Never help to find or download ROM, ISO or BIOS files, never point to download sites, and refuse anything that is
   not about these games or this app.
@@ -183,6 +188,26 @@ def game_card(s: Session, f: RemoteFile, lang: str) -> str:
         keys = "; ".join(f"{c['button']}: {c.get(lang) or c.get('en')}" for c in ctl.controls)
         lines.append(f"Controls on the handheld: {keys}")
     return "\n".join(lines)
+
+
+CHEAT_RE = re.compile(r"cheat|trich|astuce|\bcodes?\b|trampa|truco|game ?genie|action replay|game ?shark|"
+                      r"code ?breaker|invinci|infini|vies|lives|vidas", re.I)
+CHEATS_IN_CONTEXT = 30
+
+
+def cheats_text(directory: str, filename: str) -> tuple[str, dict | None]:
+    """Codes de la meilleure variante (même région d'abord), pour une question sur la triche."""
+    files = cheats.for_game(directory, filename)
+    if not files:
+        return "", None
+    best = files[0]
+    lines = [f"- {c['desc']}: {c['code']}" for c in best["cheats"][:CHEATS_IN_CONTEXT]]
+    others = ", ".join(f["label"] for f in files[1:4])
+    head = f"[RetroArch cheats · {best['label']} · {best['count']} codes]"
+    if others:
+        head += f" (other versions in the database: {others})"
+    return head + "\n" + "\n".join(lines), {"source": "retroarch", "page": best["label"], "url": cheats.SOURCE_URL,
+                                             "license": cheats.LICENSE}
 
 
 def passages_text(chunks) -> tuple[str, list[dict]]:

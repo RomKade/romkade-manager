@@ -134,6 +134,11 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                     text += "\n\nPassages:\n" + passages
                 else:
                     text += "\n\n(No reference passage for this game.)"
+                if asst.CHEAT_RE.search(question + " " + search_text):
+                    codes, src = asst.cheats_text(f.platform.directory, f.filename)
+                    if src:
+                        text += "\n\n" + codes
+                        srcs = [src, *srcs]
                 return text, srcs
 
         context, sources = await asyncio.to_thread(card)

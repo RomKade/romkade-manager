@@ -1444,3 +1444,10 @@ kbd {
 .desc-one__draft { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-control); border: 1px dashed var(--line-strong); }
 .desc-one__draft .desc-one__text { border-left-color: var(--accent-2, var(--accent)); }
 .text-ok { color: var(--ok); font-weight: 600; margin: 0; }
+
+/* Fiche du jeu : codes de triche (RetroArch) */
+.cheats__variant { max-width: 360px; }
+.cheats__empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.cheats__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.cheats__list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: var(--r-control); background: var(--panel-2); }
+.cheats__list code { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }

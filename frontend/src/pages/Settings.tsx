@@ -10,7 +10,7 @@ import {
 import { GitHubStar } from "../components/GitHubStar";
 import { GamePicker, type PickedGame } from "../components/GamePicker";
 import { StepCards } from "../components/StepCards";
-import { KnowledgePanel } from "../components/KnowledgePanel";
+import { CheatsPanel, KnowledgePanel } from "../components/KnowledgePanel";
 import { LlmPanel } from "../components/LlmPanel";
 import { SecretInput } from "../components/SecretInput";
 import { ErrorNotice, hintFor, Meter, PageHeader, Spinner } from "../components/ui";
@@ -77,7 +77,7 @@ export function SettingsPage() {
       {current === "temps-de-jeu" && <PlaytimePanel />}
       {current === "videos" && <YouTubePanel />}
       {current === "ia" && <LlmPanel />}
-      {current === "connaissances" && <><KnowledgePanel /><DescriptionsPanel /></>}
+      {current === "connaissances" && <><KnowledgePanel /><CheatsPanel /><DescriptionsPanel /></>}
       {current === "a-propos" && <><AboutPanel /><CreditsPanel /></>}
     </div>
   );

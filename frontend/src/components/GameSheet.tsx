@@ -13,6 +13,7 @@ import { saveLabel } from "../lib/saves";
 import { ConsoleBadge } from "./ConsoleBadge";
 import { assistant } from "../lib/assistant";
 import { AssistantBubble } from "./AssistantBubble";
+import { GameCheatsSection } from "./GameCheats";
 import { GameControlsSection } from "./GameControls";
 import { GameInfo } from "./GameInfo";
 import { GameGallery } from "./GameGallery";
@@ -109,6 +110,7 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
       <GameInfo game={game} />
 
       {game.role === "candidate" && <GameControlsSection id={game.id} />}
+      {game.role === "candidate" && <GameCheatsSection id={game.id} />}
 
       <dl className="facts">
         {game.full_title && <div className="facts__wide"><dt>{t("sheet.fullTitle")}</dt><dd>{game.full_title}</dd></div>}

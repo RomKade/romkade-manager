@@ -1,6 +1,11 @@
 import type { components } from "./schema";
 
 type S = components["schemas"];
+export type CheatsStatus = { available: boolean; files: number; updated_at: string | null; size: number; license: string;
+  source_url: string };
+export type CheatFile = { name: string; label: string; system: string; count: number; cheats: { desc: string; code: string }[] };
+export type GameCheats = { available: boolean; files: CheatFile[]; can_install: boolean; license: string; source_url: string };
+
 export type DescriptionDraft = {
   mode: "translate" | "write"; model: string; known: boolean; texts: Record<string, { text: string; origin: string }>;
 };
@@ -138,6 +143,10 @@ export const api = {
   gameKnowledge: (id: number) => request<GameKnowledge>("GET", `/games/${id}/knowledge`),
   fetchGameKnowledge: (id: number) => request<GameKnowledge>("POST", `/games/${id}/knowledge`),
   searchGameKnowledge: (id: number, q: string) => request<KnowledgeHit[]>("GET", `/games/${id}/knowledge/search${qs({ q })}`),
+  cheatsStatus: () => request<CheatsStatus>("GET", "/cheats"),
+  downloadCheats: () => request<CheatsStatus>("POST", "/cheats/download"),
+  gameCheats: (id: number) => request<GameCheats>("GET", `/games/${id}/cheats`),
+  installCheats: (id: number, name: string) => request<{ path: string }>("POST", `/games/${id}/cheats/install`, { name }),
   gameControls: (id: number) => request<GameControls>("GET", `/games/${id}/controls`),
   generateControls: (id: number) => request<GameControls>("POST", `/games/${id}/controls`),
   editControls: (id: number, body: GameControlsIn) => request<GameControls>("PUT", `/games/${id}/controls`, body),
