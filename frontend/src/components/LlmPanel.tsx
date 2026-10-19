@@ -9,7 +9,7 @@ import { dateTime } from "../lib/format";
 import { REPO_URL } from "../lib/credits";
 import { getLang, useT } from "../i18n";
 import { assistant, useAssistant } from "../lib/assistant";
-import { isValidName, PERSONAS } from "../lib/assistantNames";
+import { DEFAULT_ASSISTANT_NAME, isValidName } from "../lib/assistantNames";
 import { SecretInput } from "./SecretInput";
 import { StepCards } from "./StepCards";
 import { ErrorNotice, Spinner } from "./ui";
@@ -150,39 +150,9 @@ function LlmForm({ settings }: { settings: LlmSettings }) {
         </div>
         <StatusLine settings={settings} checking={checking} />
       </section>
-    </>
-  );
-}
 
-/** Prénom de l'assistant : un des dix personnages, ou un prénom libre. Mémorisé dans ce navigateur. */
-function NamePicker() {
-  const t = useT();
-  const { name } = useAssistant();
-  const preset = PERSONAS.some((p) => p.name === name);
-  const [other, setOther] = useState(preset ? "" : name);
-  const valid = isValidName(other);
-  return (
-    <fieldset className="names">
-      <legend>{t("settings.as.nameTitle")}</legend>
-      <p className="muted small">{t("settings.as.nameLead")}</p>
-      <div className="names__grid" role="radiogroup" aria-label={t("settings.as.nameTitle")}>
-        {PERSONAS.map((p) => (
-          <label key={p.key} className={`names__option ${name === p.name ? "is-on" : ""}`}>
-            <input type="radio" name="assistant-name" checked={name === p.name} onChange={() => assistant.setName(p.name)} />
-            <span className="names__name">{p.name}</span>
-            <span className="names__tagline">{t(`assistant.persona.${p.key}`)}</span>
-          </label>
-        ))}
-      </div>
-      <form className="names__other" onSubmit={(e) => { e.preventDefault(); if (valid) assistant.setName(other); }}>
-        <label className="field">
-          <span className="field__label">{t("settings.as.nameOther")}</span>
-          <input value={other} maxLength={20} onChange={(e) => setOther(e.target.value)} aria-invalid={!!other && !valid} />
-        </label>
-        <button type="submit" className="button button--small" disabled={!valid || other.trim() === name}>{t("settings.as.nameUse")}</button>
-      </form>
-      {other && !valid && <p className="text-error small">{t("settings.as.nameInvalid")}</p>}
-    </fieldset>
+      <NameAndDisplay />
+    </>
   );
 }
 
@@ -218,26 +188,52 @@ function StatusLine({ settings, checking }: { settings: LlmSettings; checking: b
   );
 }
 
-/** En-tête de l'onglet : l'assistant IA de jeu, son état de connexion (toujours visible) et l'affichage de sa bulle. */
+/** En-tête de l'onglet, en une ligne : ce que fait l'assistant, et son état de connexion. */
 function StatusCard({ settings, checking, onDisconnect }: { settings: LlmSettings; checking: boolean; onDisconnect: () => void }) {
   const t = useT();
-  const { hidden } = useAssistant();
+  const { name } = useAssistant();
   return (
-    <section className="block llm llm-status" aria-labelledby="llm-h">
-      <h2 id="llm-h"><Bot size={18} aria-hidden /> {t("settings.as.title")}</h2>
-      <p className="muted">{t("settings.as.lead")}</p>
+    <section className="block llm llm-head" aria-labelledby="llm-h">
+      <h2 id="llm-h" className="llm-head__title"><Bot size={18} aria-hidden /> {name}{" "}
+        <span className="llm-head__lead">{t("settings.as.short")}</span></h2>
       <div className="llm-status__row">
         <StatusLine settings={settings} checking={checking} />
         {settings.provider && (
           <button type="button" className="link-button" onClick={onDisconnect}>{t("settings.ai.disconnect")}</button>
         )}
       </div>
-      <p className="muted small">{t("settings.ai.uses")} <Link to="/parametres/connaissances">{t("settings.as.knowledge")}</Link></p>
+    </section>
+  );
+}
+
+/** Après les étapes : prénom de l'assistant (Duke par défaut, modifiable) et affichage de la bulle. */
+function NameAndDisplay() {
+  const t = useT();
+  const { name, hidden } = useAssistant();
+  const [value, setValue] = useState(name);
+  useEffect(() => setValue(name), [name]);
+  const valid = isValidName(value);
+  return (
+    <section className="block llm" aria-labelledby="ai-name">
+      <h2 id="ai-name">{t("settings.as.nameSection")}</h2>
+      <form className="names__other" onSubmit={(e) => { e.preventDefault(); if (valid) assistant.setName(value); }}>
+        <label className="field">
+          <span className="field__label">{t("settings.as.nameTitle")}</span>
+          <input value={value} maxLength={20} onChange={(e) => setValue(e.target.value)} aria-invalid={!valid} />
+        </label>
+        <button type="submit" className="button button--small" disabled={!valid || value.trim() === name}>{t("settings.as.nameUse")}</button>
+        {name !== DEFAULT_ASSISTANT_NAME && (
+          <button type="button" className="link-button" onClick={() => assistant.setName(DEFAULT_ASSISTANT_NAME)}>
+            {t("settings.as.nameDefault", { name: DEFAULT_ASSISTANT_NAME })}
+          </button>
+        )}
+      </form>
+      {!valid && <p className="text-error small">{t("settings.as.nameInvalid")}</p>}
       <label className="toggle-inline">
         <input type="checkbox" checked={!hidden} onChange={(e) => assistant.setHidden(!e.target.checked)} />
         {t("settings.as.show")}
       </label>
-      <NamePicker />
+      <p className="muted small">{t("settings.ai.uses")} <Link to="/parametres/connaissances">{t("settings.as.knowledge")}</Link></p>
     </section>
   );
 }

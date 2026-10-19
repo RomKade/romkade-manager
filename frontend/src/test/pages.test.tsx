@@ -483,11 +483,11 @@ describe("Nouvelle console : clé à approuver", () => {
 });
 
 describe("Paramètres : assistant et connaissances", () => {
-  it("onglet Assistant IA : l'assistant et son état, puis trois étapes (type d'IA, connexion et modèle, test)", async () => {
+  it("onglet Assistant IA : une ligne (rôle et état), les trois étapes, puis le prénom (Duke, modifiable) et l'affichage", async () => {
     renderAt("/parametres/ia");
     expect(await screen.findByRole("link", { name: /^Assistant IA/ })).toHaveAttribute("aria-current", "page");
     const headings = (await screen.findAllByRole("heading", { level: 2 })).map((h) => h.textContent ?? "");
-    const order = ["Assistant IA de jeu", "Type d'IA", "Connexion et modèle", "Tester la connexion"].map((x) => headings.findIndex((h) => h.includes(x)));
+    const order = ["Duke répond à tes questions", "Type d'IA", "Connexion et modèle", "Tester la connexion", "Prénom et affichage"].map((x) => headings.findIndex((h) => h.includes(x)));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     const steps = screen.getByRole("navigation", { name: "Mise en route de l'assistant IA" });
@@ -495,10 +495,14 @@ describe("Paramètres : assistant et connaissances", () => {
     expect(within(steps).getByRole("link", { name: /Tester la connexion/ })).toHaveTextContent("Faire le test");
     expect(screen.getByRole("link", { name: /Connaissances de l'assistant/ })).toHaveAttribute("href", "/parametres/connaissances");
     expect(screen.queryByRole("heading", { name: /Descriptions des jeux/ })).not.toBeInTheDocument();  // dans Connaissances
-    // Prénom : Duke par défaut, l'un des dix personnages au choix ; la bulle prend ce prénom.
+    // Prénom : Duke par défaut, aucune liste proposée ; un simple champ, et la bulle prend le nouveau prénom.
     expect(screen.getByRole("button", { name: /^Duke$/ })).toBeInTheDocument();
-    expect(screen.getAllByRole("radio", { name: /Duke|Axel|Nova|Max|Luna|Rex|Ken|Mario|Luigi|Iris/ })).toHaveLength(10);
-    await userEvent.click(screen.getByRole("radio", { name: /Luna/ }));
+    expect(screen.queryByRole("radio", { name: /Axel|Nova|Mario/ })).not.toBeInTheDocument();
+    const field = screen.getByRole("textbox", { name: "Prénom de l'assistant" });
+    expect(field).toHaveValue("Duke");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Luna");
+    await userEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
     expect(screen.getByRole("button", { name: /^Luna$/ })).toBeInTheDocument();
     // La bulle peut être masquée.
     const show = screen.getByRole("checkbox", { name: /Afficher la bulle de l'assistant IA/ });
