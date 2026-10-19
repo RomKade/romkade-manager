@@ -37,6 +37,7 @@ let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
 let assistantBodies: Record<string, unknown>[] = [];
+let assistantAction: Record<string, unknown> | null = null;
 let controlsSourced = false;
 let sheetImages: { boxart_url?: string | null; image_url?: string | null } = {};
 let knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null as string | null, stopping: false };
@@ -168,6 +169,12 @@ function mockFetch() {
     ]);
     if (url === "/api/assistant") {
       assistantBodies.push(JSON.parse(String(init?.body)));
+      if (assistantAction) {
+        return new Response([
+          `event: meta\ndata: ${JSON.stringify({ in_scope: true, reason: null, intent: "console_action", games: [], sources: [], provider: "local", local: true })}\n\n`,
+          `event: action\ndata: ${JSON.stringify(assistantAction)}\n\n`, "event: done\ndata: {}\n\n",
+        ].join(""), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+      }
       const sse = [
         `event: meta\ndata: ${JSON.stringify({ in_scope: true, reason: null, intent: "game_help", games: [], provider: "local", local: true,
           sources: [{ source: "strategywiki", page: "Super Mario World/Vanilla Dome", url: "https://strategywiki.org/wiki/Super_Mario_World/Vanilla_Dome", license: "CC BY-SA 4.0" }] })}\n\n`,
@@ -276,6 +283,7 @@ beforeEach(() => {
   favoriteIds = [];
   hostKeyTrusted = true;
   assistantBodies = [];
+  assistantAction = null;
   sessionStorage.clear();
   assistant.reset();
   knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null, stopping: false };
@@ -582,6 +590,20 @@ describe("Assistant de jeu", () => {
     expect(within(panel).getByText(/modèle local : rien ne quitte cet ordinateur/)).toBeInTheDocument();
     expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr", name: "Duke",
       messages: [{ role: "user", content: "Je bloque au château" }] });
+  });
+
+  it("propose une action sur la console et ne l'exécute qu'au clic", async () => {
+    llm = { ...llm, provider: "local", model: "qwen2.5:7b", base_url: "http://localhost:11434/v1" };
+    assistantAction = { kind: "set_volume", supported: true, system: "muOS", percent: 50, games: [] };
+    renderAt("/");
+    await userEvent.click(await screen.findByRole("button", { name: /^Duke$/ }));
+    const panel = screen.getByRole("region", { name: "Duke" });
+    await userEvent.click(await within(panel).findByRole("button", { name: "Mets le son à 50 %" }));
+    expect(await within(panel).findByText("Mettre le son à 50 % ?")).toBeInTheDocument();
+    expect(bodies.some((b) => b.url === "/api/volume")).toBe(false);  // rien avant le clic
+    await userEvent.click(within(panel).getByRole("button", { name: /Appliquer/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/volume", percent: 50 }));
+    expect(await within(panel).findByText("C'est fait.")).toBeInTheDocument();
   });
 });
 

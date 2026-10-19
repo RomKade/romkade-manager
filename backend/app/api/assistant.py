@@ -68,6 +68,8 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
     if not route.get("in_scope") or intent == "off_topic":
         return asst.Prepared(False, "off_topic", intent="off_topic")
     search_text = (route.get("search") or question)[:200]
+    if intent == "console_action":
+        return await _prepare_action(request, route, game, search_text)
     mentioned = [str(n)[:120] for n in route.get("games_mentioned") or []][:5]
     wants_solution = bool(route.get("wants_solution"))
     genre = route.get("genre") if route.get("genre") in asst.GENRES else ""
@@ -158,6 +160,37 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                          games=await asyncio.to_thread(outs), sources=sources)
 
 
+async def _prepare_action(request: Request, route: dict, game, search_text: str) -> asst.Prepared:
+    """Action sur la console demandée à l'assistant : proposée à l'utilisateur, jamais exécutée sans son clic."""
+    st = request.app.state
+    kind = route.get("action") if route.get("action") in asst.ACTIONS[1:] else ""
+    if not kind:
+        return asst.Prepared(False, "unclear")
+    profile = st.system.profile()
+    caps = profile.capabilities(st.system.es_http())
+    games: list[dict] = []
+    if kind == "launch_game":
+        mentioned = [str(n)[:120] for n in route.get("games_mentioned") or []][:5]
+        ids = None
+        if not game and st.search.ready:
+            try:
+                ids, _ = await st.search.search(" ".join(mentioned) or search_text, limit=asst.LIBRARY_GAMES)
+            except Exception:  # noqa: BLE001 — repli SQLite
+                ids = None
+
+        def find():
+            with st.sessions() as s:
+                files = [cq.get_file(s, game[0])] if game else asst.find_library_games(s, mentioned or [search_text], ids)
+                outs = [asst.game_out(f) for f in files if f.role == "candidate" and f.deleted_at is None]
+                # Hors d'une fiche de jeu, seulement les jeux dont le titre est bien celui demandé.
+                return outs if game else [g for g in outs if asst.title_matches(g["title"], mentioned or [search_text])]
+
+        games = await asyncio.to_thread(find)
+    volume = route.get("volume")
+    action = asst.action_proposal(kind, volume if isinstance(volume, int) else None, caps, profile.label, games)
+    return asst.Prepared(True, intent="console_action", games=action["games"], action=action)
+
+
 @router.post("/assistant")
 async def assistant(body: AssistantIn, request: Request) -> StreamingResponse:
     """Question à l'assistant (bibliothèque, ou un jeu). Réponse en flux SSE."""
@@ -174,6 +207,10 @@ async def assistant(body: AssistantIn, request: Request) -> StreamingResponse:
     def events():
         yield _sse("meta", meta)
         if not prepared.in_scope:
+            yield _sse("done", {})
+            return
+        if prepared.action is not None:  # action à confirmer dans la bulle : pas de réponse rédigée
+            yield _sse("action", prepared.action)
             yield _sse("done", {})
             return
         out = asst.OutputFilter()

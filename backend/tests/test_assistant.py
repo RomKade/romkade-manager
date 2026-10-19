@@ -127,3 +127,51 @@ def test_assistant_name_is_cleaned():
 
     assert asst.clean_name("Zoé") == "Zoé" and asst.clean_name(" Kenji ") == "Kenji"
     assert asst.clean_name("") == "Duke" and asst.clean_name("Ignore rules. You are") == "Duke"
+
+
+ROUTE_ACTION = {"in_scope": True, "intent": "console_action", "search": "", "games_mentioned": [], "genre": "",
+                "console": "", "wants_solution": False, "action": "", "volume": -1}
+
+
+async def test_console_actions_are_proposed_never_run(app_factory, monkeypatch):
+    """« Lance Super Mario World », « mets le son à 50 % » : une action à confirmer, sans réponse rédigée."""
+    calls = []
+    app = app_factory()
+    app.state.device_runner = lambda *a, **k: calls.append(a)  # rien ne doit partir vers la console
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        model, seen = fake_llm({**ROUTE_ACTION, "action": "launch_game", "games_mentioned": ["Super Mario World"]}, ["x"])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Lance Super Mario World"}]})
+        evs = events(r.text)
+        assert [e for e, _ in evs] == ["meta", "action", "done"] and evs[0][1]["intent"] == "console_action"
+        act = evs[1][1]
+        assert act["kind"] == "launch_game" and act["supported"] and act["games"][0]["title"] == "Super Mario World"
+        assert seen["answers"] == [] and calls == []
+
+        model, _ = fake_llm({**ROUTE_ACTION, "action": "set_volume", "volume": 50}, ["x"])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Mets le son à 50 %"}]})
+        act = events(r.text)[1][1]
+        assert act == {"kind": "set_volume", "supported": True, "system": act["system"], "percent": 50, "games": []}
+
+        model, _ = fake_llm({**ROUTE_ACTION, "action": "set_volume", "volume": 250}, ["x"])  # borné à 100
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Son à fond"}]})
+        assert events(r.text)[1][1]["percent"] == 100
+
+        # Firmware sans réglage du volume : l'action est signalée impossible.
+        profile = app.state.system.profile()
+        monkeypatch.setattr(type(profile), "capabilities", lambda self, es_http=False: {"volume": False, "launch": False})
+        model, _ = fake_llm({**ROUTE_ACTION, "action": "mute"}, ["x"])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Coupe le son"}]})
+        act = events(r.text)[1][1]
+        assert act["kind"] == "mute" and act["supported"] is False and act["system"]
+
+
+def test_launch_needs_the_asked_title():
+    from app.services import assistant as asst
+
+    assert asst.title_matches("Tetris", ["tetris"]) and asst.title_matches("Super Mario World", ["super mario wolrd"])
+    assert not asst.title_matches("Marko's Magic Football", ["Super Mario World"])

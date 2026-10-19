@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 
 import { useDeviceStatus, useLlmSettings, useNowPlaying } from "../api/queries";
 import { getLang, useT } from "../i18n";
-import { askAssistant, assistant, type AssistantGame, type ChatMessage, type Scope, useAssistant } from "../lib/assistant";
+import { type ActionState, askAssistant, assistant, type AssistantGame, type ChatMessage, type ConsoleAction, type Scope, useAssistant } from "../lib/assistant";
+import { AssistantAction } from "./AssistantAction";
 
 const MAX_QUESTION = 500;
 const MAX_USER_TURNS = 20;
@@ -79,8 +80,10 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
     try {
       await askAssistant({
         scope: target.kind, game_id: target.kind === "game" ? target.game.id : undefined, lang: getLang(), name: st.name,
+        // Une action proposée n'a pas de texte : une trace la remplace, pour que l'IA sache que cet ordre est traité.
         messages: history.flatMap((m) => (m.role === "user" || (m.role === "assistant" && m.content)
-          ? [{ role: m.role, content: m.content }] : [])),
+          ? [{ role: m.role, content: m.content }]
+          : m.role === "assistant" && m.action ? [{ role: "assistant", content: actionTrace(m.action) }] : [])),
       }, (e) => {
         if (e.type === "meta") {
           if (!e.in_scope) {
@@ -88,6 +91,9 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
             assistant.setMessages(target, [...list.slice(0, -1), { role: "refusal", reason: e.reason ?? "off_topic" }]);
           } else update((m) => ({ ...m, intent: e.intent, games: e.games, sources: e.sources }));
         } else if (e.type === "delta") update((m) => ({ ...m, content: m.content + e.text }));
+        else if (e.type === "action") {
+          update((m) => ({ ...m, action: { kind: e.kind, supported: e.supported, system: e.system, percent: e.percent, games: e.games } }));
+        }
         else if (e.type === "error") {
           const list = assistant.messages(target);
           assistant.setMessages(target, [...list.slice(0, -1), { role: "error", message: e.message }]);
@@ -105,8 +111,15 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   };
   const submit = (e: FormEvent) => { e.preventDefault(); send(text); };
   const suggestions = gameScope
-    ? ["assistant.ask.cheats", "assistant.ask.controls", "assistant.ask.stuck", "assistant.ask.tip"]
-    : ["assistant.ask.twoPlayers", "assistant.ask.racing", "assistant.ask.addGames"];
+    ? ["assistant.ask.cheats", "assistant.ask.controls", "assistant.ask.stuck", "assistant.ask.launch"]
+    : ["assistant.ask.twoPlayers", "assistant.ask.racing", "assistant.ask.volume", "assistant.ask.addGames"];
+  // Résultat d'une action confirmée ou annulée dans la conversation (gardé avec elle).
+  const settle = (index: number, state: ActionState, note?: string) => {
+    const list = assistant.messages(scope);
+    const m = list[index];
+    if (m?.role !== "assistant") return;
+    assistant.setMessages(scope, list.map((x, i) => (i === index ? { ...m, actionState: state, actionNote: note } : x)));
+  };
   const last = messages.at(-1);
   const offerSolution = gameScope && !busy && last?.role === "assistant" && last.intent === "game_help" && last.content;
 
@@ -163,7 +176,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           <p className="assistant__note">{t(gameScope ? "assistant.introGame" : "assistant.introLibrary", { title: gameScope?.title ?? "" })}</p>
         )}
         <ol className="assistant__messages">
-          {messages.map((m, i) => <Message key={i} m={m} game={gameScope} onOpenGame={onOpenGame} />)}
+          {messages.map((m, i) => <Message key={i} m={m} game={gameScope} onOpenGame={onOpenGame} onSettle={(st, note) => settle(i, st, note)} />)}
         </ol>
         <div ref={endRef} />
       </div>
@@ -200,7 +213,15 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   );
 }
 
-function Message({ m, game, onOpenGame }: { m: ChatMessage; game: AssistantGame | null; onOpenGame?: (id: number) => void }) {
+/** Trace d'une action proposée, envoyée à l'IA avec l'historique (jamais affichée). */
+function actionTrace(a: ConsoleAction): string {
+  const what = a.kind === "launch_game" ? `launch ${a.games[0]?.title ?? "a game"}` : a.kind === "set_volume" ? `set the sound to ${a.percent}%` : a.kind.replace("_", " ");
+  return `[Console action proposed to the user: ${what}]`;
+}
+
+function Message({ m, game, onOpenGame, onSettle }: {
+  m: ChatMessage; game: AssistantGame | null; onOpenGame?: (id: number) => void; onSettle: (state: ActionState, note?: string) => void;
+}) {
   const t = useT();
   const { name } = useAssistant();
   if (m.role === "user") return <li className="assistant__msg assistant__msg--user">{m.content}</li>;
@@ -214,8 +235,9 @@ function Message({ m, game, onOpenGame }: { m: ChatMessage; game: AssistantGame 
   if (m.role === "error") return <li className="assistant__msg assistant__msg--error" role="alert">{m.message}</li>;
   return (
     <li className="assistant__msg assistant__msg--bot" aria-busy={m.pending}>
-      {m.content || (m.pending && <span className="assistant__typing">{t("assistant.thinking", { name })}</span>)}
-      {(m.games ?? []).length > 0 && !game && (
+      {m.content || (m.pending && !m.action && <span className="assistant__typing">{t("assistant.thinking", { name })}</span>)}
+      {m.action && <AssistantAction action={m.action} state={m.actionState} note={m.actionNote} onSettle={onSettle} />}
+      {(m.games ?? []).length > 0 && !game && !m.action && (
         <span className="assistant__games">
           {m.games!.map((g) => (
             <button key={g.id} type="button" className="assistant__game" onClick={() => onOpenGame?.(g.id)} disabled={!onOpenGame}>

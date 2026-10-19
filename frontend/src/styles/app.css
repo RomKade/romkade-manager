@@ -1451,3 +1451,13 @@ kbd {
 .cheats__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .cheats__list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: var(--r-control); background: var(--panel-2); }
 .cheats__list code { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
+
+/* ---------- Assistant : action sur la console à confirmer ---------- */
+.assistant__action { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; padding: 10px 12px; border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-2)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.assistant__action--off { background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); margin: 0; }
+.assistant__action-q { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 600; color: var(--ink); }
+.assistant__action-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.assistant__action-result { display: flex; align-items: center; gap: 5px; margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
+.assistant__action-result.is-done { color: var(--ok); }
+.assistant__action-result.is-failed { color: var(--err); }
