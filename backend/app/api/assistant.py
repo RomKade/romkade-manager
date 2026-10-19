@@ -33,6 +33,7 @@ class AssistantIn(BaseModel):
     scope: Literal["library", "game"] = "library"
     game_id: int | None = None
     lang: Literal["fr", "en", "es"] = "fr"
+    name: str = Field("Duke", max_length=20)  # prénom de l'assistant (Paramètres > Assistant IA)
     messages: list[TurnIn] = Field(min_length=1, max_length=60)
 
 
@@ -148,7 +149,7 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
         with st.sessions() as s:
             return [asst.game_out(cq.get_file(s, f.id)) for f in files[:asst.LIBRARY_GAMES]]
 
-    return asst.Prepared(True, intent=intent, system=asst.answer_system(body.lang, scope, context or "", wants_solution),
+    return asst.Prepared(True, intent=intent, system=asst.answer_system(body.lang, scope, context or "", wants_solution, body.name),
                          games=await asyncio.to_thread(outs), sources=sources)
 
 

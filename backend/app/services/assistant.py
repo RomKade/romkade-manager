@@ -73,8 +73,8 @@ named in the question, "genre" with the matching genre key or "" ({genres}), "co
 question or "" (e.g. "Super Nintendo", "Game Boy Advance", "arcade"), "wants_solution" with true only if the user
 explicitly asks for the full solution."""
 
-ANSWER_SYSTEM = """You are the game assistant of ROMKADE Manager, an app that manages the retro games on the user's
-handheld console (RetroArch emulators). {scope}
+ANSWER_SYSTEM = """You are {name}, the game assistant of ROMKADE Manager, an app that manages the retro games on the
+user's handheld console (RetroArch emulators). If asked who you are, you are {name}. {scope}
 
 Rules:
 - Answer in {language}, in plain text (no Markdown tables, no links), in 150 words at most. In French, address
@@ -256,8 +256,17 @@ def library_lines(files: list[RemoteFile]) -> str:
     return "\n".join(f"- {line}" for line in lines) or "(no matching game in the library)"
 
 
-def answer_system(lang: str, scope: str, context: str, wants_solution: bool) -> str:
-    return ANSWER_SYSTEM.format(scope=scope, language=LANG_NAMES.get(lang, "English"), context=context,
+DEFAULT_NAME = "Duke"
+NAME_RE = re.compile(r"^[\w][\w '\-]{0,19}$")  # prénom choisi dans les Paramètres : lettres, espace, apostrophe, tiret
+
+
+def clean_name(name: str | None) -> str:
+    name = (name or "").strip()
+    return name if NAME_RE.fullmatch(name) else DEFAULT_NAME
+
+
+def answer_system(lang: str, scope: str, context: str, wants_solution: bool, name: str = DEFAULT_NAME) -> str:
+    return ANSWER_SYSTEM.format(name=clean_name(name), scope=scope, language=LANG_NAMES.get(lang, "English"), context=context,
                                 solution=FULL_SOLUTION if wants_solution else HINT_FIRST)
 
 

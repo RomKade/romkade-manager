@@ -3,6 +3,11 @@ import type { Messages } from "../core";
 /** Paramètres : connexion, mot de passe, clé de la console, test, YouTube. */
 const messages: Messages = {
   fr: {
+    "as.nameTitle": "Son prénom",
+    "as.nameLead": "La bulle porte ce prénom et l'assistant se présente ainsi. Duke par défaut.",
+    "as.nameOther": "Autre prénom",
+    "as.nameUse": "Utiliser ce prénom",
+    "as.nameInvalid": "20 caractères au plus : lettres, chiffres, espaces, apostrophes et tirets.",
     "desc.origin.cautious": "rédigé par l'IA, jeu mal connu",
     "desc.origin.written": "rédigé par l'IA",
     "desc.origin.translated": "traduit par l'IA",
@@ -323,6 +328,11 @@ const messages: Messages = {
     "yt.remove": "Retirer la clé",
   },
   en: {
+    "as.nameTitle": "Its name",
+    "as.nameLead": "The bubble shows this name and the assistant introduces itself with it. Duke by default.",
+    "as.nameOther": "Another name",
+    "as.nameUse": "Use this name",
+    "as.nameInvalid": "20 characters at most: letters, digits, spaces, apostrophes and hyphens.",
     "desc.origin.cautious": "written by the AI, little-known game",
     "desc.origin.written": "written by the AI",
     "desc.origin.translated": "translated by the AI",
@@ -643,6 +653,11 @@ const messages: Messages = {
     "yt.remove": "Remove the key",
   },
   es: {
+    "as.nameTitle": "Su nombre",
+    "as.nameLead": "La burbuja lleva este nombre y el asistente se presenta así. Duke por defecto.",
+    "as.nameOther": "Otro nombre",
+    "as.nameUse": "Usar este nombre",
+    "as.nameInvalid": "20 caracteres como máximo: letras, cifras, espacios, apóstrofos y guiones.",
     "desc.origin.cautious": "redactado por la IA, juego poco conocido",
     "desc.origin.written": "redactado por la IA",
     "desc.origin.translated": "traducido por la IA",

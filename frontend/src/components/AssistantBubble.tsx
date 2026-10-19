@@ -33,8 +33,8 @@ export function AssistantBubble({ placement, onOpenGame }: { placement: "page" |
         <Panel detected={detected} ready={llm?.ready ?? false} local={llm?.local ?? false} provider={llm?.provider ?? null}
           onOpenGame={onOpenGame} />
       ) : (
-        <button type="button" className="assistant__fab" onClick={() => assistant.setOpen(true)}>
-          <Bot size={18} aria-hidden /> {t("assistant.fab")}
+        <button type="button" className="assistant__fab" title={t("assistant.subtitle")} onClick={() => assistant.setOpen(true)}>
+          <Bot size={18} aria-hidden /> {st.name}
         </button>
       )}
     </div>
@@ -78,7 +78,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
     abort.current = new AbortController();
     try {
       await askAssistant({
-        scope: target.kind, game_id: target.kind === "game" ? target.game.id : undefined, lang: getLang(),
+        scope: target.kind, game_id: target.kind === "game" ? target.game.id : undefined, lang: getLang(), name: st.name,
         messages: history.flatMap((m) => (m.role === "user" || (m.role === "assistant" && m.content)
           ? [{ role: m.role, content: m.content }] : [])),
       }, (e) => {
@@ -111,9 +111,12 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   const offerSolution = gameScope && !busy && last?.role === "assistant" && last.intent === "game_help" && last.content;
 
   return (
-    <section className="assistant__panel" aria-label={t("assistant.title")}>
+    <section className="assistant__panel" aria-label={st.name}>
       <header className="assistant__head">
-        <span className="assistant__title"><Bot size={16} aria-hidden /> {t("assistant.title")}</span>
+        <span className="assistant__title">
+          <Bot size={16} aria-hidden /> {st.name}
+          <small className="assistant__subtitle">{t("assistant.subtitle")}</small>
+        </span>
         <div className="assistant__scope" role="group" aria-label={t("assistant.scope")}>
           <button type="button" aria-pressed={scope.kind === "library"} onClick={() => assistant.setScope({ kind: "library" })}>
             {t("assistant.library")}
@@ -129,7 +132,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           disabled={busy || messages.length === 0} onClick={() => assistant.setMessages(scope, [])}>
           <Trash2 size={15} aria-hidden />
         </button>
-        <button type="button" className="icon-button" aria-label={t("assistant.close")} onClick={() => assistant.setOpen(false)}>
+        <button type="button" className="icon-button" aria-label={t("assistant.close", { name: st.name })} onClick={() => assistant.setOpen(false)}>
           <X size={16} aria-hidden />
         </button>
       </header>
@@ -181,7 +184,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
         {userTurns >= MAX_USER_TURNS ? <p className="assistant__note">{t("assistant.tooMany")}</p> : (
           <form className="assistant__form" onSubmit={submit}>
             <input value={text} maxLength={MAX_QUESTION} disabled={!ready || busy} aria-label={t("assistant.input")}
-              placeholder={gameScope ? t("assistant.placeholderGame", { title: gameScope.title }) : t("assistant.placeholderLibrary")}
+              placeholder={gameScope ? t("assistant.placeholderGame", { title: gameScope.title, name: st.name }) : t("assistant.placeholderLibrary", { name: st.name })}
               onChange={(e) => setText(e.target.value)} />
             <button type="submit" className="button button--primary button--small" disabled={!ready || busy || !text.trim()}
               aria-label={t("assistant.send")}>
@@ -199,6 +202,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
 
 function Message({ m, game, onOpenGame }: { m: ChatMessage; game: AssistantGame | null; onOpenGame?: (id: number) => void }) {
   const t = useT();
+  const { name } = useAssistant();
   if (m.role === "user") return <li className="assistant__msg assistant__msg--user">{m.content}</li>;
   if (m.role === "refusal") {
     return (
@@ -210,7 +214,7 @@ function Message({ m, game, onOpenGame }: { m: ChatMessage; game: AssistantGame 
   if (m.role === "error") return <li className="assistant__msg assistant__msg--error" role="alert">{m.message}</li>;
   return (
     <li className="assistant__msg assistant__msg--bot" aria-busy={m.pending}>
-      {m.content || (m.pending && <span className="assistant__typing">{t("assistant.thinking")}</span>)}
+      {m.content || (m.pending && <span className="assistant__typing">{t("assistant.thinking", { name })}</span>)}
       {(m.games ?? []).length > 0 && !game && (
         <span className="assistant__games">
           {m.games!.map((g) => (

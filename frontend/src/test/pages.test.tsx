@@ -241,6 +241,8 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   localStorage.removeItem("agm-recent-searches");
+  localStorage.removeItem("romkade-assistant-name");
+  localStorage.removeItem("romkade-assistant-hidden");
   systemCaps = null;
   calls = [];
   bodies = [];
@@ -493,11 +495,16 @@ describe("Paramètres : assistant et connaissances", () => {
     expect(within(steps).getByRole("link", { name: /Tester la connexion/ })).toHaveTextContent("Faire le test");
     expect(screen.getByRole("link", { name: /Connaissances de l'assistant/ })).toHaveAttribute("href", "/parametres/connaissances");
     expect(screen.queryByRole("heading", { name: /Descriptions des jeux/ })).not.toBeInTheDocument();  // dans Connaissances
+    // Prénom : Duke par défaut, l'un des dix personnages au choix ; la bulle prend ce prénom.
+    expect(screen.getByRole("button", { name: /^Duke$/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("radio", { name: /Duke|Axel|Nova|Max|Luna|Rex|Kenji|Zoé|Sam|Iris/ })).toHaveLength(10);
+    await userEvent.click(screen.getByRole("radio", { name: /Luna/ }));
+    expect(screen.getByRole("button", { name: /^Luna$/ })).toBeInTheDocument();
     // La bulle peut être masquée.
     const show = screen.getByRole("checkbox", { name: /Afficher la bulle de l'assistant IA/ });
     expect(show).toBeChecked();
     await userEvent.click(show);
-    expect(screen.queryByRole("button", { name: /^Assistant IA$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Luna$/ })).not.toBeInTheDocument();
   });
 
   it("l'ancienne adresse de Contenu IA mène aux connaissances, avec les descriptions des jeux", async () => {
@@ -531,8 +538,8 @@ describe("Assistant de jeu", () => {
     renderAt("/bibliotheque?all=1");
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(await within(dialog).findByRole("button", { name: /^Assistant IA$/ }));
-    const panel = within(dialog).getByRole("region", { name: "Assistant IA de jeu" });
+    await userEvent.click(await within(dialog).findByRole("button", { name: /^Duke$/ }));
+    const panel = within(dialog).getByRole("region", { name: "Duke" });
     expect(within(panel).getByText("Tu regardes Super Mario World. Discuter de ce jeu ?")).toBeInTheDocument();
     // La proposition se ferme d'une croix ; le jeu reste au choix dans l'en-tête du panneau.
     await userEvent.click(within(panel).getByRole("button", { name: "Fermer la proposition" }));
@@ -544,7 +551,7 @@ describe("Assistant de jeu", () => {
     expect(await within(panel).findByText(/Indice : utilise la cape\./)).toBeInTheDocument();
     expect(within(panel).getByRole("link", { name: /StrategyWiki · CC BY-SA 4.0/ })).toHaveAttribute("href", "https://strategywiki.org/wiki/Super_Mario_World/Vanilla_Dome");
     expect(within(panel).getByText(/modèle local : rien ne quitte cet ordinateur/)).toBeInTheDocument();
-    expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr",
+    expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr", name: "Duke",
       messages: [{ role: "user", content: "Je bloque au château" }] });
   });
 });

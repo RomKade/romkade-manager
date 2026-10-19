@@ -4,6 +4,8 @@
  */
 import { useSyncExternalStore } from "react";
 
+import { DEFAULT_ASSISTANT_NAME, isValidName } from "./assistantNames";
+
 export type AssistantGame = { id: number; title: string; platform: string };
 export type Scope = { kind: "library" } | { kind: "game"; game: AssistantGame };
 export type ChatSource = { source: string; page: string; url: string; license: string };
@@ -18,6 +20,8 @@ type State = {
   open: boolean;
   /** Bulle masquée (Paramètres > Assistant IA), mémorisé dans ce navigateur. */
   hidden: boolean;
+  /** Prénom de l'assistant (« Duke » par défaut), mémorisé dans ce navigateur et transmis à l'IA. */
+  name: string;
   scope: Scope;
   /** Jeu détecté : fiche ouverte (prioritaire) ou jeu en cours sur la console. */
   sheetGame: AssistantGame | null;
@@ -29,8 +33,12 @@ type State = {
 
 const STORAGE = "romkade-assistant";
 const HIDDEN = "romkade-assistant-hidden";
+const NAME = "romkade-assistant-name";
+const loadName = () => {
+  try { const n = localStorage.getItem(NAME); return n && isValidName(n) ? n : DEFAULT_ASSISTANT_NAME; } catch { return DEFAULT_ASSISTANT_NAME; }
+};
 const loadHidden = () => { try { return localStorage.getItem(HIDDEN) === "1"; } catch { return false; } };
-let state: State = { open: false, hidden: loadHidden(), scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
+let state: State = { open: false, hidden: loadHidden(), name: loadName(), scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
   dismissedOffer: null, conversations: load() };
 const listeners = new Set<() => void>();
 
@@ -58,6 +66,11 @@ export const assistant = {
   get: () => state,
   subscribe: (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; },
   setOpen: (open: boolean) => set({ open }),
+  setName: (name: string) => {
+    const n = isValidName(name) ? name.trim() : DEFAULT_ASSISTANT_NAME;
+    try { if (n === DEFAULT_ASSISTANT_NAME) localStorage.removeItem(NAME); else localStorage.setItem(NAME, n); } catch { /* stockage indisponible */ }
+    set({ name: n });
+  },
   setHidden: (hidden: boolean) => {
     try { if (hidden) localStorage.setItem(HIDDEN, "1"); else localStorage.removeItem(HIDDEN); } catch { /* stockage indisponible */ }
     set({ hidden, open: hidden ? false : state.open });
@@ -70,7 +83,7 @@ export const assistant = {
   setMessages: (scope: Scope, messages: ChatMessage[]) =>
     set({ conversations: { ...state.conversations, [scopeKey(scope)]: messages } }),
   /** Tests : état de départ. */
-  reset: () => set({ open: false, hidden: false, scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
+  reset: () => set({ open: false, hidden: false, name: DEFAULT_ASSISTANT_NAME, scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
     dismissedOffer: null, conversations: {} }),
 };
 
@@ -87,7 +100,7 @@ export type StreamEvent =
 
 /** POST /api/assistant, puis lecture des événements SSE au fil de l'eau. Erreur de réglage : ApiError-like. */
 export async function askAssistant(
-  body: { scope: "library" | "game"; game_id?: number; lang: string; messages: { role: string; content: string }[] },
+  body: { scope: "library" | "game"; game_id?: number; lang: string; name: string; messages: { role: string; content: string }[] },
   onEvent: (e: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
