@@ -148,6 +148,20 @@ if [ -f /.asoundrc ] && grep -q agm_bt /.asoundrc; then
     log "son vers l'enceinte Bluetooth"
 fi
 
+# Ce qui dirige chaque joueur (croix seule, croix + stick), choisi dans Game Manager : RA_launch.sh réécrit le
+# remappage du dossier (remaps/<cœur>/<dossier>.rmp, stick gauche pour l'arcade) juste avant de démarrer
+# RetroArch, et ce remappage passe avant retroarch.cfg. On lance donc RA_launch.sh tel quel, avec une seule ligne
+# ajoutée avant « eval ${RUNTHIS} » : le choix (/tmp/agm-dpad.sed, écrit par players_apply.sh) appliqué à ce
+# remappage. Sans choix, ou si la ligne n'existe plus, RA_launch.sh tourne sans changement.
+ra_launch() {
+    local script=/mnt/mod/ctrl/RA_launch.sh
+    if [ -s /tmp/agm-dpad.sed ] && grep -qx '    eval ${RUNTHIS}' "$script"; then
+        bash -c "$(sed 's|^    eval \${RUNTHIS}$|    [ -f "${REMAP_FILE}" ] \&\& sed -i -f /tmp/agm-dpad.sed "${REMAP_FILE}"; eval ${RUNTHIS}|' "$script")" "$script" "$@"
+    else
+        "$script" "$@"
+    fi
+}
+
 # 3. Lancement, comme runrom() de /mnt/mod/ctrl/random.sh.
 CORE=$(grep -- "-${EMU}," "$CORES" | head -1 | cut -d, -f2)
 log "lancement $EMU / $CORE / $ROM"
@@ -169,12 +183,12 @@ case "$EMU" in
             case "$SLOT" in [0-9]*) load_slot_when_ready "$SLOT" & ;; esac
             cd /mnt/vendor/deep/retro && "$RA" -v -c /.config/retroarch/retroarch.cfg -L "cores/$CORE" "$ROM" > /tmp/agm-ra.log 2>&1
         elif [ "$SLOT" = "auto" ]; then
-            /mnt/mod/ctrl/RA_launch.sh "$CORE" "$ROM" auto
+            ra_launch "$CORE" "$ROM" auto
         elif [ -n "$SLOT" ]; then
             load_slot_when_ready "$SLOT" &
-            /mnt/mod/ctrl/RA_launch.sh "$CORE" "$ROM"
+            ra_launch "$CORE" "$ROM"
         else
-            /mnt/mod/ctrl/RA_launch.sh "$CORE" "$ROM"
+            ra_launch "$CORE" "$ROM"
         fi
         ;;
 esac

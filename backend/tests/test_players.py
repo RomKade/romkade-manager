@@ -1,6 +1,6 @@
 import httpx
 
-from app.device import players as pl
+from app.device import launcher, players as pl
 
 DEVICES = """I: Bus=0000 Vendor=0000 Product=0000 Version=0000
 N: Name="axp2202-pek"
@@ -123,15 +123,26 @@ def test_apply_script_writes_directions(tmp_path):
     cfg.write_text('video_smooth = "false"\ninput_player1_analog_dpad_mode = "2"\ninput_player1_joypad_index = "0"\n')
     players = root / "agm-players"
     players.write_text(pl.file_text([0, 1, 2, 3], [0, 1, 0, 0]))
+    rmp = root / "remaps/FinalBurn Neo/VARCADE.rmp"  # remappage du firmware : passe avant retroarch.cfg
+    rmp.parent.mkdir(parents=True)
+    rmp.write_text('input_player1_analog_dpad_mode = "1"\ninput_player2_analog_dpad_mode = "1"\n'
+                   'input_player5_analog_dpad_mode = "1"\n')
     script = (pl.APPLY_SCRIPT.replace("/proc/bus/input/devices", str(root / "proc/devices"))
-              .replace("/.config/retroarch/retroarch.cfg", str(cfg)).replace("/.config/agm-players", str(players)))
+              .replace("/.config/retroarch/retroarch.cfg", str(cfg)).replace("/.config/agm-players", str(players))
+              .replace("/mnt/vendor/deep/retro/remaps", str(root / "remaps")).replace("/tmp/agm-dpad.sed", str(root / "d.sed")))
     subprocess.run(["bash", "-c", script], check=True, capture_output=True)
+    assert rmp.read_text() == ('input_player1_analog_dpad_mode = "0"\ninput_player2_analog_dpad_mode = "1"\n'
+                               'input_player5_analog_dpad_mode = "1"\n')
+    assert 'input_player1_analog_dpad_mode = "1"' in (rmp.parent / "VARCADE.rmp.agm-orig").read_text()
     text = cfg.read_text()
     assert 'video_smooth = "false"' in text
     assert text.count("analog_dpad_mode") == 4 and 'input_player1_analog_dpad_mode = "0"' in text
     assert 'input_player2_analog_dpad_mode = "1"' in text
     assert 'input_player1_joypad_index = "1"' in text  # console : 2e par chemin sysfs (/a avant /b)
     assert (root / "agm-players.applied").read_text() == players.read_text()
+    assert (root / "d.sed").read_text().startswith("s|^input_player1_analog_dpad_mode = .*|")  # pour ra_launch
+    # launch.sh applique le choix au remappage que RA_launch.sh réécrit juste avant RetroArch
+    assert 'sed -i -f /tmp/agm-dpad.sed "${REMAP_FILE}"; eval ${RUNTHIS}' in launcher.LAUNCH_SCRIPT
 
 
 def test_apply_script_without_directions_keeps_config(tmp_path):
