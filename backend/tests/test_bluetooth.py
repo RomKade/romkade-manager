@@ -95,7 +95,8 @@ async def test_bluetooth_api(app_factory):
         assert "|env -u LD_LIBRARY_PATH aplay" in sent and "exec cat > /dev/null" in sent
         assert "|| env -u LD_LIBRARY_PATH aplay -q -t raw -f S16_LE -r 48000 -c 2 -D agm_speakers -" in sent  # enceinte absente
         assert 'slave.pcm "agm_bt"' in sent and "pcm.!default agm_vol" in sent and "> /.asoundrc" in sent
-        assert 'slave.pcm "plughw:ahubhdmi"' in sent  # horloge temps réel : la sortie HDMI, muette sans câble
+        assert 'pcm "plughw:ahubhdmi"' in sent and 'slave.pcm "agm_bt_clock"' in sent  # horloge temps réel : la sortie HDMI
+        assert "ttable.0.0 0" in sent and "ttable.1.1 0" in sent  # en silence : une TV branchée ne joue pas le son
         await c.post("/api/bluetooth/audio-output", json={"address": None})
         back = next(cmd for cmd in console.commands if cmd.startswith("rm -f /etc/alsa/conf.d/60-agm-bluetooth.conf;"))
         assert 'slave.pcm "agm_speakers"' in back and "> /.asoundrc" in back

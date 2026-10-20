@@ -28,7 +28,7 @@ CONTROL = "Game Manager"
 # Haut du curseur : +12 dB, comme le maximum de RetroArch. Les jeux (PS1, arcade) sortent souvent bas : à 0 dB,
 # même tout au maximum, le son restait faible sur les haut-parleurs.
 MAX_DB = 12.0
-VERSION = "agm-audio-3"  # change quand asoundrc() change : launcher réécrit alors /.asoundrc
+VERSION = "agm-audio-4"  # change quand asoundrc() change : launcher réécrit alors /.asoundrc
 SPEAKERS = "agm_speakers"  # défini dans ASOUNDRC (voir asoundrc)
 
 # Ce que fait le « default » du firmware (/etc/asound.conf) à l'ouverture : ampli, sorties, mixeur à fond.
@@ -41,12 +41,17 @@ def asoundrc(slave: str = SPEAKERS) -> str:
 
     agm_speakers reproduit le « default » du firmware (mêmes hooks), en 16 bits imposés : sans cela, la chaîne
     de volume envoyait du 32 bits à la puce son, et le son sortait très faible.
+
+    Console branchée à une TV, le RetroArch du firmware ouvre lui-même « playback_hdmi » (défini dans
+    /etc/asound.conf), quel que soit son réglage audio_device : vers une enceinte Bluetooth, on redéfinit donc aussi
+    « playback_hdmi » sur notre sortie. Vers les haut-parleurs, la TV garde le son.
     """
+    hdmi = "pcm.!playback_hdmi agm_vol\n" if slave != SPEAKERS else ""
     hooks = "\n".join(f'            {{ name "{name}" preserve true lock true value {value} }}'
                        for name, value in FIRMWARE_HOOKS)
     return f"""# Game Manager : volume des jeux lancés depuis Game Manager (supprimable sans risque) {VERSION}
 pcm.!default agm_vol
-pcm.agm_vol {{
+{hdmi}pcm.agm_vol {{
     type plug
     slave.pcm {{
         type softvol

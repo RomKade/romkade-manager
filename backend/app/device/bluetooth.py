@@ -181,9 +181,10 @@ def alsa_conf(mac: str) -> str:
     déconnecte en plein jeu), un second aplay joue la suite sur les haut-parleurs de la console (SPEAKERS) ; en
     dernier recours, `cat` absorbe le son : le jeu tourne sans son au lieu de se bloquer.
 
-    Le greffon « file » recopie le son vers une vraie sortie, CLOCK_PCM : la sortie HDMI, muette sans câble.
-    Elle donne à RetroArch l'horloge temps réel dont sa synchronisation audio a besoin ; avec une sortie
-    « null », sans horloge, le son arrivait par à-coups.
+    Le greffon « file » recopie le son vers une vraie sortie, CLOCK_PCM : la sortie HDMI. Elle donne à RetroArch
+    l'horloge temps réel dont sa synchronisation audio a besoin ; avec une sortie « null », sans horloge, le son
+    arrivait par à-coups. La copie passe par « agm_bt_clock », qui met tous les canaux à zéro : console branchée
+    à une TV, la TV reçoit du silence et le son ne sort que sur l'enceinte.
     """
     aplay = "env -u LD_LIBRARY_PATH aplay -q -t raw -f S16_LE -r 48000 -c 2 -D"
     play = f"{aplay} agm_bt_out - 2>/dev/null || {aplay} {SPEAKERS} - 2>/dev/null || exec cat > /dev/null"
@@ -194,12 +195,21 @@ pcm.agm_bt_out {{
     type plug
     slave.pcm "bluealsa"
 }}
+pcm.agm_bt_clock {{
+    type route
+    slave {{
+        pcm "{CLOCK_PCM}"
+        channels 2
+    }}
+    ttable.0.0 0
+    ttable.1.1 0
+}}
 pcm.agm_bt {{
     type plug
     slave {{
         pcm {{
             type file
-            slave.pcm "{CLOCK_PCM}"
+            slave.pcm "agm_bt_clock"
             file "|{play}"
             format "raw"
         }}

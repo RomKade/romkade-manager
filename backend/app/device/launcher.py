@@ -48,13 +48,19 @@ async def ssh_run(client: DeviceClient, command: str, timeout: float = 20) -> tu
 
 
 def launch_command(platform_dir: str, rom_path: str, slot: str | None = None) -> str:
-    from app.device.volume import ASOUNDRC, VERSION, asoundrc  # volume importe Runner d'ici
+    from app.device.bluetooth import ALSA_CONF, alsa_conf  # bluetooth et volume importent Runner d'ici
+    from app.device.volume import ASOUNDRC, VERSION, asoundrc
 
     # Volume des jeux (voir volume.py) : /.asoundrc installé s'il manque ou date d'une autre version (en gardant
     # la sortie Bluetooth si elle était choisie).
     rc = (f"grep -q {VERSION} {ASOUNDRC} 2>/dev/null || {{ if grep -q agm_bt {ASOUNDRC} 2>/dev/null; "
           f"then printf %s {shlex.quote(asoundrc('agm_bt'))} > {ASOUNDRC}; "
           f"else printf %s {shlex.quote(asoundrc())} > {ASOUNDRC}; fi; }}; ")
+    # Sortie Bluetooth choisie avec une version précédente de bluetooth.alsa_conf (sans agm_bt_clock) : réécrite
+    # pour la même enceinte.
+    mac = "$(sed -n 's/^defaults.bluealsa.device \"\\(.*\\)\"$/\\1/p' " + ALSA_CONF + ")"
+    rc += (f"[ -f {ALSA_CONF} ] && ! grep -q agm_bt_clock {ALSA_CONF} && m={mac} && [ -n \"$m\" ] && "
+           f"printf %s {shlex.quote(alsa_conf('@MAC@'))} | sed \"s/@MAC@/$m/g\" > {ALSA_CONF}; ")
     # setsid + nohup : le jeu continue après la fermeture de la session SSH. AGM_VOLKEYS : touches de volume
     # pendant le jeu (volume_keys.py, lancé par launch.sh). AGM_PLAYERS : manette de chaque joueur
     # (players_apply.sh, lancé par launch.sh une fois RetroArch fermé).
