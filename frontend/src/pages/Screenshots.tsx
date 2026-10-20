@@ -33,7 +33,7 @@ export function ScreenshotsPage() {
                 <button type="button" className="link-button" onClick={() => setOpenId(g.game_id)}>{g.title}</button>
                 <span className="muted">{t("screenshots.count", { count: g.shots.length })}</span>
               </h2>
-              <ShotGrid shots={g.shots} title={g.title} />
+              <ShotGrid shots={g.shots} title={g.title} platform={g.platform_label} />
             </section>
           ))
         )}

@@ -31,8 +31,8 @@ input_player4_joypad_index = "3"
 
 def test_parse_status():
     st = pl.parse_status(SAMPLE)
-    assert st["controllers"] == [{"index": 0, "name": "ANBERNIC-keys", "builtin": True, "usb_id": "0001:0001"},
-                                 {"index": 1, "name": "Xbox Wireless Controller", "builtin": False, "usb_id": "045e:0b13"}]
+    assert st["controllers"] == [{"index": 0, "name": "ANBERNIC-keys", "builtin": True, "usb_id": "0001:0001", "remote": None},
+                                 {"index": 1, "name": "Xbox Wireless Controller", "builtin": False, "usb_id": "045e:0b13", "remote": None}]
     assert st["players"] == [2, 1, 0, 3] and st["applied"] and not st["game_running"]
 
 

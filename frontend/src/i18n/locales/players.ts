@@ -30,6 +30,12 @@ const messages: Messages = {
     "dpadLeft": "Croix + stick gauche",
     "dpadRight": "Croix + stick droit",
     "directionLead": "Direction : en plus de la croix, un stick peut diriger le joueur (réglage d'origine de la console : stick droit pour le joueur 1). Les jeux qui gèrent eux-mêmes les sticks, comme sur N64 ou PlayStation, les gardent pour eux.",
+    "computerPad": "Manette de l'ordinateur · {name}",
+    "computerPadOther": "Manette de l'ordinateur",
+    "computerHint": "Une manette connectée à cet ordinateur (en Bluetooth ou en USB) apparaît dans la liste après un appui sur un de ses boutons : Game Manager relaie ses boutons à la console par le Wi-Fi. Garde la page de Game Manager ouverte pendant la partie.",
+    "computerLinking": "Connexion de la manette de l'ordinateur à la console…",
+    "computerNotSeen": "La console n'a pas vu la manette de l'ordinateur. Réessaie.",
+    "computerLost": "Connexion à la console perdue.",
   },
   en: {
     "title": "Controllers",
@@ -59,6 +65,12 @@ const messages: Messages = {
     "dpadLeft": "D-pad + left stick",
     "dpadRight": "D-pad + right stick",
     "directionLead": "Direction: besides the D-pad, a stick can steer the player (console default: right stick for player 1). Games that use the sticks themselves, such as on N64 or PlayStation, keep them.",
+    "computerPad": "Computer controller · {name}",
+    "computerPadOther": "Computer controller",
+    "computerHint": "A controller connected to this computer (Bluetooth or USB) shows up in the list once you press one of its buttons: Game Manager relays its buttons to the console over Wi-Fi. Keep the Game Manager page open while playing.",
+    "computerLinking": "Connecting the computer controller to the console…",
+    "computerNotSeen": "The console didn't see the computer controller. Try again.",
+    "computerLost": "Connection to the console lost.",
   },
   es: {
     "title": "Mandos",
@@ -88,6 +100,12 @@ const messages: Messages = {
     "dpadLeft": "Cruceta + stick izquierdo",
     "dpadRight": "Cruceta + stick derecho",
     "directionLead": "Dirección: además de la cruceta, un stick puede dirigir al jugador (ajuste de fábrica de la consola: stick derecho para el jugador 1). Los juegos que usan los sticks por sí mismos, como en N64 o PlayStation, los conservan.",
+    "computerPad": "Mando del ordenador · {name}",
+    "computerPadOther": "Mando del ordenador",
+    "computerHint": "Un mando conectado a este ordenador (por Bluetooth o USB) aparece en la lista tras pulsar uno de sus botones: Game Manager envía sus botones a la consola por Wi-Fi. Deja abierta la página de Game Manager mientras juegas.",
+    "computerLinking": "Conectando el mando del ordenador con la consola…",
+    "computerNotSeen": "La consola no vio el mando del ordenador. Inténtalo de nuevo.",
+    "computerLost": "Se perdió la conexión con la consola.",
   },
 };
 

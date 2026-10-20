@@ -45,17 +45,17 @@ export function NowPlayingCard({ online, onOpen }: { online: boolean; onOpen?: (
         <VolumeControl online={online} />
         <div className="now-card__actions">
           {ra && caps.save_state && (
-            <button type="button" className="button" onClick={() => save.mutate()} disabled={save.isPending}>
+            <button type="button" className="button button--small button--save" onClick={() => save.mutate()} disabled={save.isPending}>
               <Save size={16} aria-hidden /> {save.isPending ? t("dashboard.saving") : t("dashboard.saveNow")}
             </button>
           )}
           {(ra || !caps.resume_slot) && caps.quit && (
-            <button type="button" className="button button--danger" onClick={() => quit.mutate()} disabled={quit.isPending}>
+            <button type="button" className="button button--small button--danger" onClick={() => quit.mutate()} disabled={quit.isPending}>
               <Square size={16} fill="currentColor" aria-hidden /> {quit.isPending ? t("common.device.quitting") : t("common.device.quit")}
             </button>
           )}
           {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("dashboard.saved")}</span>}
-          {now.game && <ScreenshotButton />}
+          {now.game && <ScreenshotButton variant="small" label="full" />}
         </div>
         {!((ra || !caps.resume_slot) && caps.quit) && <p className="muted">{t("dashboard.quitOnConsole")}</p>}
         {(save.isError || quit.isError) && <p className="text-error">{errorMessage(save.error ?? quit.error)}</p>}

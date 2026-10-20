@@ -689,10 +689,16 @@ button, input, select { font: inherit; color: inherit; }
 .sheet__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
 .sheet__launch-error { flex-basis: 100%; }
 .favorite-button.is-on { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
-.launch-choice { display: flex; flex-direction: column; gap: 8px; flex-basis: 100%; padding: 10px 12px; border-radius: var(--r-panel);
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); background: var(--panel-2); }
-.launch-choice__title { margin: 0; font-weight: 700; }
-.launch-choice__options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.launch-who { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 12px;
+  margin: 0; padding: 0; border: 0; min-width: 0; }
+.launch-who legend { padding: 0; margin-bottom: 8px; font-weight: 700; }
+.launch-who__player { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.launch-who__player span { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); }
+.launch-who select {
+  height: 40px; padding: 0 12px; border-radius: var(--r-control); border: 1px solid var(--line-strong);
+  background: var(--panel-2); color: var(--ink); width: 100%; min-width: 0; text-overflow: ellipsis;
+}
+.launch-who select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 22%, transparent); }
 .device-card__playing { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
 .device-card__playing strong { color: var(--ink); }
 @media (max-width: 760px) { .device-card__playing { display: none; } }
@@ -743,6 +749,17 @@ button, input, select { font: inherit; color: inherit; }
 .button--danger { background: var(--danger); border-color: color-mix(in srgb, var(--danger) 70%, #fff); color: var(--danger-ink); box-shadow: 0 0 18px color-mix(in srgb, var(--danger) 35%, transparent); }
 .button--danger:hover:not(:disabled) { filter: brightness(1.08); border-color: color-mix(in srgb, var(--danger) 60%, #fff); box-shadow: 0 0 24px color-mix(in srgb, var(--danger) 50%, transparent); }
 .button--small { min-height: 34px; padding: 4px 12px; font-size: var(--fs-sm); }
+/* Actions du jeu en cours, chacune sa couleur : Sauvegarder (cyan), Quitter (rouge, --danger), Capture (violet) */
+.button--save, .button--shot {
+  --tint: var(--accent);
+  background: color-mix(in srgb, var(--tint) 16%, var(--panel-2)); border-color: color-mix(in srgb, var(--tint) 60%, transparent);
+}
+.button--shot { --tint: var(--series-5); }
+.button--save svg, .button--shot svg { color: var(--tint); }
+.button--save:hover:not(:disabled), .button--shot:hover:not(:disabled) {
+  border-color: var(--tint); background: color-mix(in srgb, var(--tint) 26%, var(--panel-2));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--tint) 35%, transparent);
+}
 
 /* Tableau de bord : jeu en cours — module principal. Jaquette à gauche, infos au centre,
    ambiance à droite : la jaquette elle-même agrandie et floutée, sous un dégradé sombre qui garde le texte lisible. */
@@ -899,8 +916,11 @@ kbd {
 .bt-status.is-on::before { background: var(--ok-dot); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok-dot) 25%, transparent); }
 /* État, pas un bouton : texte simple, sans fond de pastille */
 .bt-sound { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
-.bt-relaunch { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; background: color-mix(in srgb, var(--warn) 15%, transparent); }
-.bt-relaunch > div { flex: 1 1 260px; }
+/* .block est en colonne : ici une ligne (icône, texte, bouton), sinon flex-basis donne 260 px de hauteur au texte. */
+.bt-relaunch { flex-direction: row; align-items: center; gap: 12px 16px; flex-wrap: wrap; background: color-mix(in srgb, var(--warn) 15%, transparent); }
+.bt-relaunch > svg { flex: none; color: var(--warn); }
+.bt-relaunch > div { flex: 1 1 260px; min-width: 0; }
+.bt-relaunch > .button { align-self: center; }
 .bt-relaunch h2 { margin: 0 0 4px; font-size: var(--fs-md); }
 .bt-relaunch p { margin: 0; }
 .players h2 { display: flex; align-items: center; gap: 8px; }
@@ -1499,3 +1519,21 @@ kbd {
 .assistant__shot img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); image-rendering: pixelated; }
 .assistant__shot-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .assistant__shot-text { margin: 0; white-space: pre-wrap; font-size: var(--fs-sm); background: var(--panel-2); border-radius: 6px; padding: 8px; }
+
+/* Partage d'une capture sur les réseaux (au-dessus de la fiche du jeu, z-index 41) */
+.share-overlay { position: fixed; inset: 0; z-index: 59; background: rgb(0 0 0 / 55%); }
+.share-dialog { position: fixed; z-index: 60; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px); overflow: auto; display: grid; gap: 12px; padding: 20px; border-radius: var(--r-panel);
+  background: var(--panel); color: var(--ink); box-shadow: 0 20px 60px rgb(0 0 0 / 45%); }
+.share-dialog__close { position: absolute; top: 10px; right: 10px; }
+.share-dialog__title { margin: 0; font-size: 1.15rem; padding-right: 32px; }
+.share-dialog__img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #000; border-radius: var(--r-panel); image-rendering: pixelated; }
+.share-dialog textarea { width: 100%; resize: vertical; font: inherit; }
+.share-dialog__networks { display: flex; flex-wrap: wrap; gap: 8px; }
+.share-dialog__sub select { width: auto; }
+.share-dialog__done { margin: 0; padding: 10px 12px; border-radius: var(--r-panel); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+.share-btn__dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--brand); }
+.share-btn--instagram { --brand: #e1306c; }
+.share-btn--bluesky { --brand: #1185fe; }
+.share-btn--x { --brand: currentColor; }
+.share-btn--reddit { --brand: #ff4500; }

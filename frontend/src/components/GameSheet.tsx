@@ -8,7 +8,8 @@ import { saveFileUrl, type GameDetail } from "../api/client";
 import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetFavorite, useSetPlayers } from "../api/queries";
 import { useT } from "../i18n";
 import { bytes, date, dateTime } from "../lib/format";
-import { assignPlayer, completePlayers } from "../lib/players";
+import { controllerLabel, dropUnusedRelays, linkComputerPad, padName, useComputerPads, useRelays } from "../lib/computerPads";
+import { assignPlayer, completePlayers, defaultSlots, PLAYERS } from "../lib/players";
 import { saveLabel } from "../lib/saves";
 import { ConsoleBadge } from "./ConsoleBadge";
 import { assistant } from "../lib/assistant";
@@ -112,7 +113,7 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
 
       {game.role === "candidate" && <GameControlsSection id={game.id} />}
       {game.role === "candidate" && <GameCheatsSection id={game.id} />}
-      <GameScreenshots id={game.id} title={game.title} />
+      <GameScreenshots id={game.id} title={game.title} platform={game.platform.label} />
 
       <dl className="facts">
         {game.full_title && <div className="facts__wide"><dt>{t("sheet.fullTitle")}</dt><dd>{game.full_title}</dd></div>}
@@ -170,8 +171,9 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
 
 /**
  * Disparaît quand ce jeu tourne (le bandeau « En cours » prend le relais) ; bloqué pendant son démarrage.
- * Une manette branchée en plus des boutons de la console : « Jouer » demande d'abord qui joue (joueur 1), écrit
- * ce choix, puis lance le jeu, qui le prend en compte au démarrage de RetroArch.
+ * Raccourci de la page Manettes : plusieurs manettes possibles (boutons de la console, manettes branchées, manettes
+ * de l'ordinateur) : « Qui joue ? » donne une manette à chaque joueur (jusqu'à 4) ; « Jouer » écrit ce choix (en
+ * relayant d'abord les manettes de l'ordinateur), puis lance le jeu, qui le prend en compte au démarrage de RetroArch.
  */
 function LaunchButton({ id }: { id: number }) {
   const t = useT();
@@ -181,15 +183,61 @@ function LaunchButton({ id }: { id: number }) {
   const caps = useCaps();
   const qc = useQueryClient();
   const [starting, setStarting] = useState(false);
-  const [choosing, setChoosing] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState("");
   const pq = usePlayers(online && caps.players);
   const savePlayers = useSetPlayers();
+  const relays = useRelays();
   const controllers = pq.data?.controllers ?? [];
   const players = pq.data ? completePlayers(pq.data.players) : [];
-  const play = (index?: number) => {
-    setChoosing(false);
-    if (index == null || players[0] === index) launch.mutate(id);
-    else savePlayers.mutate(assignPlayer(players, 0, index), { onSuccess: () => launch.mutate(id) });
+  // Manettes de l'ordinateur pas encore relayées : les choisir les relaie vers la console.
+  const pads = useComputerPads().filter((g) => !relays.some((r) => r.pad === g.index));
+  // Une liste par joueur, autant que de manettes possibles (4 au plus) : chacune est à un seul joueur.
+  const options = [...controllers.map((c) => String(c.index)), ...pads.map((g) => `pc:${g.index}`)];
+  const slots = Math.min(PLAYERS, options.length);
+  const initial = defaultSlots(players, options, slots);
+  const [touched, setTouched] = useState<string[] | null>(null);
+  const draft = touched && touched.length === slots && touched.every((v) => options.includes(v)) ? touched : initial;
+  const pick = (n: number, value: string) => {
+    const next = [...draft];
+    const other = next.indexOf(value);
+    if (other >= 0) next[other] = next[n]!;  // échange avec le joueur qui l'avait
+    next[n] = value;
+    setTouched(next);
+  };
+  const play = async () => {
+    setLinkError("");
+    setLinking(true);
+    try {
+      // Manettes de l'ordinateur choisies : relayées d'abord, pour connaître leur numéro sur la console.
+      let current = pq.data;
+      const index = new Map<string, number>();
+      for (const value of draft) {
+        const pad = value.startsWith("pc:") ? pads.find((g) => g.index === Number(value.slice(3))) : null;
+        if (!pad) continue;
+        const linked = await linkComputerPad(pad, t);
+        qc.setQueryData(["players"], linked.players);
+        current = linked.players;
+        index.set(value, linked.index);
+      }
+      const base = current ? completePlayers(current.players) : players;
+      const final = draft.reduce((acc, v, n) => assignPlayer(acc, n, index.get(v) ?? Number(v)), base);
+      setTouched(null);
+      if (final.every((v, i) => v === base[i])) launch.mutate(id);
+      else savePlayers.mutate(final, { onSuccess: (d) => { dropUnusedRelays(d); launch.mutate(id); } });
+    } catch (e) {
+      setLinkError((e as Error).message);
+    } finally {
+      setLinking(false);
+    }
+  };
+  const optionLabel = (value: string) => {
+    if (value.startsWith("pc:")) {
+      const g = pads.find((x) => x.index === Number(value.slice(3)));
+      return t("players.computerPad", { name: g ? padName(g) : "" });
+    }
+    const c = controllers.find((x) => x.index === Number(value));
+    return c ? controllerLabel(c, relays, t) : value;
   };
   // « Démarrage… » reste affiché jusqu'à ce que la console annonce ce jeu (le bandeau « En cours » prend alors
   // le relais), en relisant l'état toutes les 2 s ; au plus 60 s si le jeu ne démarre pas.
@@ -203,28 +251,28 @@ function LaunchButton({ id }: { id: number }) {
   if (now?.playing && now.game?.id === id) return null;
   if (!caps.launch) return <p className="muted">{t("sheet.launchUnavailable")}</p>;
   // Un seul état visible de l'envoi au démarrage du jeu (jusqu'à ce que le bandeau « En cours » prenne le relais).
-  const busy = launch.isPending || savePlayers.isPending || starting;
-  if (choosing) return (
-    <div className="launch-choice" role="group" aria-labelledby="launch-choice-h">
-      <p id="launch-choice-h" className="launch-choice__title">{t("sheet.whoPlays")}</p>
-      <div className="launch-choice__options">
-        {controllers.map((c) => (
-          <button key={c.index} type="button" className={`button ${players[0] === c.index ? "button--primary" : ""}`}
-            onClick={() => play(c.index)}>
-            <Gamepad2 size={16} aria-hidden /> {c.builtin ? t("players.builtin") : c.name}
-          </button>
-        ))}
-        <button type="button" className="button button--small" onClick={() => setChoosing(false)}>{t("sheet.controls.cancel")}</button>
-      </div>
-    </div>
-  );
+  const busy = launch.isPending || savePlayers.isPending || starting || linking;
   return (
     <>
+      {slots > 1 && (
+        <fieldset className="launch-who" disabled={busy}>
+          <legend>{t("sheet.whoPlays")}</legend>
+          {draft.map((value, n) => (
+            <label key={n} className="launch-who__player">
+              <span>{t("players.player", { n: n + 1 })}</span>
+              <select value={value} onChange={(e) => pick(n, e.target.value)}>
+                {options.map((o) => <option key={o} value={o}>{optionLabel(o)}</option>)}
+              </select>
+            </label>
+          ))}
+        </fieldset>
+      )}
       <button type="button" className={`button button--primary ${busy ? "is-busy" : ""}`}
-        onClick={() => (controllers.length > 1 ? setChoosing(true) : play())} disabled={busy} aria-busy={busy}>
+        onClick={play} disabled={busy} aria-busy={busy}>
         {busy ? <Loader2 size={16} aria-hidden className="spin" /> : <Gamepad2 size={16} aria-hidden />}{" "}
         <span role="status">{busy ? t("sheet.starting") : t("sheet.play")}</span>
       </button>
+      {linkError && <p className="sheet__launch-error players__warn">{linkError}</p>}
       {(launch.isError || savePlayers.isError) && <div className="sheet__launch-error">
         <ErrorNotice error={launch.error ?? savePlayers.error} title={t("sheet.launchFailed")} /></div>}
     </>
@@ -286,7 +334,7 @@ function PlayingBanner({ gameId }: { gameId: number }) {
       <strong>{t("dashboard.nowPlaying")}</strong>
       <span className="playing-banner__actions">
         {(ra || !caps.resume_slot) && caps.quit && <>
-          {ra && caps.save_state && <button type="button" className="button button--small" onClick={() => save.mutate()} disabled={save.isPending}
+          {ra && caps.save_state && <button type="button" className="button button--small button--save" onClick={() => save.mutate()} disabled={save.isPending}
             aria-label={save.isSuccess ? t("dashboard.saved") : t("dashboard.saveNow")} title={t("dashboard.saveNow")}>
             <Save size={14} aria-hidden /> {save.isSuccess ? t("dashboard.savedShort") : t("dashboard.saveShort")}
           </button>}

@@ -1,11 +1,16 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Gamepad2, Library, RotateCcw, Users } from "lucide-react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import type { Players } from "../api/client";
+import type { Controller, Players } from "../api/client";
 import { useCaps, useDeviceStatus, useLaunchGame, useNowPlaying, usePlayers, useSetDirections, useSetPlayers } from "../api/queries";
 import { ErrorNotice, PageHeader, Spinner } from "../components/ui";
 import { useT } from "../i18n";
-import { assignPlayer, completePlayers, controllerName } from "../lib/players";
+import {
+  type ComputerRelay, controllerLabel, dropUnusedRelays, gamepadsSupported, linkComputerPad, padName, useComputerPads, useRelays,
+} from "../lib/computerPads";
+import { assignPlayer, completePlayers } from "../lib/players";
 
 /** Manettes : qui contrôle le jeu, manette de chaque joueur dans RetroArch (voir backend app/device/players.py). */
 export function ControllersPage() {
@@ -28,11 +33,30 @@ export function ControllersPage() {
   const game = now?.playing && now.process === "retroarch" ? now.game : null;
   const canRelaunch = !!game && caps.launch;
   const relaunch = () => game && launch.mutate({ id: game.id, slot: caps.resume_slot ? "auto" : null });
-  const busy = save.isPending || steer.isPending || launch.isPending;
+  const qc = useQueryClient();
+  const relays = useRelays();
+  const [linking, setLinking] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const busy = save.isPending || steer.isPending || launch.isPending || linking;
 
   // Choisir une manette pour un joueur l'échange avec le joueur qui l'avait : deux joueurs n'ont jamais la même.
+  // Une manette de l'ordinateur que plus aucun joueur n'utilise n'est plus relayée.
   const choose = (player: number, index: number, then?: () => void) =>
-    save.mutate(assignPlayer(players, player, index), { onSuccess: then });
+    save.mutate(assignPlayer(players, player, index), { onSuccess: (d) => { dropUnusedRelays(d); then?.(); } });
+  // Manette de l'ordinateur : on la relaie vers la console, puis on donne au joueur la manette virtuelle créée.
+  const chooseComputer = async (player: number, pad: Gamepad) => {
+    setLinking(true);
+    setLinkError("");
+    try {
+      const { players: d, index } = await linkComputerPad(pad, t);
+      qc.setQueryData(["players"], d);
+      dropUnusedRelays(await save.mutateAsync(assignPlayer(completePlayers(d.players), player, index)));
+    } catch (e) {
+      setLinkError((e as Error).message);
+    } finally {
+      setLinking(false);
+    }
+  };
   // Ce qui dirige un joueur ; les autres gardent le leur (inconnu : croix seule, le réglage par défaut de RetroArch).
   const direct = (player: number, direction: number) =>
     p && steer.mutate(p.directions.map((d, n) => (n === player ? direction : d ?? 0)));
@@ -72,7 +96,8 @@ export function ControllersPage() {
         <ErrorNotice error={q.error} />
       ) : p && (
         <PlayersBlock p={p} players={players} busy={busy} error={save.error ?? steer.error ?? launch.error}
-          canRelaunch={canRelaunch} onChoose={(n, i) => choose(n, i)} onDirection={direct} />
+          canRelaunch={canRelaunch} onChoose={(n, i) => choose(n, i)} onDirection={direct}
+          relays={relays} linking={linking} linkError={linkError} onComputer={chooseComputer} />
       )}
     </div>
   );
@@ -81,16 +106,25 @@ export function ControllersPage() {
 /** input_playerN_analog_dpad_mode de RetroArch : 0 croix seule, 1 + stick gauche, 2 + stick droit. */
 const DIRECTIONS = ["dpad", "dpadLeft", "dpadRight"] as const;
 
-function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirection }: {
+function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirection, relays, linking, linkError, onComputer }: {
   p: Players; players: number[]; busy: boolean; error: unknown; canRelaunch: boolean;
   onChoose: (player: number, index: number) => void; onDirection: (player: number, direction: number) => void;
+  relays: ComputerRelay[]; linking: boolean; linkError: string; onComputer: (player: number, pad: Gamepad) => void;
 }) {
   const t = useT();
   const bluetooth = useCaps().bluetooth;
   const byIndex = new Map(p.controllers.map((c) => [c.index, c]));
+  const name = (c: Controller) => controllerLabel(c, relays, t);
   const label = (i: number) => {
     const c = byIndex.get(i);
-    return c ? controllerName(c, t) : t("players.missing", { n: i });
+    return c ? name(c) : t("players.missing", { n: i });
+  };
+  // Manettes de l'ordinateur pas encore relayées : les choisir les relaie vers la console.
+  const pads = useComputerPads().filter((g) => !relays.some((r) => r.pad === g.index));
+  const pick = (n: number, value: string) => {
+    const pad = value.startsWith("pc:") ? pads.find((g) => g.index === Number(value.slice(3))) : null;
+    if (pad) onComputer(n, pad);
+    else if (!value.startsWith("pc:")) onChoose(n, Number(value));
   };
   const p1 = players[0] ?? 0;
   const options = [...new Set([...p.controllers.map((c) => c.index), ...players])].sort((x, y) => x - y);
@@ -110,8 +144,11 @@ function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirect
             <li key={n} className="players__player">
               <div className="field">
                 <label htmlFor={`player-${n}`} className="field__label">{t("players.player", { n: n + 1 })}</label>
-                <select id={`player-${n}`} value={index} disabled={busy} onChange={(e) => onChoose(n, Number(e.target.value))}>
-                  {options.map((i) => <option key={i} value={i}>{label(i)}</option>)}
+                <select id={`player-${n}`} value={String(index)} disabled={busy} onChange={(e) => pick(n, e.target.value)}>
+                  {options.map((i) => <option key={i} value={String(i)}>{label(i)}</option>)}
+                  {pads.map((g) => (
+                    <option key={`pc:${g.index}`} value={`pc:${g.index}`}>{t("players.computerPad", { name: padName(g) })}</option>
+                  ))}
                 </select>
               </div>
               <div className="field">
@@ -125,6 +162,9 @@ function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirect
           ))}
         </ol>
         <p className="muted">{t("players.directionLead")}</p>
+        {gamepadsSupported() && <p className="muted">{t("players.computerHint")}</p>}
+        {linking && <p className="muted" role="status">{t("players.computerLinking")}</p>}
+        {linkError && <p className="players__warn"><AlertTriangle size={16} aria-hidden /> {linkError}</p>}
         {error ? <ErrorNotice error={error} /> : !p.applied && <p className="muted">{t(canRelaunch ? "players.pendingRelaunch" : "players.pending")}</p>}
       </section>
 
@@ -132,7 +172,7 @@ function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirect
         <h2 id="players-detected">{t("players.detected")}</h2>
         {p.controllers.length === 0 ? <p className="muted">{t("players.noneDetected")}</p> : (
           <ul className="players__detected">
-            {p.controllers.map((c) => <li key={c.index}><Gamepad2 size={16} aria-hidden /> {controllerName(c, t)}</li>)}
+            {p.controllers.map((c) => <li key={c.index}><Gamepad2 size={16} aria-hidden /> {name(c)}</li>)}
           </ul>
         )}
         {bluetooth && <p className="muted"><Link to="/bluetooth">{t("players.help")}</Link></p>}

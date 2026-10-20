@@ -64,10 +64,12 @@ def parse_controllers(text: str) -> list[dict]:
         ids = re.search(r"^I: .*Vendor=([0-9a-f]{4}) Product=([0-9a-f]{4})", block, re.M | re.I)
         builtin = name.group(1) == "ANBERNIC-keys" or "gpio-keys" in (phys.group(1) if phys else "")
         usb_id = f"{ids.group(1).lower()}:{ids.group(2).lower()}" if ids else None
-        found.append((int(js.group(1)), name.group(1), builtin, usb_id))
+        # Manette de l'ordinateur relayée par Game Manager (gamepad_relay.py) : identifiant du relais.
+        remote = re.match(r"romkade-relay-([a-z0-9]+)$", phys.group(1).strip()) if phys else None
+        found.append((int(js.group(1)), name.group(1), builtin, usb_id, remote.group(1) if remote else None))
     found.sort()
-    return [{"index": i, "name": name, "builtin": builtin, "usb_id": usb_id}
-            for i, (_, name, builtin, usb_id) in enumerate(found)]
+    return [{"index": i, "name": name, "builtin": builtin, "usb_id": usb_id, "remote": remote}
+            for i, (_, name, builtin, usb_id, remote) in enumerate(found)]
 
 
 def _indexes(text: str, line_re: re.Pattern = LINE_RE) -> list[int | None]:

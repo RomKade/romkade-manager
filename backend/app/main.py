@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import assistant, bluetooth, catalog, cheats, controls, descriptions, knowledge, llm, play, players, playtime, saves, screenshots, system, transfers, videos, volume
+from app.api import assistant, bluetooth, catalog, cheats, controls, descriptions, gamepad, knowledge, llm, play, players, playtime, saves, screenshots, system, transfers, videos, volume
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
 from app.credentials import CredentialStore, default_store
@@ -144,6 +144,7 @@ def create_app(
     app.include_router(screenshots.router)
     app.include_router(bluetooth.router)
     app.include_router(players.router)
+    app.include_router(gamepad.router)
     app.include_router(volume.router)
     app.include_router(descriptions.router)
     app.include_router(controls.router)

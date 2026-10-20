@@ -2295,6 +2295,8 @@ export interface components {
             builtin: boolean;
             /** Usb Id */
             usb_id?: string | null;
+            /** Remote */
+            remote?: string | null;
         };
         /** DayOut */
         DayOut: {

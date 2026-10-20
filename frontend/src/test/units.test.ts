@@ -96,3 +96,12 @@ describe("accueil de la bibliothèque", () => {
     expect(groupOf("OPENBOR")).toBe("Moteurs et autres");
   });
 });
+
+describe("défaut de « Qui joue ? » (fiche du jeu)", () => {
+  it("garde la manette de chaque joueur si elle est là, sinon une libre, chacune à un seul joueur", async () => {
+    const { defaultSlots } = await import("../lib/players");
+    expect(defaultSlots([1, 0, 2, 3], ["0", "1"], 2)).toEqual(["1", "0"]);
+    expect(defaultSlots([5, 1, 2, 3], ["0", "1", "pc:0"], 3)).toEqual(["0", "1", "pc:0"]);
+    expect(defaultSlots([2, 1, 0, 3], ["0", "1", "2", "3", "4"], 4)).toEqual(["2", "1", "0", "3"]);
+  });
+});

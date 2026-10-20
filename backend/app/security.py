@@ -5,6 +5,7 @@ requêtes à http://127.0.0.1:8765 depuis le navigateur de l'utilisateur. Deux c
 - en-tête Host : seul localhost / 127.0.0.1 est accepté (bloque le « DNS rebinding ») ;
 - en-tête Origin : une requête qui modifie quelque chose (POST, PUT, DELETE…) venant d'une autre
   origine que l'interface elle-même est refusée.
+Un WebSocket doit en plus venir de l'interface (Origin obligatoire) : il peut piloter la console.
 """
 
 from starlette.responses import JSONResponse
@@ -27,6 +28,8 @@ class LocalOnlyMiddleware:
         self.hosts = LOCAL_HOSTS | (extra_hosts or set())
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "websocket":
+            return await self._websocket(scope, receive, send)
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
@@ -41,6 +44,16 @@ class LocalOnlyMiddleware:
                                         "Requête refusée : elle ne vient pas de l'interface de l'application")
         if scope["method"] not in SAFE_METHODS and origin == "null":
             return await self._deny(scope, receive, send, "origin_not_allowed", "Requête refusée : origine opaque")
+        return await self.app(scope, receive, send)
+
+    async def _websocket(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """WebSocket (manette à distance) : les navigateurs ne l'empêchent pas entre sites, l'Origin est donc exigée."""
+        headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+        origin = headers.get("origin", "")
+        if (_hostname(headers.get("host", "")) not in self.hosts
+                or _hostname(origin.split("://", 1)[-1]) not in self.hosts):
+            await receive()  # websocket.connect
+            return await send({"type": "websocket.close", "code": 1008})
         return await self.app(scope, receive, send)
 
     @staticmethod

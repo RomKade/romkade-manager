@@ -36,6 +36,7 @@ let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
+let relayToken = "";
 let assistantBodies: Record<string, unknown>[] = [];
 let assistantAction: Record<string, unknown> | null = null;
 let controlsSourced = false;
@@ -136,6 +137,8 @@ function mockFetch() {
       shots = [shot("20261019-210000.png"), ...shots];
       return json({ game_id: 1, title: "Super Mario World", shot: shots[0] });
     }
+    if (url.startsWith("/api/screenshots/") && init?.method !== "DELETE")
+      return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { "Content-Type": "image/png" } });
     if (url.startsWith("/api/screenshots/") && init?.method === "DELETE") {
       shots = shots.filter((s) => s.url !== url);
       return new Response(null, { status: 204 });
@@ -166,7 +169,9 @@ function mockFetch() {
     }
     if (url.startsWith("/api/players")) {
       const body = init?.method === "PUT" ? JSON.parse(String(init.body)) as { players?: number[]; directions?: number[] } : {};
-      return json({ controllers: [{ index: 0, name: "ANBERNIC-keys", builtin: true }, { index: 1, name: "8BitDo Pro 2", builtin: false }],
+      // Manette de l'ordinateur relayée (WebSocket simulé) : manette virtuelle n°4 de la console.
+      const relayed = relayToken ? [{ index: 4, name: "Microsoft X-Box 360 pad", builtin: false, remote: relayToken }] : [];
+      return json({ controllers: [{ index: 0, name: "ANBERNIC-keys", builtin: true }, { index: 1, name: "8BitDo Pro 2", builtin: false }, ...relayed],
         players: body.players ?? [2, 1, 0, 3], directions: body.directions ?? [2, null, null, null],
         applied: !(playingId && init?.method === "PUT"), game_running: playingId != null });
     }
@@ -299,6 +304,7 @@ beforeEach(() => {
   shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
   favoriteIds = [];
   hostKeyTrusted = true;
+  relayToken = "";
   assistantBodies = [];
   assistantAction = null;
   sessionStorage.clear();
@@ -454,16 +460,20 @@ describe("Jeu en cours", () => {
 });
 
 describe("Jouer avec une manette branchée", () => {
-  it("demande qui joue, donne le joueur 1 à cette manette puis lance le jeu", async () => {
+  it("« Qui joue ? » : une manette par joueur, échangées entre joueurs, enregistrées puis le jeu lancé", async () => {
     renderAt("/bibliotheque?all=1");
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(await within(dialog).findByRole("button", { name: /Jouer sur la console/ }));
-    const choice = within(dialog).getByRole("group", { name: "Qui joue ?" });
-    await userEvent.click(within(choice).getByRole("button", { name: /8BitDo Pro 2/ }));
+    const who = await within(dialog).findByRole("group", { name: "Qui joue ?" });
+    // Deux manettes : deux joueurs. Le joueur 1 prend la 8BitDo, le joueur 2 reçoit les boutons de la console.
+    expect(within(who).getByLabelText("Joueur 1")).toHaveDisplayValue("Boutons de la console");
+    expect(within(who).queryByLabelText("Joueur 3")).not.toBeInTheDocument();
+    await userEvent.selectOptions(within(who).getByLabelText("Joueur 1"), "8BitDo Pro 2 · manette n°1");
+    expect(within(who).getByLabelText("Joueur 2")).toHaveDisplayValue("Boutons de la console");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Jouer sur la console/ }));
     await waitFor(() => expect(bodies.some((b) => b.url === "/api/games/1/launch")).toBe(true));
     const put = bodies.findIndex((b) => b.url === "/api/players");
-    expect(bodies[put]).toEqual({ url: "/api/players", players: [1, 2, 0, 3] });
+    expect(bodies[put]).toEqual({ url: "/api/players", players: [1, 0, 2, 3] });
     expect(put).toBeLessThan(bodies.findIndex((b) => b.url === "/api/games/1/launch"));
   });
 });
@@ -981,6 +991,39 @@ describe("Manettes", () => {
     expect(await screen.findByRole("heading", { name: "Bibliothèque", level: 1 })).toBeInTheDocument();
   });
 
+  it("donne au joueur 1 une manette connectée à l'ordinateur, relayée vers la console", async () => {
+    const sent: string[] = [];
+    vi.stubGlobal("WebSocket", class {
+      static OPEN = 1;
+      readyState = 0;
+      onmessage: ((e: { data: string }) => void) | null = null;
+      onclose: (() => void) | null = null;
+      constructor(url: string) {
+        relayToken = new URL(url).searchParams.get("token")!;
+        setTimeout(() => { this.readyState = 1; this.onmessage?.({ data: '{"ready": true}' }); }, 0);
+      }
+      send(data: string) { sent.push(data); }
+      close() { this.readyState = 3; }
+    });
+    const pad = { index: 0, id: "Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)", connected: true,
+                  mapping: "standard", buttons: [{ value: 1, pressed: true }], axes: [0, 0, 0, 0] };
+    Object.defineProperty(navigator, "getGamepads", { value: () => [pad], configurable: true });
+    Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0));
+
+    renderAt("/manettes");
+    await userEvent.selectOptions(await screen.findByLabelText("Joueur 1"), "Manette de l'ordinateur · Xbox Wireless Controller");
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [4, 1, 0, 3] }), { timeout: 3000 });
+    expect(relayToken).toMatch(/^[a-z0-9]{4,16}$/);
+    await waitFor(() => expect(JSON.parse(sent[0]!)).toEqual({ b: [1], a: [0, 0, 0, 0] }));
+    expect(screen.getByLabelText("Joueur 1")).toHaveDisplayValue("Manette de l'ordinateur · Xbox Wireless Controller");
+
+    // Le joueur 1 reprend les boutons de la console : échange, la manette de l'ordinateur passe au joueur 3.
+    await userEvent.selectOptions(screen.getByLabelText("Joueur 1"), "Boutons de la console");
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [0, 1, 4, 3] }));
+    expect(screen.getByLabelText("Joueur 3")).toHaveDisplayValue("Manette de l'ordinateur · Xbox Wireless Controller");
+  });
+
   it("choisit ce qui dirige le joueur 1 : la croix seule, ou la croix et un stick", async () => {
     renderAt("/manettes");
     const [p1] = await screen.findAllByLabelText("Direction");
@@ -1079,6 +1122,32 @@ describe("Captures d'écran", () => {
     await userEvent.click(within(game).getAllByRole("button", { name: "Supprimer la capture" })[0]!);
     await waitFor(() => expect(within(game).getAllByRole("img")).toHaveLength(1));
     expect(within(game).getByText("1 capture")).toBeInTheDocument();
+  });
+
+  it("partage une capture sur X (image copiée, éditeur ouvert) puis sur Reddit (image téléchargée)", async () => {
+    const opened: string[] = [];
+    const open = vi.spyOn(window, "open").mockImplementation((u) => { opened.push(String(u)); return {} as Window; });
+    const write = vi.fn(async () => undefined);
+    Object.assign(navigator, { clipboard: { write, writeText: vi.fn(async () => undefined) } });
+    vi.stubGlobal("ClipboardItem", class { constructor(public items: unknown) {} });
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    renderAt("/captures");
+    const game = await screen.findByRole("region", { name: /Super Mario World/ });
+    await userEvent.click(within(game).getAllByRole("button", { name: "Partager sur les réseaux" })[0]!);
+    const dialog = await screen.findByRole("dialog", { name: "Partager la capture" });
+    expect(within(dialog).getByLabelText("Texte du message")).toHaveValue("Super Mario World · Super Nintendo\n#retrogaming #SuperNintendo");
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "X" })).toBeEnabled());
+    await userEvent.click(within(dialog).getByRole("button", { name: "X" }));
+    expect(await within(dialog).findByText(/Image copiée : colle-la/)).toBeInTheDocument();
+    expect(write).toHaveBeenCalled();
+    expect(opened.at(-1)).toBe("https://x.com/intent/post?text=" + encodeURIComponent("Super Mario World · Super Nintendo\n#retrogaming #SuperNintendo"));
+    await userEvent.selectOptions(within(dialog).getByLabelText("Communauté Reddit"), "retrogaming");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reddit" }));
+    expect(await within(dialog).findByText(/Image téléchargée : ajoute-la au post Reddit/)).toBeInTheDocument();
+    expect(opened.at(-1)).toBe("https://www.reddit.com/r/retrogaming/submit?type=IMAGE&title=" + encodeURIComponent("Super Mario World · Super Nintendo"));
+    open.mockRestore();
+    vi.unstubAllGlobals();
   });
 
   it("sans capture, explique comment en prendre ; la section est dans le menu", async () => {

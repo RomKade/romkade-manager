@@ -15,6 +15,7 @@ class ControllerOut(BaseModel):
     name: str
     builtin: bool
     usb_id: str | None = None  # « vvvv:pppp »
+    remote: str | None = None  # manette de l'ordinateur relayée (api/gamepad.py) : identifiant du relais
 
 
 class PlayersOut(BaseModel):
