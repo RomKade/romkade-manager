@@ -72,10 +72,15 @@ ngrok http "127.0.0.1:$PORT" --traffic-policy-file "$PHONE_POLICY" --log=stdout 
 NGROK_PID=$!
 trap 'kill $NGROK_PID 2>/dev/null' EXIT INT TERM
 
+# Le tunnel vers CE port : un autre ngrok déjà lancé (autre projet) prend la console locale 4040, le nôtre passe
+# alors sur 4041, 4042…
 URL=""
 for _ in $(seq 1 30); do
-  URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null \
-    | .venv/bin/python -c "import sys, json; t = json.load(sys.stdin).get('tunnels', []); print(next((x['public_url'] for x in t if x['public_url'].startswith('https')), ''))" 2>/dev/null || true)
+  for API in 4040 4041 4042 4043; do
+    URL=$(curl -s "http://127.0.0.1:$API/api/tunnels" 2>/dev/null \
+      | .venv/bin/python -c "import sys, json; t = json.load(sys.stdin).get('tunnels', []); print(next((x['public_url'] for x in t if x['public_url'].startswith('https') and x.get('config', {}).get('addr', '').endswith(':$PORT')), ''))" 2>/dev/null || true)
+    [ -n "$URL" ] && break
+  done
   [ -n "$URL" ] && break
   kill -0 $NGROK_PID 2>/dev/null || break
   sleep 0.5
