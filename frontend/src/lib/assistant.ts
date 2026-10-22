@@ -9,7 +9,8 @@ import { DEFAULT_ASSISTANT_NAME, isValidName } from "./assistantNames";
 
 /** Jeu cité par l'assistant ; code (dossier de la console) et adresses des images : pour sa jaquette miniature. */
 export type AssistantGame = {
-  id: number; title: string; platform: string; code?: string; image_url?: string | null; boxart_url?: string | null;
+  id: number; title: string; platform: string; code?: string; year?: number | null; image_url?: string | null;
+  boxart_url?: string | null;
 };
 export type Scope = { kind: "library" } | { kind: "game"; game: AssistantGame };
 export type ChatSource = { source: string; page: string; url: string; license: string };

@@ -78,6 +78,12 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
     genre = route.get("genre") if route.get("genre") in asst.GENRES else ""
     console = str(route.get("console") or "")[:60]
     players = route.get("players") if isinstance(route.get("players"), int) and 1 <= route.get("players") <= 8 else 0
+    sort = route.get("sort") if route.get("sort") in asst.SORTS else ""
+    # Thème qui n'est pas un genre (« western ») : expressions à chercher, titres connus du modèle pour ce thème.
+    theme = [p.strip()[:40] for p in str(route.get("theme") or "").split(",") if len(p.strip()) >= 3][:6] \
+        if intent == "find_games" and not mentioned else []
+    theme_titles = [str(t)[:80] for t in route.get("theme_titles") or [] if isinstance(t, str)][:asst.THEME_TITLES] \
+        if theme else []
 
     def dirs_for_console():
         with st.sessions() as s:
@@ -85,12 +91,25 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
 
     dirs = await asyncio.to_thread(dirs_for_console) if intent == "find_games" else []
     library_ids = None
-    if intent == "find_games" and st.search.ready:
+    theme_keys: list[str] = []
+    if theme and st.search.ready:
+        # Chaque expression à part, en phrase exacte ; un jeu cité par plusieurs expressions passe devant.
+        votes: dict[str, int] = {}
+        for phrase in theme:
+            try:
+                for rank, key in enumerate(await st.search.search_knowledge_games(phrase)):
+                    votes[key] = votes.get(key, 0) + 100 - rank
+            except Exception:  # noqa: BLE001 — sans Typesense : les titres connus du modèle seulement
+                break
+        theme_keys = sorted(votes, key=lambda k: -votes[k])
+    if intent == "find_games" and st.search.ready and not theme:
         # Genre et console en filtres ; les mots-clés seulement s'ils nomment des jeux.
-        q = " ".join(mentioned) if mentioned else ("*" if genre or dirs else search_text)
+        q = " ".join(mentioned) if mentioned else ("*" if genre or dirs or sort else search_text)
+        order = {"newest": ("year", "desc"), "oldest": ("year", "asc"), "added": ("added", "desc")}.get(sort)
         try:
             library_ids, _ = await st.search.search(q, genres=[genre] if genre else None, platforms=dirs or None,
-                                                    limit=asst.LIBRARY_GAMES)
+                                                    limit=asst.LIBRARY_GAMES,
+                                                    **({"sort": order[0], "order": order[1]} if order and not mentioned else {}))
         except Exception:  # noqa: BLE001 — repli SQLite
             library_ids = None
 
@@ -120,14 +139,22 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                 overview, favs = asst.library_overview(s, console_key)
                 return None, (favs if asst.FAVORITES_RE.search(question) else []), overview
             if intent == "find_games":
-                if players and not mentioned:  # nombre de joueurs : seulement en base, jamais deviné
-                    games = asst.find_by_filters(s, genre, dirs, players)
-                elif library_ids is None and not mentioned and (genre or dirs):
-                    games = asst.find_by_filters(s, genre, dirs)
+                if theme:
+                    games = asst.theme_games(s, theme_titles, theme_keys, dirs)
+                    if genre:
+                        games = [g for g in games if g.genre == genre]
+                    if players:
+                        games = [g for g in games if g.players and (g.players == 1 if players == 1 else g.players >= players)]
+                elif players and not mentioned:  # nombre de joueurs : seulement en base, jamais deviné
+                    games = asst.find_by_filters(s, genre, dirs, players, sort)
+                elif library_ids is None and not mentioned and (genre or dirs or sort):
+                    games = asst.find_by_filters(s, genre, dirs, sort=sort)
                 else:
                     games = asst.find_library_games(s, mentioned or [search_text], library_ids)
-                filters = ", ".join(x for x in (asst.GENRES.get(genre, ""), console,
-                                                 f"{players}+ players" if players > 1 else "1 player" if players else "") if x)
+                games = asst.sort_games(games, sort)
+                filters = ", ".join(x for x in (asst.GENRES.get(genre, ""), f"theme: {theme[0]}" if theme else "", console,
+                                                 f"{players}+ players" if players > 1 else "1 player" if players else "",
+                                                 asst.SORT_LABELS.get(sort, "")) if x)
                 # Une carte cliquable par jeu sous la réponse : le texte n'a pas à les énumérer (doublon).
                 more = len(games) > asst.LIBRARY_GAMES
                 seen: set = set()

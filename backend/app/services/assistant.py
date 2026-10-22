@@ -55,6 +55,12 @@ ACTION_CAPS = {"launch_game": "launch", "quit_game": "quit", "save_state": "save
                "volume_up": "volume", "volume_down": "volume", "mute": "volume", "unmute": "volume",
                "take_screenshot": "screenshot"}
 GENRE_KEYS = [""] + list(GENRES)  # « » : aucun genre précis
+# Tri des jeux trouvés : par année de sortie (« les plus récents », « les plus anciens »), ou derniers ajoutés.
+SORTS = ["", "newest", "oldest", "added"]
+THEME_TITLES = 12
+SORT_ORDER = {"newest": (RemoteFile.release_year.is_(None), RemoteFile.release_year.desc()),
+              "oldest": (RemoteFile.release_year.is_(None), RemoteFile.release_year.asc()),
+              "added": (RemoteFile.first_seen_at.desc(),)}
 ROUTE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -68,9 +74,12 @@ ROUTE_SCHEMA = {
         "action": {"type": "string", "enum": ACTIONS},
         "volume": {"type": "integer"},
         "players": {"type": "integer"},
+        "theme": {"type": "string"},
+        "theme_titles": {"type": "array", "items": {"type": "string"}},
+        "sort": {"type": "string", "enum": SORTS},
     },
     "required": ["in_scope", "intent", "search", "games_mentioned", "genre", "console", "wants_solution", "action",
-                 "volume", "players"],
+                 "volume", "players", "theme", "theme_titles", "sort"],
     "additionalProperties": False,
 }
 
@@ -103,7 +112,13 @@ question or "" (e.g. "Super Nintendo", "Game Boy Advance", "arcade"), "wants_sol
 explicitly asks for the full solution, "action" with the console action ("" unless the intent is console_action),
 "volume" with the requested sound level from 0 to 100 (-1 if none), "players" with the number of players the user
 wants to play with (« à deux », « two players », « en coop » = 2; « à quatre » = 4; « seul », « solo » = 1; -1 if
-not asked)."""
+not asked), "theme" with the setting or subject asked for when it is not a genre key, in English, with a few
+synonyms or phrases separated by commas (e.g. « jeux de western » -> "wild west, far west, cowboy, outlaw,
+gunslinger", « des jeux de ninja » -> "ninja, shinobi"; "" if none), "theme_titles" with up to 12 well-known retro game titles that match that theme, from your own
+knowledge (e.g. western: "Sunset Riders", "Wild Guns", "Gun.Smoke", "Express Raider", "Desperados"; [] if no
+theme), "sort" with "newest" when the user wants the most recent games (latest releases, « les jeux les plus
+récents », « les derniers jeux sortis »), "oldest" for the oldest ones, "added" for the games they added last to
+their library, "" otherwise. Recently PLAYED games are library_info, not a sort."""
 
 ANSWER_SYSTEM = """You are {name}, the game assistant of ROMKADE Manager, an app that manages the retro games on the
 user's handheld console (RetroArch emulators). If asked who you are, you are {name}. {scope}
@@ -291,8 +306,10 @@ def app_help(question: str) -> str:
 def game_out(f: RemoteFile) -> dict:
     """Jeu cité par l'assistant, avec de quoi afficher sa jaquette dans la réponse (mêmes adresses que le catalogue)."""
     return {"id": f.id, "title": _game_title(f), "platform": f.platform.label or f.platform.directory,
-            "code": f.platform.directory, "image_url": f"/api/games/{f.id}/image" if f.image_relpath else None,
-            "boxart_url": f"/api/games/{f.id}/boxart" if has_boxart_source(f.platform.directory) else None}
+            "code": f.platform.directory,
+            "image_url": f"/api/games/{f.id}/image" if f.image_relpath else None,
+            "boxart_url": f"/api/games/{f.id}/boxart" if has_boxart_source(f.platform.directory) else None,
+            "year": f.release_year}
 
 
 def console_dirs(s: Session, console: str) -> list[str]:
@@ -304,7 +321,7 @@ def console_dirs(s: Session, console: str) -> list[str]:
             if kn.platform_matches(kn.platform_names(p.directory), [console])]
 
 
-def find_by_filters(s: Session, genre: str, dirs: list[str], players: int = 0) -> list[RemoteFile]:
+def find_by_filters(s: Session, genre: str, dirs: list[str], players: int = 0, sort: str = "") -> list[RemoteFile]:
     """Jeux de la bibliothèque filtrés par genre, console et nombre de joueurs (sans Typesense), un par titre.
     À plusieurs : sur la même console (deux manettes), sauf si seules des consoles portables sont demandées (câble
     link). Seuls les jeux dont le nombre de joueurs est connu sont retenus."""
@@ -324,9 +341,48 @@ def find_by_filters(s: Session, genre: str, dirs: list[str], players: int = 0) -
         only_handhelds = bool(dirs) and all(canonical(d) in LINK_DIRS for d in dirs)
         q = q.where(RemoteFile.players >= players,
                     RemoteFile.platform_id.in_(link_ids) if only_handhelds else RemoteFile.platform_id.not_in(link_ids))
+    if sort:
+        q = q.order_by(*SORT_ORDER[sort])
+    elif players >= 2:
         q = q.order_by(RemoteFile.release_year.is_(None), func.random())  # varié d'une question à l'autre
-        return list(s.scalars(q.limit(LIBRARY_GAMES * 3)))
-    return list(s.scalars(q.order_by(RemoteFile.normalized_title).limit(LIBRARY_GAMES * 3)))
+    else:
+        q = q.order_by(RemoteFile.normalized_title)
+    return list(s.scalars(q.limit(LIBRARY_GAMES * 3)))
+
+
+def theme_games(s: Session, titles: list[str], keys: list[str], dirs: list[str]) -> list[RemoteFile]:
+    """Jeux d'un thème (« western ») : d'abord les titres que le modèle connaît pour ce thème, présents dans la
+    bibliothèque (titre normalisé exact, pas de recherche floue : un titre absent ne doit rien ramener d'autre), puis
+    ceux dont la présentation parle du thème (`keys` : « plateforme:titre normalisé », du plus sûr au moins sûr)."""
+    base = select(RemoteFile).options(joinedload(RemoteFile.platform)).where(
+        RemoteFile.role == "candidate", RemoteFile.deleted_at.is_(None))
+    if dirs:
+        from app.db.models import Platform
+        base = base.join(Platform).where(Platform.directory.in_(dirs))
+    out: list[RemoteFile] = []
+    names = [n for n in (kn.norm(t) for t in titles[:THEME_TITLES]) if len(n) >= 3]
+    for n in names:
+        out += list(s.scalars(base.where(RemoteFile.normalized_title == n).limit(2)))
+    for key in keys:
+        pid, _, title = key.partition(":")
+        if pid.isdigit() and title:
+            out += list(s.scalars(base.where(RemoteFile.platform_id == int(pid),
+                                             RemoteFile.normalized_title == title).limit(1)))
+    return out
+
+
+def sort_games(files: list[RemoteFile], sort: str) -> list[RemoteFile]:
+    """« newest » / « oldest » : par année de sortie (années inconnues à la fin) ; « added » : derniers ajoutés."""
+    if sort in ("newest", "oldest"):
+        known = sorted((f for f in files if f.release_year), key=lambda f: f.release_year, reverse=sort == "newest")
+        return known + [f for f in files if not f.release_year]
+    if sort == "added":
+        return sorted(files, key=lambda f: f.first_seen_at.timestamp() if f.first_seen_at else 0, reverse=True)
+    return files
+
+
+SORT_LABELS = {"newest": "sorted by release year, newest first", "oldest": "sorted by release year, oldest first",
+               "added": "most recently added to the library first"}
 
 
 def players_text(f: RemoteFile) -> str | None:

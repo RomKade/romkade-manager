@@ -35,6 +35,7 @@ CONTAINER = "agm-typesense"
 PORT = 8118
 COLLECTION = "games"
 KNOWLEDGE = "knowledge"
+THEME_POSITIONS = 3  # passages d'un article retenus pour un thème : introduction et présentation du jeu
 KNOWLEDGE_SETTLE = 15  # secondes sans changement avant de reconstruire l'index des connaissances
 KNOWLEDGE_SCHEMA = {
     "fields": [
@@ -412,6 +413,20 @@ class SearchService:
         if r.status_code != 200:
             raise RuntimeError(f"recherche Typesense : {r.status_code} {r.text[:200]}")
         return [int(h["document"]["id"]) for h in r.json().get("hits", [])]
+
+    async def search_knowledge_games(self, phrase: str, limit: int = 20) -> list[str]:
+        """Jeux (« plateforme:titre normalisé ») dont la présentation parle d'un thème (« wild west »), pour les thèmes
+        qui ne sont pas des genres du catalogue. Seuls les premiers passages des encyclopédies comptent (introduction,
+        présentation du jeu) : plus loin, « western » est le côté ouest d'un château ou la version occidentale."""
+        params = {"q": f'"{phrase.replace(chr(34), "")}"', "query_by": "text", "group_by": "game", "group_limit": "1",
+                  "filter_by": f"source:=[wikipedia,segaretro] && position:<={THEME_POSITIONS}",
+                  "per_page": str(limit), "prefix": "false", "num_typos": "0", "drop_tokens_threshold": "0",
+                  "include_fields": "game", "highlight_fields": "none"}
+        async with self._http() as http:
+            r = await http.get(f"/collections/{KNOWLEDGE}/documents/search", params=params)
+        if r.status_code != 200:
+            raise RuntimeError(f"recherche Typesense : {r.status_code} {r.text[:200]}")
+        return [g["group_key"][0] for g in r.json().get("grouped_hits", []) if g.get("group_key")]
 
     # ---------- recherche ----------
 
