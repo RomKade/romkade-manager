@@ -5,7 +5,9 @@ mcp.romkade.com {
   request_body {
     max_size 16MB
   }
-  reverse_proxy romkade-cloud:8787 {
+  # Par APISIX (limites de débit, routes romkade-mcp et romkade-agent ; ~/app/gateway/README.md sur la droplet),
+  # qui transmet à romkade-cloud:8787.
+  reverse_proxy apisix:9080 {
     flush_interval -1
   }
 }

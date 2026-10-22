@@ -1,6 +1,6 @@
 #!/bin/sh
 # Déploie ROMKADE Cloud sur la droplet (hôte SSH « do-deployer ») : sources, image, conteneur.
-# La route Caddy (caddy.snippet) s'ajoute une fois, à la main ou avec l'aide de Claude (voir README).
+# La route Caddy (caddy.site, vers APISIX) s'ajoute une fois, à la main ou avec l'aide de Claude (voir README).
 set -e
 cd "$(dirname "$0")/../.."
 DEST=app/romkade-cloud
