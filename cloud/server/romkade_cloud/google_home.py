@@ -1,0 +1,278 @@
+"""Google Home : « Hey Google, ouvre Zelda sur la RG35XX ». © 2026 ROMKADE, tous droits réservés.
+
+Intégration « cloud-to-cloud » de Google Home (developers.home.google.com/cloud-to-cloud) : chaque console reliée
+au compte ROMKADE devient un appareil de type console de jeux (GAME_CONSOLE) dans l'app Google Home. Ses jeux sont
+les « applications » de l'appareil (trait AppSelector) : les favoris d'abord, puis complétés ; un nom prononcé qui
+n'est pas dans la liste est cherché dans tout le catalogue. On/Off et Stop quittent le jeu, Volume règle le son.
+Les ordres passent par le même relais que ChatGPT et Claude (relay.py) jusqu'à l'app ROMKADE de la console.
+
+Connexion du compte (« account linking » OAuth de Google) : Google ne fait pas de PKCE, que Supabase exige. Le
+serveur sert donc de petit relais d'autorisation : /google/authorize renvoie vers Supabase (avec PKCE, page de
+connexion et de consentement de romkade.com/authentification), /google/callback rend à Google un code à usage
+unique, /google/token l'échange auprès de Supabase. Les jetons d'accès sont ceux de Supabase, vérifiés comme pour
+le MCP. Google présente l'identifiant et le secret de ROMKADE (ROMKADE_GOOGLE_CLIENT_ID / _SECRET) ; côté Supabase,
+le relais est un client public (ROMKADE_GOOGLE_SUPABASE_CLIENT_ID, redirection vers /google/callback).
+"""
+
+import asyncio
+import base64
+import hashlib
+import hmac
+import logging
+import secrets
+import time
+from urllib.parse import parse_qsl, urlencode
+
+import httpx
+from starlette.requests import Request
+from starlette.responses import JSONResponse, RedirectResponse, Response
+
+from app.services.classify import normalize_title
+
+from .auth import SupabaseAuth, account_id
+from .relay import CommandFailed, CommandTimeout, ConsoleOffline, Relay
+from .store import Console, Store
+
+log = logging.getLogger(__name__)
+
+GOOGLE_REDIRECTS = ("https://oauth-redirect.googleusercontent.com/r/",
+                    "https://oauth-redirect-sandbox.googleusercontent.com/r/")
+CODE_TTL = 600            # secondes : connexion en cours, puis code rendu à Google
+MAX_APPS = 120            # jeux déclarés par console (favoris d'abord)
+TRAITS = ["action.devices.traits.AppSelector", "action.devices.traits.MediaState", "action.devices.traits.OnOff",
+          "action.devices.traits.TransportControl", "action.devices.traits.Volume"]
+LANGS = ("fr", "en", "es", "de", "it")
+
+
+def _b64(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def synonyms(title: str) -> list[str]:
+    """Façons de dire un jeu : « Legend of Zelda, The » -> « The Legend of Zelda », « Legend of Zelda », « Zelda » ;
+    sans sous-titre (« Sonic The Hedgehog 2 - … ») ; le premier nom est celui que Google répète."""
+    base = title
+    for article in (", The", ", A", ", An"):
+        if base.endswith(article):
+            base = f"{article[2:]} {base[:-len(article)]}"
+    names = [base]
+    short = base.split(" ", 1)[1] if base.lower().startswith(("the ", "a ", "an ")) else base
+    for sep in (" - ", ": "):
+        short = short.split(sep)[0]
+    names.append(short.strip())
+    if short.lower().startswith("legend of "):
+        names.append(short[10:].strip())
+    return list(dict.fromkeys(n for n in names if n))
+
+
+class GoogleHome:
+    def __init__(self, store: Store, relay: Relay, auth: SupabaseAuth | None, public_url: str, client_id: str,
+                 client_secret: str, supabase_client_id: str, transport: httpx.AsyncBaseTransport | None = None):
+        self.store, self.relay, self.auth, self.public_url = store, relay, auth, public_url.rstrip("/")
+        self.client_id, self.client_secret, self.supabase_client_id = client_id, client_secret, supabase_client_id
+        self.transport = transport
+        self.pending: dict[str, dict] = {}   # état de la connexion en cours (Supabase) -> retour vers Google
+        self.codes: dict[str, dict] = {}     # code rendu à Google -> code Supabase + vérificateur PKCE
+
+    @property
+    def ready(self) -> bool:
+        return bool(self.auth and self.client_id and self.client_secret and self.supabase_client_id)
+
+    @property
+    def callback(self) -> str:
+        return f"{self.public_url}/google/callback"
+
+    def _expire(self) -> None:
+        now = time.time()
+        for table in (self.pending, self.codes):
+            for k in [k for k, v in table.items() if now - v["at"] > CODE_TTL]:
+                del table[k]
+
+    # ---------- connexion du compte (OAuth) ----------
+    async def authorize(self, request: Request) -> Response:
+        if not self.ready:
+            return JSONResponse({"error": "google_home_disabled"}, 503)
+        q = request.query_params
+        redirect = q.get("redirect_uri", "")
+        if q.get("client_id") != self.client_id or not redirect.startswith(GOOGLE_REDIRECTS):
+            return JSONResponse({"error": "invalid_client"}, 400)
+        self._expire()
+        verifier = secrets.token_urlsafe(48)
+        state = secrets.token_urlsafe(24)
+        self.pending[state] = {"redirect": redirect, "state": q.get("state", ""), "verifier": verifier, "at": time.time()}
+        params = {"response_type": "code", "client_id": self.supabase_client_id, "redirect_uri": self.callback,
+                  "state": state, "code_challenge": _b64(hashlib.sha256(verifier.encode()).digest()),
+                  "code_challenge_method": "S256"}
+        return RedirectResponse(f"{self.auth.issuer}/oauth/authorize?{urlencode(params)}", 302)
+
+    async def oauth_callback(self, request: Request) -> Response:
+        q = request.query_params
+        p = self.pending.pop(q.get("state", ""), None)
+        if p is None or time.time() - p["at"] > CODE_TTL:
+            return JSONResponse({"error": "expired", "error_description": "Connexion expirée : recommence depuis Google Home."}, 400)
+        if not q.get("code"):
+            return RedirectResponse(f"{p['redirect']}?{urlencode({'error': 'access_denied', 'state': p['state']})}", 302)
+        code = secrets.token_urlsafe(32)
+        self.codes[code] = {"code": q["code"], "verifier": p["verifier"], "at": time.time()}
+        return RedirectResponse(f"{p['redirect']}?{urlencode({'code': code, 'state': p['state']})}", 302)
+
+    def _client_ok(self, request: Request, form) -> bool:
+        cid, secret = form.get("client_id", ""), form.get("client_secret", "")
+        header = request.headers.get("authorization", "")
+        if header.lower().startswith("basic "):
+            try:
+                cid, _, secret = base64.b64decode(header[6:]).decode().partition(":")
+            except ValueError:
+                return False
+        return hmac.compare_digest(cid, self.client_id) and hmac.compare_digest(secret, self.client_secret)
+
+    async def token(self, request: Request) -> Response:
+        if not self.ready:
+            return JSONResponse({"error": "google_home_disabled"}, 503)
+        form = dict(parse_qsl((await request.body()).decode("utf-8", "replace")))  # formulaire OAuth (urlencoded)
+        if not self._client_ok(request, form):
+            return JSONResponse({"error": "invalid_client"}, 401)
+        grant = form.get("grant_type")
+        if grant == "authorization_code":
+            c = self.codes.pop(form.get("code", ""), None)
+            if c is None or time.time() - c["at"] > CODE_TTL:
+                return JSONResponse({"error": "invalid_grant"}, 400)
+            body = {"grant_type": "authorization_code", "code": c["code"], "redirect_uri": self.callback,
+                    "client_id": self.supabase_client_id, "code_verifier": c["verifier"]}
+        elif grant == "refresh_token":
+            body = {"grant_type": "refresh_token", "refresh_token": form.get("refresh_token", ""),
+                    "client_id": self.supabase_client_id}
+        else:
+            return JSONResponse({"error": "unsupported_grant_type"}, 400)
+        try:
+            async with httpx.AsyncClient(timeout=15, transport=self.transport) as http:
+                r = await http.post(f"{self.auth.issuer}/oauth/token", data=body,
+                                    headers={"apikey": self.auth.publishable_key} if self.auth.publishable_key else {})
+        except httpx.HTTPError:
+            return JSONResponse({"error": "temporarily_unavailable"}, 503)
+        if r.status_code >= 400:
+            log.info("Google Home : échange de jeton refusé par Supabase (%s) %s", r.status_code, r.text[:200])
+            return JSONResponse({"error": "invalid_grant"}, 400)
+        t = r.json()
+        out = {"token_type": "Bearer", "access_token": t["access_token"], "expires_in": t.get("expires_in", 3600)}
+        if t.get("refresh_token"):
+            out["refresh_token"] = t["refresh_token"]
+        return JSONResponse(out)
+
+    # ---------- appareils et commandes ----------
+    def apps(self, c: Console) -> list[dict]:
+        rows, _ = self.store.favorites(c.id, MAX_APPS)
+        if len(rows) < MAX_APPS:
+            more, _ = self.store.search([c.id], [], None, MAX_APPS)
+            seen = {r["id"] for r in rows}
+            rows = [*rows, *[r for r in more if r["id"] not in seen]][:MAX_APPS]
+        return [{"key": f"g{r['id']}", "names": [{"lang": lang, "name_synonym": synonyms(r["title"])} for lang in LANGS]}
+                for r in rows]
+
+    def device(self, c: Console) -> dict:
+        info = c.info
+        return {
+            "id": c.id, "type": "action.devices.types.GAME_CONSOLE", "traits": TRAITS,
+            "name": {"name": c.label, "defaultNames": ["Console ROMKADE"], "nicknames": [c.label, "console"]},
+            "willReportState": False,
+            "deviceInfo": {"manufacturer": "ROMKADE", "model": info.get("model") or "console",
+                           "swVersion": str(info.get("agent_version") or "")},
+            "attributes": {"availableApplications": self.apps(c), "transportControlSupportedCommands": ["STOP"],
+                           "supportActivityState": False, "supportPlaybackState": False,
+                           "volumeMaxLevel": 100, "volumeCanMuteAndUnmute": True, "levelStepSize": 10},
+        }
+
+    def _game(self, c: Console, params: dict):
+        key = str(params.get("newApplication") or "")
+        if key.startswith("g") and key[1:].isdigit():
+            row = self.store.game(int(key[1:]), c.account_id)
+            if row is not None and row["console_id"] == c.id:
+                return row
+        name = params.get("newApplicationName") or key
+        words = normalize_title(str(name)).split()
+        rows, _ = self.store.search([c.id], words, None, 1) if words else ([], 0)
+        return rows[0] if rows else None
+
+    async def _execute_one(self, c: Console, command: str, params: dict) -> dict:
+        name = command.rsplit(".", 1)[-1]
+        if name in ("appSelect", "appSearch", "appInstall"):
+            row = self._game(c, params)
+            if row is None:
+                return {"status": "ERROR", "errorCode": "noAvailableApp"}
+            await self.relay.call(c.id, "launch", {"platform_dir": row["platform_dir"],
+                                                   "relative_path": row["relative_path"], "slot": None}, 60)
+            return {"status": "SUCCESS", "states": {"online": True, "on": True, "currentApplication": f"g{row['id']}"}}
+        if name == "OnOff":
+            if not params.get("on"):
+                await self.relay.call(c.id, "quit", None, 45)
+            return {"status": "SUCCESS", "states": {"online": True, "on": bool(params.get("on"))}}
+        if name == "mediaStop":
+            await self.relay.call(c.id, "quit", None, 45)
+            return {"status": "SUCCESS", "states": {"online": True}}
+        if name in ("setVolume", "volumeRelative", "mute"):
+            if name == "mute":
+                p = {"percent": None, "muted": bool(params.get("mute"))}
+            elif name == "setVolume":
+                p = {"percent": max(0, min(100, int(params.get("volumeLevel", 50)))), "muted": False}
+            else:
+                st = await self.relay.call(c.id, "status", None, 20)
+                now = (st.get("volume") or {}).get("percent") or 50
+                p = {"percent": max(0, min(100, now + 10 * int(params.get("relativeSteps", 1)))), "muted": False}
+            await self.relay.call(c.id, "volume", p, 30)
+            states = {"online": True, "isMuted": bool(p["muted"])}
+            if p["percent"] is not None:
+                states["currentVolume"] = p["percent"]
+            return {"status": "SUCCESS", "states": states}
+        return {"status": "ERROR", "errorCode": "functionNotSupported"}
+
+    async def execute(self, c: Console, command: str, params: dict) -> dict:
+        try:
+            return await self._execute_one(c, command, params)
+        except ConsoleOffline:
+            return {"status": "OFFLINE", "errorCode": "deviceOffline"}
+        except CommandTimeout:
+            return {"status": "ERROR", "errorCode": "deviceTurnedOff"}
+        except CommandFailed as exc:
+            log.info("Google Home : %s refusé par la console : %s", command, exc.message)
+            return {"status": "ERROR", "errorCode": "appLaunchFailed" if "app" in command.lower() else "hardError"}
+
+    async def fulfillment(self, request: Request) -> Response:
+        header = request.headers.get("authorization", "")
+        claims = (await asyncio.to_thread(self.auth.verify, header[7:].strip())
+                  if self.auth and header.lower().startswith("bearer ") else None)
+        if claims is None:
+            return JSONResponse({"error": "invalid_token"}, 401)
+        account = self.store.ensure_account(account_id(claims), claims.get("email"))
+        body = await request.json()
+        request_id = body.get("requestId", "")
+        mine = {c.id: c for c in self.store.consoles_of(account)}
+        for item in body.get("inputs", []):
+            intent = item.get("intent")
+            payload = item.get("payload") or {}
+            if intent == "action.devices.SYNC":
+                return JSONResponse({"requestId": request_id, "payload": {
+                    "agentUserId": account, "devices": [self.device(c) for c in mine.values()]}})
+            if intent == "action.devices.QUERY":
+                devices = {}
+                for d in payload.get("devices", []):
+                    c = mine.get(d.get("id"))
+                    if c is None:
+                        devices[d.get("id")] = {"status": "ERROR", "errorCode": "deviceNotFound"}
+                        continue
+                    online = self.relay.online(c.id)
+                    devices[c.id] = {"status": "SUCCESS", "online": online, "on": online, "isMuted": False,
+                                     "currentApplication": ""}
+                return JSONResponse({"requestId": request_id, "payload": {"devices": devices}})
+            if intent == "action.devices.EXECUTE":
+                results = []
+                for cmd in payload.get("commands", []):
+                    for d in cmd.get("devices", []):
+                        c = mine.get(d.get("id"))
+                        for ex in cmd.get("execution", []):
+                            r = (await self.execute(c, ex.get("command", ""), ex.get("params") or {}) if c
+                                 else {"status": "ERROR", "errorCode": "deviceNotFound"})
+                            results.append({"ids": [d.get("id")], **r})
+                return JSONResponse({"requestId": request_id, "payload": {"commands": results}})
+            if intent == "action.devices.DISCONNECT":
+                return JSONResponse({})
+        return JSONResponse({"requestId": request_id, "payload": {"errorCode": "notSupported"}}, 400)

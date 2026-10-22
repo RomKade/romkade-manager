@@ -43,6 +43,7 @@ from . import catalog
 from .analytics import Analytics
 from .art import Art
 from .auth import SupabaseAuth, account_id
+from .google_home import GoogleHome
 from .relay import Relay
 from .store import MAX_CONSOLES, Store
 from .tools import build
@@ -121,6 +122,10 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     if auth is None and supabase_url:
         auth = SupabaseAuth(supabase_url, publishable_key)
     mcp = build(store, relay, public_url)
+    # Google Home (google_home.py) : identifiants donnés à Google et client public Supabase du relais d'autorisation.
+    google = GoogleHome(store, relay, auth, public_url, os.environ.get("ROMKADE_GOOGLE_CLIENT_ID", ""),
+                        os.environ.get("ROMKADE_GOOGLE_CLIENT_SECRET", ""),
+                        os.environ.get("ROMKADE_GOOGLE_SUPABASE_CLIENT_ID", ""))
     analytics = Analytics(mcp)  # statistiques d'usage, sans le contenu des appels (analytics.py)
     art = Art(store)
 
@@ -364,6 +369,10 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/agent/result", result, methods=["POST"]),
         Route("/art/{key}.webp", cover),
         Route("/healthz", health),
+        Route("/google/authorize", google.authorize, methods=["GET"]),
+        Route("/google/callback", google.oauth_callback, methods=["GET"]),
+        Route("/google/token", google.token, methods=["POST"]),
+        Route("/google/fulfillment", google.fulfillment, methods=["POST"]),
         Route("/.well-known/oauth-protected-resource", protected_resource),
         Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
         Route("/.well-known/oauth-authorization-server", authorization_server),
@@ -392,7 +401,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
             await analytics.close()
 
     app.router.lifespan_context = lifespan
-    app.state.store, app.state.relay = store, relay
+    app.state.store, app.state.relay, app.state.google = store, relay, google
     return AccountPath(CrossOrigin(app), store, auth, public_url)
 
 
