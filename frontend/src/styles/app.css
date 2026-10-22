@@ -1556,3 +1556,18 @@ kbd {
 /* Bulle de Duke repliée : seulement sa barre de titre */
 .assistant__panel.is-collapsed { height: auto; }
 .assistant__panel.is-collapsed .assistant__head { border-bottom: 0; cursor: pointer; }
+
+/* Visage de Duke (pixel art) : dans le bouton, l'en-tête de la bulle et pendant qu'il réfléchit */
+.duke-avatar { display: block; image-rendering: pixelated; flex: none; }
+.assistant__face { display: inline-grid; place-items: center; width: 34px; height: 34px; margin: -6px 2px -6px -8px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--accent) 28%, var(--panel)), var(--panel) 75%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); overflow: hidden; }
+.assistant__face--small { width: 26px; height: 26px; margin: -4px 0; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent); }
+.assistant__typing { display: inline-flex; align-items: center; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) {
+  .assistant__fab:hover .duke-avatar { animation: duke-nod 420ms steps(2) 1; }
+  .duke-avatar.is-thinking { animation: duke-nod 900ms steps(2) infinite; }
+}
+@keyframes duke-nod { 50% { transform: translateY(-1px) rotate(-4deg); } }
+.llm__persona { display: flex; align-items: center; gap: 14px; }
+.llm__persona .assistant__face { width: 64px; height: 64px; margin: 0; }

@@ -10,6 +10,7 @@ import { REPO_URL } from "../lib/credits";
 import { getLang, useT } from "../i18n";
 import { assistant, useAssistant } from "../lib/assistant";
 import { DEFAULT_ASSISTANT_NAME, isValidName } from "../lib/assistantNames";
+import { DukeAvatar } from "./DukeAvatar";
 import { SecretInput } from "./SecretInput";
 import { StepCards } from "./StepCards";
 import { ErrorNotice, Spinner } from "./ui";
@@ -204,6 +205,10 @@ function NameAndDisplay() {
   return (
     <section className="block llm" aria-labelledby="ai-name">
       <h2 id="ai-name">{t("settings.as.nameSection")}</h2>
+      <div className="llm__persona">
+        <span className="assistant__face"><DukeAvatar size={44} /></span>
+        <p className="muted small">{t("settings.as.faceHint", { name })}</p>
+      </div>
       <form className="names__other" onSubmit={(e) => { e.preventDefault(); if (valid) assistant.setName(value); }}>
         <label className="field">
           <span className="field__label">{t("settings.as.nameTitle")}</span>

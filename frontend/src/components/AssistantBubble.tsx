@@ -1,4 +1,4 @@
-import { Bot, ChevronDown, ChevronUp, ExternalLink, Gamepad2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, Gamepad2, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import { useDeviceStatus, useLlmSettings, useNowPlaying } from "../api/queries";
 import { getLang, useT } from "../i18n";
 import { type ActionState, askAssistant, assistant, type AssistantGame, type ChatMessage, type ConsoleAction, type Scope, useAssistant } from "../lib/assistant";
 import { AssistantAction } from "./AssistantAction";
+import { DukeAvatar } from "./DukeAvatar";
 
 const MAX_QUESTION = 500;
 const MAX_USER_TURNS = 20;
@@ -35,7 +36,7 @@ export function AssistantBubble({ placement, onOpenGame }: { placement: "page" |
           onOpenGame={onOpenGame} />
       ) : (
         <button type="button" className="assistant__fab" title={t("assistant.subtitle")} onClick={() => assistant.setOpen(true)}>
-          <Bot size={18} aria-hidden /> {st.name}
+          <span className="assistant__face"><DukeAvatar size={26} /></span> {st.name}
         </button>
       )}
     </div>
@@ -127,7 +128,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
     <section className={`assistant__panel ${st.collapsed ? "is-collapsed" : ""}`} aria-label={st.name}>
       <header className="assistant__head" onClick={st.collapsed ? () => assistant.setCollapsed(false) : undefined}>
         <span className="assistant__title">
-          <Bot size={16} aria-hidden /> {st.name}
+          <span className="assistant__face assistant__face--small"><DukeAvatar size={20} /></span> {st.name}
           <small className="assistant__subtitle">{t("assistant.subtitle")}</small>
         </span>
         <div className="assistant__scope" role="group" aria-label={t("assistant.scope")}>
@@ -243,7 +244,7 @@ function Message({ m, game, onOpenGame, onSettle }: {
   if (m.role === "error") return <li className="assistant__msg assistant__msg--error" role="alert">{m.message}</li>;
   return (
     <li className="assistant__msg assistant__msg--bot" aria-busy={m.pending}>
-      {m.content || (m.pending && !m.action && <span className="assistant__typing">{t("assistant.thinking", { name })}</span>)}
+      {m.content || (m.pending && !m.action && <span className="assistant__typing"><DukeAvatar size={16} className="is-thinking" /> {t("assistant.thinking", { name })}</span>)}
       {m.action && <AssistantAction action={m.action} state={m.actionState} note={m.actionNote} onSettle={onSettle} />}
       {(m.games ?? []).length > 0 && !game && !m.action && (
         <span className="assistant__games">
