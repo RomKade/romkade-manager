@@ -17,8 +17,9 @@ import urllib.request
 from pathlib import Path
 
 PROJECT = "urpvxqtyscuomkusqsiu"
-SITE = "https://mcp.romkade.com"
-LOGO = f"{SITE}/romkade-logo.png"
+SITE = "https://romkade.com"                      # page de connexion : romkade.com/authentification/
+MCP = "https://mcp.romkade.com"                    # serveur MCP (logo des e-mails servi par lui)
+LOGO = f"{MCP}/romkade-logo.png"
 HERE = Path(__file__).resolve().parent
 
 
@@ -119,10 +120,10 @@ EMAILS = {
 def config(e: dict) -> dict:
     cfg = {
         "site_url": SITE,
-        "uri_allow_list": f"{SITE}/**,http://127.0.0.1:8765/**,http://localhost:8765/**",
+        "uri_allow_list": f"{SITE}/**,{MCP}/**,http://127.0.0.1:8765/**,http://localhost:8765/**",
         "oauth_server_enabled": True,
         "oauth_server_allow_dynamic_registration": True,
-        "oauth_server_authorization_path": "/oauth/consent",
+        "oauth_server_authorization_path": "/authentification/",
         "smtp_host": "in-v3.mailjet.com", "smtp_port": "587",
         "smtp_user": e["MAILJET_API_KEY"], "smtp_pass": e["MAILJET_SECRET_KEY"],
         "smtp_admin_email": "noreply@romkade.com", "smtp_sender_name": "ROMKADE",

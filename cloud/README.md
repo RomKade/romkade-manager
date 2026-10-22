@@ -60,9 +60,10 @@ fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, s
 
 - Supabase Auth (projet `urpvxqtyscuomkusqsiu`, Paris) est le **serveur OAuth 2.1** : ChatGPT, Claude… découvrent
   l'authentification par `https://mcp.romkade.com/.well-known/oauth-protected-resource`, s'inscrivent seuls comme
-  clients (DCR) et envoient l'utilisateur sur **`/oauth/consent`** (`ui/consent.html`) : connexion, création du
-  compte avec code de vérification renvoyable, mot de passe oublié, double authentification (application), puis
-  « Autoriser ». Le serveur MCP vérifie le jeton (ES256, clés publiques JWKS, `auth.py`) : compte `sb:<id>`.
+  clients (DCR) et envoient l'utilisateur sur **`https://romkade.com/authentification/`** (page statique du site,
+  dépôt romkade-website, `src/pages/authentification.astro`) : connexion, création du compte avec code de
+  vérification renvoyable, mot de passe oublié, double authentification (application), puis « Autoriser ».
+  La page parle directement à Supabase depuis le navigateur ; `mcp.romkade.com/oauth/consent` y redirige. Le serveur MCP vérifie le jeton (ES256, clés publiques JWKS, `auth.py`) : compte `sb:<id>`.
 - `deploy/supabase_setup.py` : configuration rejouable de Supabase Auth par l'API de gestion (OAuth, Mailjet,
   codes à 6 chiffres, règles de mot de passe, e-mails ROMKADE en français, anglais et espagnol). Secrets dans
   `deploy/.env` (jamais commité).

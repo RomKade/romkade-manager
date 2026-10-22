@@ -9,7 +9,7 @@
     /agent/catalog           l'agent envoie la liste des fichiers de son dossier de ROMs
     /agent/poll, /result     ordres pour la console et leurs résultats (voir relay.py)
     /.well-known/oauth-protected-resource   serveur d'autorisation de ce serveur MCP (Supabase Auth)
-    /oauth/consent           page ROMKADE de connexion et d'autorisation (ui/consent.html)
+    /oauth/consent           ancienne adresse de la page de connexion -> https://romkade.com/authentification/
     /icon.png, /romkade-logo.webp, /fonts/…, /consoles/…   logo, polices et illustrations de l'interface
     /art/<clé>.webp          jaquette d'un jeu (libretro-thumbnails, mise en cache)
 
@@ -46,6 +46,7 @@ from .tools import build
 
 log = logging.getLogger("romkade.cloud")
 STATIC = Path(__file__).parent / "static"
+LOGIN_PAGE = "https://romkade.com/authentification/"  # page de connexion ROMKADE (site romkade.com, OAuth Supabase)
 PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp", "romkade-logo.png"}  # .png : e-mails
 MAX_BODY = 8 * 1024 * 1024
 # Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée.
@@ -250,16 +251,10 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         return JSONResponse({k: v for k, v in authorization_metadata.items() if k != "_at"},
                             headers={"Cache-Control": "public, max-age=3600"})
 
-    consent_html = (STATIC.parent / "ui" / "consent.html").read_text()
-
-    async def consent(_: Request) -> Response:
-        if auth is None:
-            return JSONResponse({"error": "not_found"}, 404)
-        html = (consent_html.replace("__SUPABASE_URL__", auth.url)
-                .replace("__SUPABASE_KEY__", auth.publishable_key))
-        return Response(html, media_type="text/html; charset=utf-8",
-                        headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY",
-                                 "Referrer-Policy": "no-referrer"})
+    async def consent(request: Request) -> Response:
+        """Ancienne adresse de la page de connexion : elle est maintenant sur le site (romkade.com/authentification/)."""
+        query = f"?{request.url.query}" if request.url.query else ""
+        return Response(status_code=302, headers={"Location": f"{LOGIN_PAGE}{query}", "Cache-Control": "no-store"})
 
     async def home(_: Request) -> Response:
         return Response(status_code=302, headers={"Location": "https://romkade.com"})

@@ -283,9 +283,8 @@ def test_oauth_accounts(env):
                 assert (await h.post(f"{base}/", json={}, headers={"authorization": "Bearer faux"})).status_code == 401
                 meta = (await h.get(f"{base}/.well-known/oauth-protected-resource")).json()
                 assert meta["resource"] == base and meta["authorization_servers"] == [FakeAuth.issuer]
-                page = await h.get(f"{base}/oauth/consent?authorization_id=abc")
-                assert page.status_code == 200 and "sb_publishable_test" in page.text and "__SUPABASE" not in page.text
-                assert page.headers["x-frame-options"] == "DENY"
+                page = await h.get(f"{base}/oauth/consent?authorization_id=abc")  # page déplacée sur le site
+                assert page.headers["location"] == "https://romkade.com/authentification/?authorization_id=abc"
                 assert (await h.get(f"{base}/")).status_code == 302  # navigateur : vers romkade.com
             # Avec un jeton valide : compte « sb:u-123 » créé, sans console pour l'instant.
             transport = streamable_http_client(f"{base}/", http_client=httpx2.AsyncClient(
