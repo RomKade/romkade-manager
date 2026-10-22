@@ -28,8 +28,10 @@ CLOUD_URL = os.environ.get("ROMKADE_CLOUD_URL", "https://mcp.romkade.com").rstri
 SUPPORTED = {"anbernic-stock-mod"}
 AUTOSTART = "/mnt/mod/ctrl/autostart"
 MARK = "# ROMKADE"
-VENDOR = ("__init__.py", "errors.py")
-VENDOR_DEVICE = ("__init__.py", "launcher.py", "volume.py", "systems.py", "launch.sh", "onion_launch.sh",
+# Modules du Manager exécutés sur la console : tout ce qu'ils importent de app (même dans une fonction) doit y être,
+# sinon l'app ROMKADE échoue au premier appel (test_bundle_covers_every_app_import).
+VENDOR = ("__init__.py", "errors.py", "platforms.py")
+VENDOR_DEVICE = ("__init__.py", "launcher.py", "volume.py", "systems.py", "bluetooth.py", "launch.sh", "onion_launch.sh",
                  "players_apply.sh", "volume_keys.py")
 
 
