@@ -288,6 +288,13 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
                 return JSONResponse({"error": "bad_request"}, 400)
             info = {k: body.get(k) for k in AGENT_FIELDS if body.get(k) is not None}
             name = (str(body.get("name") or "").strip()[:40]) or None
+            # Agent déjà installé sur la console : on reprend la même console (catalogue gardé) si elle n'est à
+            # personne ou déjà à ce compte ; sinon (console d'un autre compte), nouvelle console.
+            existing = store.console_for_secret(str(body.get("secret") or "")) if body.get("secret") else None
+            if existing is not None and existing.account_id in (None, account):
+                store.claim(existing.id, account, name)
+                return JSONResponse({"console": console_json(store.console(existing.id)), "secret": body["secret"],
+                                     "server": public_url, "reused": True})
             c, secret = store.register_console_for(account, info, name)
             return JSONResponse({"console": console_json(c), "secret": secret, "server": public_url}, 201)
         return JSONResponse({"consoles": [console_json(c) for c in store.consoles_of(account)]})

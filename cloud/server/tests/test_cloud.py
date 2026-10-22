@@ -356,6 +356,8 @@ def test_account_api_for_the_manager(env):
                 linked = r.json()
                 assert linked["console"]["name"] == "Ma RG" and linked["secret"] and linked["server"] == base
                 assert store.console_for_secret(linked["secret"]).account_id == "sb:u-123"
+                again = (await h.post("/api/me/consoles", headers=ok, json={"secret": linked["secret"]})).json()
+                assert again["reused"] and again["console"]["id"] == linked["console"]["id"]  # pas de doublon
                 listed = (await h.get("/api/me/consoles", headers=ok)).json()["consoles"]
                 assert [c["name"] for c in listed] == ["Ma RG"]
                 cid = listed[0]["id"]

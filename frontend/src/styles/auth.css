@@ -217,3 +217,17 @@ a.account-chip__who:hover .account-chip__name { color: var(--accent); }
 .auth__digits--compact { grid-template-columns: repeat(6, 44px); gap: 8px; }
 .field .auth__digits--compact .auth__digit, .account .field .auth__digits--compact .auth__digit { width: 44px; min-height: 48px; height: 48px; font-size: 1.25rem; }
 @media (max-width: 560px) { .account__mfa { grid-template-columns: 1fr; } }
+
+/* Mon compte : champ et bouton côte à côte, même hauteur, largeur raisonnable */
+.account__inline { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.account__inline input { flex: 0 1 340px; min-width: 200px; }
+.account__inline .button { flex: none; }
+.account__narrow { max-width: 340px; }
+.account__danger-go { align-self: flex-start; margin-top: 16px; }
+.account__cloud { padding: 12px 14px; border-radius: var(--r-control); background: color-mix(in srgb, var(--accent) 6%, var(--panel-2));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line)); font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 8px; }
+.account__cloud p { margin: 0; }
+.account__cloud ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); }
+.account__cloud-head { color: var(--ink); }
+.account__badge { display: inline-block; padding: 1px 8px; margin-right: 4px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 800;
+  color: var(--accent-ink); background: var(--live); vertical-align: 1px; }

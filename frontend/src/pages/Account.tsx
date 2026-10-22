@@ -109,13 +109,13 @@ function Profile() {
   const a = useAction();
   return (
     <Block icon={<UserRound size={18} aria-hidden />} title={t("account.profile.title")}>
-      <form className="account__row" onSubmit={(e: FormEvent) => { e.preventDefault();
+      <form className="field" onSubmit={(e: FormEvent) => { e.preventDefault();
         a.run(async () => { const { error } = await supabase.auth.updateUser({ data: { name: name.trim() } }); fail(error); return t("account.saved"); }); }}>
-        <div className="field account__grow">
-          <label htmlFor="acc-name">{t("account.profile.name")}</label>
+        <label htmlFor="acc-name">{t("account.profile.name")}</label>
+        <div className="account__inline">
           <input id="acc-name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} required />
+          <button className="button button--primary" disabled={a.busy || !name.trim()}>{t("account.save")}</button>
         </div>
-        <button className="button button--primary" disabled={a.busy || !name.trim()}>{t("account.save")}</button>
       </form>
       <p className="field__hint">{t("account.profile.since", { date: date(session?.user.created_at) })}</p>
       <Result a={a} />
@@ -134,13 +134,13 @@ function EmailChange() {
     <Block icon={<Mail size={18} aria-hidden />} title={t("account.email.title")}>
       <p><span className="muted">{t("account.email.current")} : </span><strong>{session?.user.email}</strong></p>
       {!sent ? (
-        <form className="account__row" onSubmit={(e: FormEvent) => { e.preventDefault();
+        <form className="field" onSubmit={(e: FormEvent) => { e.preventDefault();
           a.run(async () => { const { error } = await supabase.auth.updateUser({ email: email.trim() }); fail(error); setSent(true); return t("account.email.sent", { email: email.trim() }); }); }}>
-          <div className="field account__grow">
-            <label htmlFor="acc-email">{t("account.email.new")}</label>
+          <label htmlFor="acc-email">{t("account.email.new")}</label>
+          <div className="account__inline">
             <input id="acc-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <button className="button" disabled={a.busy || !email.includes("@")}>{t("account.sendCode")}</button>
           </div>
-          <button className="button" disabled={a.busy || !email.includes("@")}>{t("account.sendCode")}</button>
         </form>
       ) : (
         <form onSubmit={(e: FormEvent) => { e.preventDefault();
@@ -262,6 +262,15 @@ function Consoles() {
   useEffect(() => { load(); }, [load, connected]);
   return (
     <Block icon={<Cloud size={18} aria-hidden />} title={t("account.consoles.title")} lead={t("account.consoles.lead")}>
+      <div className="account__cloud">
+        <p className="account__cloud-head"><span className="account__badge">{t("account.cloud.free")}</span> {t("account.cloud.what")}</p>
+        <ul>
+          <li>{t("account.cloud.ai")}</li>
+          <li>{t("account.cloud.anywhere")}</li>
+          <li>{t("account.cloud.soon")}</li>
+        </ul>
+        <p className="field__hint">{t("account.cloud.privacy")}</p>
+      </div>
       {list === null ? <span className="auth-spin" aria-hidden /> : list.length === 0 ? <p className="muted">{t("account.consoles.none")}</p> : (
         <ul className="account__list">
           {list.map((c) => (
@@ -287,15 +296,15 @@ function Consoles() {
         <p className="muted small">{t("account.link.lead")}</p>
         {!connected ? <p className="field__hint">{t("account.link.offline")}</p>
           : agent && !agent.supported ? <p className="field__hint">{t("account.link.unsupported")}</p> : (
-          <form className="account__row" onSubmit={(e: FormEvent) => { e.preventDefault();
+          <form className="field" onSubmit={(e: FormEvent) => { e.preventDefault();
             a.run(async () => { await localAgent.link(name.trim()); await load(); return t("account.link.done"); }); }}>
-            <div className="field account__grow">
-              <label htmlFor="acc-console-name">{t("account.link.name")}</label>
-              <input id="acc-console-name" value={name} maxLength={40} placeholder="Ma RG35XX" onChange={(e) => setName(e.target.value)} />
-            </div>
+            <label htmlFor="acc-console-name">{t("account.link.name")}</label>
+            <div className="account__inline">
+            <input id="acc-console-name" value={name} maxLength={40} placeholder="Ma RG35XX" onChange={(e) => setName(e.target.value)} />
             <button className="button button--primary" disabled={a.busy}>
               {a.busy ? <span className="auth-spin" aria-hidden /> : <Cloud size={16} aria-hidden />} {agent?.installed ? t("account.link.again") : t("account.link.go")}
             </button>
+            </div>
           </form>
         )}
         {agent?.installed && connected && (
@@ -366,9 +375,9 @@ function DeleteAccount() {
         a.run(async () => { await cloud.deleteAccount(); await supabase.auth.signOut(); }); }}>
         <div className="field">
           <label htmlFor="acc-delete">{t("account.danger.type")}</label>
-          <input id="acc-delete" type="email" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={email} autoComplete="off" />
+          <input id="acc-delete" className="account__narrow" type="email" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={email} autoComplete="off" />
         </div>
-        <button className="button button--danger account__actions" disabled={a.busy || typed.trim().toLowerCase() !== email.toLowerCase()}>
+        <button className="button button--danger account__danger-go" disabled={a.busy || typed.trim().toLowerCase() !== email.toLowerCase()}>
           {t("account.danger.go")}
         </button>
       </form>

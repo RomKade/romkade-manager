@@ -133,6 +133,12 @@ class Store:
             self._db.execute("UPDATE consoles SET account_id = ?, name = ? WHERE id = ?", (account_id, name, c.id))
         return self.console(c.id), secret
 
+    def claim(self, console_id: str, account_id: str, name: str | None = None) -> None:
+        """Rattache une console existante à un compte (code d'appairage effacé)."""
+        with self._lock, self._db:
+            self._db.execute("UPDATE consoles SET account_id = ?, name = COALESCE(?, name), pairing_code = NULL, "
+                             "pairing_expires = NULL WHERE id = ?", (account_id, name, console_id))
+
     def delete_account(self, account_id: str) -> int:
         """Supprime un compte, ses consoles et leurs catalogues. Renvoie le nombre de consoles supprimées."""
         with self._lock, self._db:
