@@ -603,7 +603,7 @@ describe("Paramètres : assistant et connaissances", () => {
     await waitFor(() => expect(calls).toContain("/api/knowledge/start?refresh=true"));
     knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null, stopping: false };
     await userEvent.click(await within(panel).findByRole("button", { name: /Récupérer pour le jeu restant/ }));
-    expect(await within(panel).findByText(/Récupération : 0 sur 1/)).toBeInTheDocument();
+    expect(await within(panel).findByText(/Récupération en cours : 0 sur 1/)).toBeInTheDocument();
 
     await userEvent.type(within(panel).getByRole("searchbox", { name: "Jeu" }), "mario");
     await userEvent.click(await within(panel).findByRole("button", { name: /Super Mario World/ }));

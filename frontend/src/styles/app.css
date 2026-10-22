@@ -1378,6 +1378,7 @@ kbd {
 @media (max-width: 760px) { .nav__external { display: none; } }
 
 /* Paramètres > Contenu IA > Connaissances */
+.knowledge__job { display: flex; flex-direction: column; gap: 8px; }
 .knowledge__test { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
 .knowledge__test h3 { font-size: var(--fs-md); }
 .knowledge__search { max-width: 420px; }
