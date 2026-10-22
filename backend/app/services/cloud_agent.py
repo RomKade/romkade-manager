@@ -57,7 +57,8 @@ def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
     src = agent_source()
     base = roms_root.rstrip("/").rsplit("/", 1)[0] + "/romkade"
     files: dict[str, tuple[bytes, int]] = {}
-    for name, mode in (("romkade_agent.py", 0o755), ("screen.py", 0o755), ("start.sh", 0o755), ("uninstall.sh", 0o755)):
+    for name, mode in (("romkade_agent.py", 0o755), ("screen.py", 0o755), ("splash.sh", 0o755), ("start.sh", 0o755),
+                       ("uninstall.sh", 0o755)):
         files[f"{base}/{name}"] = ((src / name).read_bytes(), mode)
     for asset in sorted((src / "assets").iterdir()):
         if asset.is_file() and asset.name != "apps-icon.png":
@@ -154,7 +155,8 @@ async def install(run, client, sftp, roms_root: str, server: str, secret: str, s
     from app.device.launcher import GAME_PROCESSES  # jeu en cours : on ne le recouvre pas
     _, out = await run(client, (
         f"for p in {' '.join(GAME_PROCESSES)}; do pidof $p >/dev/null 2>&1 && exit 0; done; "
-        f"cd {shlex.quote(base)} && (setsid python3 screen.py --splash {splash} 6 </dev/null >/tmp/romkade-splash.log 2>&1 &); "
+        # splash.sh ferme le menu le temps de l'écran (il s'affiche au-dessus de l'app), puis le laisse revenir.
+        f"(setsid bash {shlex.quote(base + '/splash.sh')} {splash} 6 </dev/null >/tmp/romkade-splash.log 2>&1 &); "
         "echo shown"), timeout=15)
     return "shown" in out
 

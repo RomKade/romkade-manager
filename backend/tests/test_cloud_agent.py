@@ -100,6 +100,6 @@ def test_install_writes_version_and_shows_splash_unless_a_game_runs():
 
     shown = asyncio.run(cloud_agent.install(run, None, sftp, "/mnt/mmc/Roms", "https://cloud", "s", splash="updated"))
     assert shown and sftp.files["/mnt/mmc/romkade/VERSION"].decode().strip() == cloud_agent.manager_version()
-    assert "for p in retroarch" in commands[-1] and "pidof $p" in commands[-1] and "screen.py --splash updated" in commands[-1]
+    assert "for p in retroarch" in commands[-1] and "pidof $p" in commands[-1] and "splash.sh updated 6" in commands[-1]
     # Sans écran demandé (ou pendant un jeu : la commande ne répond pas « shown »), rien ne s'affiche.
     assert not asyncio.run(cloud_agent.install(run, None, sftp, "/mnt/mmc/Roms", "https://cloud", "s"))
