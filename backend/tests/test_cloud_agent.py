@@ -39,3 +39,10 @@ def test_register_expired_session():
     with pytest.raises(errors.AppError) as exc:
         asyncio.run(cloud_agent.register("vieux", None, {}, None, transport=transport))
     assert exc.value.code == "cloud_unauthorized"
+
+
+def test_register_one_console_per_account():
+    transport = httpx.MockTransport(lambda r: httpx.Response(409, json={"error": "console_limit", "max": 1}))
+    with pytest.raises(errors.AppError) as exc:
+        asyncio.run(cloud_agent.register("jeton", None, {}, None, transport=transport))
+    assert exc.value.code == "cloud_console_limit" and exc.value.status == 409

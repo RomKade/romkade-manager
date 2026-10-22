@@ -43,7 +43,7 @@ from .analytics import Analytics
 from .art import Art
 from .auth import SupabaseAuth, account_id
 from .relay import Relay
-from .store import Store
+from .store import MAX_CONSOLES, Store
 from .tools import build
 
 log = logging.getLogger("romkade.cloud")
@@ -295,6 +295,8 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
                 store.claim(existing.id, account, name)
                 return JSONResponse({"console": console_json(store.console(existing.id)), "secret": body["secret"],
                                      "server": public_url, "reused": True})
+            if len(store.consoles_of(account)) >= MAX_CONSOLES:
+                return JSONResponse({"error": "console_limit", "max": MAX_CONSOLES}, 409)
             c, secret = store.register_console_for(account, info, name)
             return JSONResponse({"console": console_json(c), "secret": secret, "server": public_url}, 201)
         return JSONResponse({"consoles": [console_json(c) for c in store.consoles_of(account)]})

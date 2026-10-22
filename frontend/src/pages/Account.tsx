@@ -1,11 +1,12 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
-import { AppWindow, Cloud, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldAlert, ShieldCheck, UserRound } from "lucide-react";
+import { AppWindow, Cloud, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { NavLink, useParams } from "react-router-dom";
 
 import { useDeviceStatus } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { CodeInput, PasswordInput } from "../auth/AuthScreen";
+import { ACCOUNT_TABS, accountPath } from "../auth/accountTabs";
 import { cloud, localAgent, type CloudConsole } from "../auth/cloud";
 import { PasswordStrength, passwordValid } from "../auth/password";
 import { supabase } from "../auth/supabase";
@@ -17,25 +18,18 @@ import { locale, useT } from "../i18n";
  * authentification, applications connectées), sauf les consoles reliées et la suppression du compte (ROMKADE Cloud),
  * et la liaison de la console branchée (moteur local du Manager, qui installe l'agent ROMKADE).
  */
-const TABS = [
-  { slug: "", label: "account.tab.profile", icon: UserRound },
-  { slug: "securite", label: "account.tab.security", icon: ShieldCheck },
-  { slug: "consoles", label: "account.tab.consoles", icon: Cloud },
-  { slug: "applications", label: "account.tab.apps", icon: AppWindow },
-  { slug: "zone-dangereuse", label: "account.tab.danger", icon: ShieldAlert },
-] as const;
 
 export function AccountPage() {
   const t = useT();
   translate = t as typeof translate;
   const { tab = "" } = useParams();
-  const current = TABS.some((x) => x.slug === tab) ? tab : "";
+  const current = ACCOUNT_TABS.some((x) => x.slug === tab) ? tab : "";
   return (
     <div className="page account">
       <PageHeader title={t("account.title")} lead={t("account.lead")} />
       <nav className="subnav" aria-label={t("account.tab.label")}>
-        {TABS.map(({ slug, label, icon: Icon }) => (
-          <NavLink key={slug} to={slug ? `/compte/${slug}` : "/compte"} end
+        {ACCOUNT_TABS.map(({ slug, label, icon: Icon }) => (
+          <NavLink key={slug} to={accountPath(slug)} end
             className={() => `subnav__item ${current === slug ? "is-active" : ""} ${slug === "zone-dangereuse" ? "subnav__item--danger" : ""}`}
             aria-current={current === slug ? "page" : undefined}>
             <Icon size={16} aria-hidden /> {t(label)}
@@ -45,7 +39,7 @@ export function AccountPage() {
       <div className="account__tab">
         {current === "" && <><Profile /><EmailChange /></>}
         {current === "securite" && <><PasswordChange /><TwoFactor /><Sessions /></>}
-        {current === "consoles" && <Consoles />}
+        {current === "console" && <Consoles />}
         {current === "applications" && <ConnectedApps />}
         {current === "zone-dangereuse" && <DeleteAccount />}
       </div>
@@ -295,6 +289,7 @@ function Consoles() {
         <h3><MonitorSmartphone size={16} aria-hidden /> {t("account.link.title")}</h3>
         <p className="muted small">{t("account.link.lead")}</p>
         {!connected ? <p className="field__hint">{t("account.link.offline")}</p>
+          : list && list.length > 0 && !agent?.installed ? <p className="field__hint">{t("account.link.limit", { name: list[0]!.name })}</p>
           : agent && !agent.supported ? <p className="field__hint">{t("account.link.unsupported")}</p> : (
           <form className="field" onSubmit={(e: FormEvent) => { e.preventDefault();
             a.run(async () => { await localAgent.link(name.trim()); await load(); return t("account.link.done"); }); }}>

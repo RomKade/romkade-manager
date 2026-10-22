@@ -28,7 +28,7 @@ from app.services.classify import normalize_title
 from app.services.genres import GENRES
 
 from .relay import CommandFailed, CommandTimeout, ConsoleOffline, Relay
-from .store import Console, Store
+from .store import MAX_CONSOLES, Console, Store
 
 UI = "ui://romkade/app.html"
 UI_FILE = Path(__file__).parent / "ui" / "app.html"
@@ -197,6 +197,9 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         recent = [t for t in pair_failures.get(account, []) if now - t < 3600]
         if len(recent) >= MAX_PAIR_FAILURES:
             raise UserError("Trop d'essais de code : réessaie dans une heure.")
+        if len(consoles(account)) >= MAX_CONSOLES:
+            raise UserError("Une seule console par compte pour l'instant : retire l'autre dans le Manager "
+                            "(Mon compte > Console) avant d'en relier une nouvelle.")
         c = store.pair(code, account, (name or "").strip()[:40] or None)
         if c is None:
             pair_failures[account] = [*recent, now]

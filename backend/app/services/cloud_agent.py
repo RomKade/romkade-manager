@@ -91,6 +91,9 @@ async def register(token: str, name: str | None, info: dict, secret: str | None,
         raise errors.AppError("cloud_unreachable", "ROMKADE Cloud est injoignable : vérifie la connexion Internet.", 502) from exc
     if r.status_code == 401:
         raise errors.AppError("cloud_unauthorized", "Session ROMKADE expirée : reconnecte-toi.", 401)
+    if r.status_code == 409:
+        raise errors.AppError("cloud_console_limit", "Une seule console par compte pour l'instant : retire celle déjà "
+                              "reliée avant de relier celle-ci.", 409)
     if r.status_code >= 400:
         raise errors.AppError("cloud_error", f"ROMKADE Cloud a refusé la liaison ({r.status_code}).", 502)
     return r.json()

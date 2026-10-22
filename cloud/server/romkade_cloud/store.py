@@ -17,6 +17,7 @@ from pathlib import Path
 PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # ni 0/O ni 1/I : lu sur un petit écran
 PAIRING_LENGTH = 6
 PAIRING_TTL = 15 * 60
+MAX_CONSOLES = 1  # consoles par compte, pour l'instant
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (

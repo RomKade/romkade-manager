@@ -1,5 +1,6 @@
-import { Bluetooth, BookOpen, Camera, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, LogOut, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
-import { Link, NavLink } from "react-router-dom";
+import { Bluetooth, BookOpen, Camera, ChevronDown, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, LogOut, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { isActive, useCaps, useDeviceStatus, useSettings, useStatus, useSystem, useTransfers } from "../api/queries";
 import { getLang, useT } from "../i18n";
@@ -11,6 +12,7 @@ import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
 import { docsUrl } from "../lib/credits";
 import { APP_VERSION } from "../version";
 import { GitHubStar } from "./GitHubStar";
+import { ACCOUNT_TABS, accountPath } from "../auth/accountTabs";
 import { useAuth } from "../auth/AuthContext";
 
 const NAV = [
@@ -136,19 +138,36 @@ function DeviceCard() {
 function AccountChip() {
   const t = useT();
   const { session, signOut } = useAuth();
+  const inAccount = useLocation().pathname.startsWith("/compte");
+  const [open, setOpen] = useState(inAccount);
+  useEffect(() => { if (inAccount) setOpen(true); }, [inAccount]);
   if (!session) return null;
   const meta = session.user.user_metadata as { name?: string } | undefined;
   const email = session.user.email ?? "";
   return (
-    <div className="account-chip" title={email}>
-      <span className="account-chip__avatar" aria-hidden>{(meta?.name || email || "?").slice(0, 1).toUpperCase()}</span>
-      <Link to="/compte" className="account-chip__who" title={t("account.open")}>
-        <span className="account-chip__name">{meta?.name || email}</span>
-        {meta?.name && <span className="account-chip__email">{email}</span>}
-      </Link>
-      <button type="button" className="account-chip__out" onClick={() => signOut()} aria-label={t("auth.signout")} title={t("auth.signout")}>
-        <LogOut size={16} aria-hidden />
-      </button>
+    <div className={`account-chip ${open ? "is-open" : ""}`}>
+      <div className="account-chip__row">
+        <span className="account-chip__avatar" aria-hidden>{(meta?.name || email || "?").slice(0, 1).toUpperCase()}</span>
+        <button type="button" className="account-chip__who" aria-expanded={open} aria-controls="account-menu"
+          onClick={() => setOpen((o) => !o)}>
+          <span className="account-chip__name">{meta?.name || email}</span>
+          <ChevronDown size={15} aria-hidden className="account-chip__chevron" />
+        </button>
+        <button type="button" className="account-chip__out" onClick={() => signOut()} aria-label={t("auth.signout")} title={t("auth.signout")}>
+          <LogOut size={16} aria-hidden />
+        </button>
+      </div>
+      {open && (
+        <ul id="account-menu" className="account-chip__menu" aria-label={t("account.open")}>
+          {ACCOUNT_TABS.map(({ slug, label, icon: Icon }) => (
+            <li key={slug}>
+              <NavLink to={accountPath(slug)} end className={({ isActive }) => `account-chip__item ${isActive ? "is-active" : ""} ${slug === "zone-dangereuse" ? "account-chip__item--danger" : ""}`}>
+                <Icon size={15} aria-hidden /> {t(label)}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
