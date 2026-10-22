@@ -1,4 +1,4 @@
-import { Bluetooth, BookOpen, Camera, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
+import { Bluetooth, BookOpen, Camera, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, LogOut, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 
 import { isActive, useCaps, useDeviceStatus, useSettings, useStatus, useSystem, useTransfers } from "../api/queries";
@@ -11,6 +11,7 @@ import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
 import { docsUrl } from "../lib/credits";
 import { APP_VERSION } from "../version";
 import { GitHubStar } from "./GitHubStar";
+import { useAuth } from "../auth/AuthContext";
 
 const NAV = [
   { to: "/", label: "common.nav.dashboard", icon: Gauge, end: true },
@@ -73,6 +74,7 @@ export function Sidebar() {
         </ul>
       </nav>
       <DeviceCard />
+      <AccountChip />
       <GitHubStar className="sidebar__github" />
       <p className="sidebar__meta">
         <Link to="/conditions">{t("legal.link")}</Link>
@@ -129,3 +131,24 @@ function DeviceCard() {
   );
 }
 
+
+/** Compte ROMKADE connecté (nom ou e-mail) et déconnexion. Rien hors de la barrière de connexion (tests). */
+function AccountChip() {
+  const t = useT();
+  const { session, signOut } = useAuth();
+  if (!session) return null;
+  const meta = session.user.user_metadata as { name?: string } | undefined;
+  const email = session.user.email ?? "";
+  return (
+    <div className="account-chip" title={email}>
+      <span className="account-chip__avatar" aria-hidden>{(meta?.name || email || "?").slice(0, 1).toUpperCase()}</span>
+      <span className="account-chip__who">
+        <span className="account-chip__name">{meta?.name || email}</span>
+        {meta?.name && <span className="account-chip__email">{email}</span>}
+      </span>
+      <button type="button" className="account-chip__out" onClick={() => signOut()} aria-label={t("auth.signout")} title={t("auth.signout")}>
+        <LogOut size={16} aria-hidden />
+      </button>
+    </div>
+  );
+}

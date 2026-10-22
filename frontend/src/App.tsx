@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { ApiError } from "./api/client";
+import { AuthGate } from "./auth/AuthContext";
 import { useStatus, useTransfersLive } from "./api/queries";
 import { AnalyticsNotice } from "./components/AnalyticsNotice";
 import { AssistantBubble } from "./components/AssistantBubble";
@@ -114,9 +115,12 @@ export function App() {
   const lang = useLang();
   return (
     <QueryClientProvider client={client}>
-      <BrowserRouter key={lang}>
-        <AppRoutes />
-      </BrowserRouter>
+      {/* Compte ROMKADE obligatoire : sans connexion, l'écran de connexion remplace tout le Manager. */}
+      <AuthGate>
+        <BrowserRouter key={lang}>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthGate>
     </QueryClientProvider>
   );
 }

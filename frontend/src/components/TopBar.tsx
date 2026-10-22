@@ -29,7 +29,7 @@ export function TopBar() {
 }
 
 /** Langue : bouton compact (drapeau + code) et petit menu déroulant. Sur téléphone, fixé en haut à droite. */
-function LanguageSwitcher() {
+export function LanguageSwitcher() {
   const t = useT();
   const lang = useLang();
   const [open, setOpen] = useState(false);

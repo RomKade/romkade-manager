@@ -2,6 +2,7 @@ import "@fontsource-variable/archivo/wdth.css";
 import "@fontsource-variable/atkinson-hyperlegible-next/wght.css";
 import "./styles/tokens.css";
 import "./styles/app.css";
+import "./styles/auth.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
