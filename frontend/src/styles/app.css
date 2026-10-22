@@ -408,6 +408,7 @@ button, input, select { font: inherit; color: inherit; }
 .hero__num--games { color: var(--accent); text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent); }
 .hero__num--consoles { color: var(--accent-2); text-shadow: 0 0 22px color-mix(in srgb, var(--accent-2) 45%, transparent); }
 .hero__sub { color: var(--ink-2); font-size: var(--fs-lg); max-width: 62ch; }
+.hero__hello { margin: 0; color: var(--accent); font-size: var(--fs-lg); font-weight: 700; }
 .hero__actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
 .dashboard__cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
 
