@@ -153,3 +153,22 @@
 /* Vérification anti-robot (Cloudflare Turnstile) */
 .auth__captcha { margin-top: 16px; min-height: 0; }
 .auth__captcha > div:empty { display: none; }
+
+/* Force du mot de passe (inscription, nouveau mot de passe) */
+.pw-strength { margin-top: 10px; }
+.pw-strength__bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pw-strength__bar span { height: 6px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); transition: background 220ms var(--ease), box-shadow 220ms var(--ease); }
+.pw-strength--weak .pw-strength__bar .is-on { background: var(--err); border-color: var(--err); box-shadow: 0 0 10px color-mix(in srgb, var(--err) 50%, transparent); }
+.pw-strength--medium .pw-strength__bar .is-on { background: var(--warn); border-color: var(--warn); box-shadow: 0 0 10px color-mix(in srgb, var(--warn) 50%, transparent); }
+.pw-strength--strong .pw-strength__bar .is-on { background: var(--live); border-color: var(--live); box-shadow: 0 0 10px color-mix(in srgb, var(--live) 55%, transparent); }
+.pw-strength__label { margin: 8px 0 0; font-size: var(--fs-xs); color: var(--ink-2); }
+.pw-strength--weak .pw-strength__label strong { color: var(--err); }
+.pw-strength--medium .pw-strength__label strong { color: var(--warn); }
+.pw-strength--strong .pw-strength__label strong { color: var(--live); }
+.pw-strength__rules { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.pw-strength__rules li { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--ink-3); transition: color 180ms; }
+.pw-strength__rules li svg { flex: none; color: var(--err); }
+.pw-strength__rules li.is-ok { color: var(--ink-2); }
+.pw-strength__rules li.is-ok svg { color: var(--live); }
+.pw-strength__rules .pw-strength__bonus { grid-column: 1 / -1; }
+.pw-strength__plus { width: 14px; text-align: center; font-weight: 800; color: var(--ink-3); }

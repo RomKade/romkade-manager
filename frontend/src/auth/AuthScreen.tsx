@@ -7,6 +7,7 @@ import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
 import { LanguageSwitcher } from "../components/TopBar";
 import { getLang, useT } from "../i18n";
 import { CaptchaBox, useCaptcha, type Captcha } from "./captcha";
+import { PasswordStrength, passwordValid } from "./password";
 import { PRIVACY_URL, supabase, TERMS_URL } from "./supabase";
 
 /**
@@ -209,8 +210,9 @@ function SignUp({ email, setEmail, go, onDone }: EmailProps & StepProps & { onDo
       <Field id="auth-email" label={t("auth.email")}>
         <input id="auth-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </Field>
-      <Field id="auth-password" label={t("auth.password")} hint={t("auth.rules")}>
+      <Field id="auth-password" label={t("auth.password")}>
         <PasswordInput id="auth-password" value={password} onChange={setPassword} autoComplete="new-password" />
+        <PasswordStrength password={password} />
       </Field>
       <label className="auth__check">
         <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
@@ -219,7 +221,7 @@ function SignUp({ email, setEmail, go, onDone }: EmailProps & StepProps & { onDo
       </label>
       <CaptchaBox captcha={captcha} offline={t("auth.captchaFail")} />
       <Notice error={s.error} />
-      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || !captcha.token}>
+      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || !captcha.token || !passwordValid(password)}>
         {s.busy ? <span className="auth-spin" aria-hidden /> : t("auth.signup.submit")}
       </button>
       <div className="auth__links">
@@ -310,12 +312,13 @@ function Reset({ email, go, onDone }: { email: string; onDone: () => void } & St
       <h1 id="auth-title" className="auth__title">{t("auth.reset.title")}</h1>
       <p className="auth__muted">{t("auth.verify.sub", { email })}</p>
       <CodeInput value={code} onChange={setCode} />
-      <Field id="auth-password" label={t("auth.newPassword")} hint={t("auth.rules")}>
+      <Field id="auth-password" label={t("auth.newPassword")}>
         <PasswordInput id="auth-password" value={password} onChange={setPassword} autoComplete="new-password" />
+        <PasswordStrength password={password} />
       </Field>
       <CaptchaBox captcha={captcha} offline={t("auth.captchaFail")} />
       <Notice error={s.error} />
-      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || code.length !== 6 || !captcha.token}>
+      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || code.length !== 6 || !captcha.token || !passwordValid(password)}>
         {s.busy ? <span className="auth-spin" aria-hidden /> : t("auth.reset.submit")}
       </button>
       <div className="auth__links">
