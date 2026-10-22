@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { PlayStats } from "../api/client";
-import { usePlayState, usePlayStats, useResetPlaytime } from "../api/queries";
+import { usePlayState, usePlayStats, useResetPlaytime, useStatus } from "../api/queries";
 import { ConsoleBadge } from "../components/ConsoleBadge";
 import { Cover } from "../components/Cover";
 import { Empty, ErrorNotice, PageHeader, Spinner } from "../components/ui";
@@ -44,6 +44,18 @@ export function PlaytimePage() {
   const s = stats.data;
   const st = state.data;
   const limit = st?.settings.alert_enabled ? st.settings.alert_minutes * 60 : null;
+  const status = useStatus();
+
+  // Bibliothèque jamais lue : les journaux de la console n'auraient ni jaquette ni fiche, on invite à synchroniser.
+  if (status.data && !status.data.synced) return (
+    <div className="page playtime">
+      <PageHeader title={t("playtime.title")} lead={t("playtime.lead")} />
+      <Empty title={t("dashboard.notSynced")}>
+        <p>{t("playtime.notSynced")}</p>
+        <Link to="/" className="button">{t("playtime.toSync")}</Link>
+      </Empty>
+    </div>
+  );
 
   return (
     <div className="page playtime">
