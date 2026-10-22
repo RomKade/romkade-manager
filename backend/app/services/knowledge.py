@@ -18,6 +18,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import quote
 
@@ -38,13 +39,16 @@ USER_AGENT = "ROMKADE-Manager/0.4 (https://romkade.com; game knowledge for a loc
 WIKIDATA = "https://www.wikidata.org/w/api.php"
 WIKIPEDIA = "https://{lang}.wikipedia.org/w/api.php"
 STRATEGYWIKI = "https://strategywiki.org/w/api.php"
+SEGARETRO = "https://segaretro.org/api.php"
 LICENSE = "CC BY-SA 4.0"
+# Licence de chaque source (Sega Retro : GNU FDL 1.2 ; les autres : CC BY-SA 4.0).
+SOURCE_LICENSE = {"wikipedia": LICENSE, "strategywiki": LICENSE, "segaretro": "GFDL 1.2"}
 LANGS = ("en", "fr", "es")
 VIDEO_GAME = "Q7889"
 PAUSE = 0.25           # entre deux requêtes : une à la fois, sans marteler les serveurs
 MAX_GUIDE_PAGES = 25   # sous-pages de soluce StrategyWiki par jeu
 CHUNK_WORDS = 400
-MIN_WORDS = 30
+MIN_WORDS = 12   # une section courte peut tout dire (« Continue mode » de Sega Retro)
 SETTINGS_FILE = "knowledge.json"
 
 # Sections sans intérêt pour jouer (sources, liens, notes), dans les trois langues.
@@ -53,7 +57,17 @@ SKIP_SECTIONS = {
     "sources", "footnotes", "notes et références", "références", "bibliographie", "liens externes", "voir aussi",
     "articles connexes", "notes et sources", "referencias", "enlaces externos", "véase también", "notas",
     "bibliografía", "awards", "distinctions", "premios", "galerie", "gallery",
+    # Sega Retro : fiches de collection, sans intérêt pour jouer
+    "production credits", "magazine articles", "physical scans", "promotional material", "artwork",
+    "digital manuals", "localised names", "technical information", "versions", "external links",
 }
+# Catégories Sega Retro des jeux de chaque console (« 1987 Master System games ») : page trouvée par son titre
+# quand Wikidata ne donne pas de lien, gardée seulement si elle est classée pour cette console.
+SEGARETRO_CATEGORY = {"SMS": "Master System games", "MD": "Mega Drive games", "GG": "Game Gear games",
+                      "SEGA32X": "32X games", "MDCD": "Mega-CD games", "SATURN": "Saturn games",
+                      "DREAMCAST": "Dreamcast games", "SG1000": "SG-1000 games"}
+# Sous-pages Sega Retro utiles pour jouer (« Jeu/Hidden content » : continues, niveaux cachés, codes).
+SEGARETRO_SUBPAGES = ("hidden content", "hints", "walkthrough", "achievements")
 # Sous-pages StrategyWiki les plus utiles d'abord (soluce, secrets, boss, objets…).
 # « controls » d'abord : la page des commandes sert aussi à rédiger celles de la fiche (services/controls.py).
 GUIDE_PRIORITY = ("controls", "walkthrough", "getting started", "gameplay", "basics", "secret", "boss", "tips", "strateg",
@@ -126,6 +140,90 @@ def title_score(ours: str, names: list[str]) -> float:
 
 
 # ---------- découpage ----------
+
+class _HtmlText(HTMLParser):
+    """HTML d'une page MediaWiki -> texte à titres « == Section == », tableaux et listes compris (le résumé
+    TextExtracts les perd, or les objets, ennemis et niveaux de Sega Retro sont en tableaux)."""
+    SKIP_TAGS = {"script", "style", "sup", "figure", "noscript"}
+    SKIP_CLASSES = {"mw-editsection", "toc", "navbox", "reference", "mw-references-wrap", "gallery", "thumb",
+                    "infobox", "noprint", "metadata", "references"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.lines: list[str] = []
+        self.buf: list[str] = []
+        self.skip = 0
+        self.stack: list[tuple[str, bool]] = []
+        self.heading: int | None = None
+        self.cells: list[str] | None = None
+
+    def _flush(self):
+        text = " ".join("".join(self.buf).split())
+        self.buf.clear()
+        if not text:
+            return
+        if self.heading:
+            self.lines.append(f"{'=' * self.heading} {text} {'=' * self.heading}")
+        elif self.cells is not None:
+            self.cells.append(text)
+        else:
+            self.lines.append(text)
+
+    def handle_starttag(self, tag, attrs):
+        classes = set((dict(attrs).get("class") or "").split())
+        skipping = tag in self.SKIP_TAGS or bool(classes & self.SKIP_CLASSES)
+        self.stack.append((tag, skipping))
+        if skipping:
+            self.skip += 1
+        if self.skip:
+            return
+        if tag == "img":  # boutons de manette en images (« appuie sur [1] ») : leur texte de remplacement
+            alt = (dict(attrs).get("alt") or "").strip()
+            if alt and len(alt) <= 30 and not alt.lower().endswith((".png", ".jpg", ".gif", ".svg")):
+                self.buf.append(f" {alt} ")
+        elif tag in ("h2", "h3", "h4"):
+            self._flush()
+            self.heading = int(tag[1])
+        elif tag == "tr":
+            self._flush()
+            self.cells = []
+        elif tag in ("td", "th", "p", "li", "div", "dd", "dt", "br"):
+            self._flush()
+            if tag == "li" and self.cells is None:
+                self.buf.append("- ")
+
+    def handle_endtag(self, tag):
+        while self.stack:
+            t, skipping = self.stack.pop()
+            if skipping:
+                self.skip -= 1
+            if t == tag:
+                break
+        if self.skip:
+            return
+        if tag in ("h2", "h3", "h4"):
+            self._flush()
+            self.heading = None
+        elif tag == "tr" and self.cells is not None:
+            self._flush()
+            row, self.cells = self.cells, None
+            if row:
+                self.lines.append(" · ".join(row))
+        elif tag in ("td", "th", "p", "li", "div", "dd", "dt"):
+            self._flush()
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.buf.append(data)
+
+
+def html_text(html: str) -> str:
+    parser = _HtmlText()
+    parser.feed(html)
+    parser.close()
+    parser._flush()
+    return "\n".join(parser.lines)
+
 
 def chunk_extract(text: str, page: str) -> list[tuple[str, str]]:
     """Texte brut d'une page (titres « == Section == ») -> passages (section, texte) d'environ 400 mots."""
@@ -228,7 +326,28 @@ class Fetcher:
             score = title_score(title, _names(e))
             if score >= 0.88 and (best is None or score > best[0]):
                 best = (score, q)
+        if best is None:
+            # Fiche sans la bonne console (Wikidata incomplet : « Wonder Boy » n'y cite pas la Master System) :
+            # retenue seulement si c'est le seul jeu qui porte exactement ce titre.
+            exact = [q for q, e in games.items() if title_score(title, _names(e)) >= 0.999]
+            if len(exact) == 1:
+                return exact[0], games[exact[0]]
         return (best[1], games[best[1]]) if best else None
+
+    async def segaretro_page(self, http: httpx.AsyncClient, names: list[str], directory: str) -> str | None:
+        """Page Sega Retro du jeu cherchée par son titre, si elle est classée dans les jeux de cette console."""
+        suffix = SEGARETRO_CATEGORY.get(canonical(directory))
+        if not suffix:
+            return None
+        for name in dict.fromkeys(n for n in names if n):
+            data = await self._get(http, SEGARETRO, {"action": "query", "prop": "categories", "titles": name,
+                                                     "cllimit": "500", "redirects": "1"})
+            for page in data.get("query", {}).get("pages", []):
+                if page.get("missing") or page.get("title", "").startswith("Category:"):
+                    continue
+                if any(c["title"].endswith(suffix) for c in page.get("categories", [])):
+                    return page["title"].replace(" ", "_")
+        return None
 
     async def wikipedia(self, http: httpx.AsyncClient, lang: str, page: str) -> list[dict]:
         data = await self._get(http, WIKIPEDIA.format(lang=lang), {"action": "query", "prop": "extracts",
@@ -261,6 +380,27 @@ class Fetcher:
                        for s, t in chunk_extract(text, page.split("/")[-1])]
         return chunks
 
+    async def segaretro(self, http: httpx.AsyncClient, page_id: str) -> list[dict]:
+        """Sega Retro (jeux Sega) : page du jeu (histoire, objets, ennemis, boss, niveaux, astuces) et sous-pages
+        utiles (contenu caché…), lues en HTML pour garder les tableaux."""
+        main = page_id.replace("_", " ")
+        listing = await self._get(http, SEGARETRO, {"action": "query", "list": "allpages", "apprefix": f"{main}/",
+                                                    "aplimit": "100"})
+        subpages = [p["title"] for p in listing.get("query", {}).get("allpages", [])
+                    if any(k in p["title"].split("/")[-1].lower() for k in SEGARETRO_SUBPAGES)]
+        chunks: list[dict] = []
+        for page in [main, *subpages]:
+            data = await self._get(http, SEGARETRO, {"action": "parse", "page": page, "prop": "text",
+                                                     "disabletoc": "1", "redirects": "1"})
+            html = (data.get("parse") or {}).get("text") or ""
+            if isinstance(html, dict):  # formatversion 1
+                html = html.get("*", "")
+            url = f"https://segaretro.org/{quote(page.replace(' ', '_'))}"
+            chunks += [{"source": "segaretro", "lang": "en", "page": page, "url": url, "section": sec, "text": t,
+                        "license": SOURCE_LICENSE["segaretro"]}
+                       for sec, t in chunk_extract(html_text(html), page.split("/")[-1])]
+        return chunks
+
     async def fetch(self, title: str, directory: str) -> Fetched:
         async with self._client() as http:
             found = await self.find(http, title, directory)
@@ -275,7 +415,14 @@ class Fetcher:
                 chunks += await self.wikipedia(http, lang, page)
             if guide:
                 chunks += await self.strategywiki(http, guide)
-            sources = {"wikipedia": wiki, **({"strategywiki": guide} if guide else {})}
+            sega = next((v for v in _claim_values(ent, "P7517") if isinstance(v, str)), None)  # Sega Retro ID
+            if not sega:
+                sega = await self.segaretro_page(http, [ent.get("labels", {}).get("en", {}).get("value"), title],
+                                                 directory)
+            if sega:
+                chunks += await self.segaretro(http, sega)
+            sources = {"wikipedia": wiki, **({"strategywiki": guide} if guide else {}),
+                       **({"segaretro": sega} if sega else {})}
             return Fetched("found" if chunks else "not_found", qid, sources, chunks)
 
 
@@ -344,8 +491,10 @@ def store(s: Session, platform_id: int, normalized_title: str, result: Fetched, 
     row.chunks = len(result.chunks)
     s.add(row)
     for i, c in enumerate(result.chunks):
+        c = dict(c)
+        lic = c.pop("license", None) or SOURCE_LICENSE.get(c["source"], LICENSE)
         s.add(KnowledgeChunk(platform_id=platform_id, normalized_title=normalized_title, position=i,
-                             license=LICENSE, **c))
+                             license=lic, **c))
     return row
 
 
@@ -364,7 +513,8 @@ def game_out(s: Session, platform_id: int, normalized_title: str) -> dict:
         KnowledgeChunk.platform_id == platform_id, KnowledgeChunk.normalized_title == normalized_title)
         .order_by(KnowledgeChunk.position).limit(12)).all()
     return {"status": row.status, "fetched_at": row.fetched_at, "error": row.error, "chunks": row.chunks,
-            "sources": [{"source": src, "lang": lang, "page": page, "url": url, "chunks": n, "license": LICENSE}
+            "sources": [{"source": src, "lang": lang, "page": page, "url": url, "chunks": n,
+                         "license": SOURCE_LICENSE.get(src, LICENSE)}
                         for src, lang, page, url, n in pages],
             "sections": list(dict.fromkeys(sections))}
 
@@ -382,6 +532,19 @@ def best_chunks(s: Session, platform_id: int, normalized_title: str, question: s
                     key=lambda x: (x[0], x[1]), reverse=True)
     picked = [c for score, _, c in scored if score > 0][:limit]
     return picked or chunks[:min(limit, 2)]
+
+
+def version_chunk(s: Session, platform_id: int, normalized_title: str, directory: str,
+                  exclude: list[KnowledgeChunk]) -> KnowledgeChunk | None:
+    """Passage dont la section porte sur la console du joueur (« Master System and Game Gear », « Master System
+    version ») : joint aux passages choisis, pour que la version jouée l'emporte sur l'arcade ou les autres."""
+    names = {m for n in platform_names(directory) for m in (n, n.removeprefix("sega "), n.removeprefix("nintendo "))
+             if (" " in m and len(m) >= 5) or len(m) >= 6}
+    taken = {c.id for c in exclude}
+    for c in chunks_for(s, platform_id, normalized_title):
+        if c.id not in taken and any(n in norm(c.section) for n in names):
+            return c
+    return None
 
 
 def chunks_for(s: Session, platform_id: int, normalized_title: str) -> list[KnowledgeChunk]:
@@ -427,19 +590,24 @@ class KnowledgeJobs:
 
         return await asyncio.to_thread(save)
 
-    def start(self) -> bool:
+    def start(self, refresh: bool = False) -> bool:
+        """Jeux jamais recherchés ; avec `refresh`, tous les jeux à nouveau (nouvelle source, pages mises à jour)."""
         if self.running():
             return False
-        self.task = asyncio.create_task(self._run())
+        self.task = asyncio.create_task(self._run(refresh))
         return True
 
     def stop(self) -> None:
         if self.running():
             self.state["stopping"] = True
 
-    async def _run(self) -> None:
+    async def _run(self, refresh: bool = False) -> None:
         def todo():
             with self.sessions() as s:
+                if refresh:  # les jamais recherchés d'abord, puis les autres
+                    pending = pending_games(s)
+                    return pending + [g for g in s.execute(_games_query().order_by(
+                        RemoteFile.platform_id, RemoteFile.normalized_title)).all() if tuple(g) not in set(pending)]
                 return pending_games(s)
 
         games = await asyncio.to_thread(todo)

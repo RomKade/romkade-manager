@@ -7,6 +7,7 @@
 # « …/soc/5101000.ohci0… » passe avant les boutons « …/soc/soc@03000000:gpio_keys » : Xbox = 0, console = 1.
 # On traduit donc chaque numéro dans l'ordre de RetroArch et on réserve en plus la manette au joueur
 # (« vvvv:pppp nom », type 1 = préférée) : deux garanties pour que la bonne manette contrôle le bon joueur.
+# Les lignes input_playerN_analog_dpad_mode (croix seule ou croix + un stick) sont recopiées telles quelles.
 PLAYERS=/.config/agm-players
 RACFG=/.config/retroarch/retroarch.cfg
 [ -s "$PLAYERS" ] && [ -f "$RACFG" ] || exit 0
@@ -36,6 +37,26 @@ OUT=$(free=$COUNT; grep -o '^input_player[1-4]_joypad_index = "[0-9]*"' "$PLAYER
     echo "input_player${p}_reserved_device = \"$dev\""
     echo "input_player${p}_device_reservation_type = \"$type\""
 done)
+
+# Ce qui dirige chaque joueur (croix seule ou croix + un stick) : recopié tel quel, s'il a été choisi.
+DPAD=$(grep -o '^input_player[1-4]_analog_dpad_mode = "[0-9]"' "$PLAYERS")
+[ -n "$DPAD" ] && OUT=$(printf '%s\n%s' "$OUT" "$DPAD") && \
+    sed -i -E '/^input_player[1-4]_analog_dpad_mode = /d' "$RACFG"
+# Les fichiers de remappage (par cœur, dossier ou jeu : remaps/<cœur>/*.rmp) passent avant retroarch.cfg, et ceux
+# du firmware mettent souvent le stick gauche (FinalBurn Neo : 1) : le choix y est donc écrit aussi. Copie
+# d'origine gardée à côté (.agm-orig) la première fois. SED reste pour launch.sh : RA_launch.sh réécrit le
+# remappage du dossier à chaque jeu (voir ra_launch).
+SED=/tmp/agm-dpad.sed
+rm -f "$SED"
+if [ -n "$DPAD" ]; then
+    printf '%s\n' "$DPAD" | sed -E 's/^(input_player[1-4]_analog_dpad_mode = )(.*)$/s|^\1.*|\1\2|/' > "$SED"
+    find /mnt/vendor/deep/retro/remaps /.config/retroarch/remaps -name '*.rmp' 2>/dev/null | while IFS= read -r f; do
+        grep -q '^input_player[1-4]_analog_dpad_mode = ' "$f" || continue
+        [ -f "$f.agm-orig" ] || cp "$f" "$f.agm-orig"
+        sed -f "$SED" "$f" > "$SED.out" && cat "$SED.out" > "$f"
+    done
+    rm -f "$SED.out"
+fi
 
 sed -i -E '/^input_player[1-4]_(joypad_index|reserved_device|device_reservation_type) = /d' "$RACFG"
 printf '%s\n' "$OUT" >> "$RACFG"

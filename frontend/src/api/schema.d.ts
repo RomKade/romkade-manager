@@ -989,6 +989,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/device/screenshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take Screenshot
+         * @description Capture l'écran du jeu en cours sur la console et la range avec les captures de ce jeu.
+         */
+        post: operations["take_screenshot_api_device_screenshot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screenshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All Screenshots
+         * @description Toutes les captures, par jeu (le jeu capturé le plus récemment d'abord).
+         */
+        get: operations["all_screenshots_api_screenshots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/games/{game_id}/screenshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Game Screenshots */
+        get: operations["game_screenshots_api_games__game_id__screenshots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screenshots/{game_id}/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screenshot File */
+        get: operations["screenshot_file_api_screenshots__game_id___name__get"];
+        put?: never;
+        post?: never;
+        /** Delete Screenshot */
+        delete: operations["delete_screenshot_api_screenshots__game_id___name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/bluetooth": {
         parameters: {
             query?: never;
@@ -1098,6 +1173,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bluetooth/test-sound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bt Sound Test
+         * @description Test sonore : joue un court carillon sur l'enceinte ou le casque connecté, pour vérifier que le son y arrive.
+         */
+        post: operations["bt_sound_test_api_bluetooth_test_sound_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/players": {
         parameters: {
             query?: never;
@@ -1109,8 +1204,9 @@ export interface paths {
         get: operations["players_status_api_players_get"];
         /**
          * Players Set
-         * @description Manette de chaque joueur (numéros de RetroArch, joueur 1 en premier). Appliqué tout de suite si aucun jeu
-         *     ne tourne, sinon au prochain jeu lancé depuis Game Manager.
+         * @description Manette de chaque joueur (numéros de RetroArch, joueur 1 en premier) et/ou ce qui le dirige (croix seule ou
+         *     croix + un stick) ; ce qui n'est pas donné ne change pas. Appliqué tout de suite si aucun jeu ne tourne, sinon
+         *     au prochain jeu lancé depuis Game Manager.
          */
         put: operations["players_set_api_players_put"];
         post?: never;
@@ -1441,7 +1537,8 @@ export interface paths {
         put?: never;
         /**
          * Knowledge Start
-         * @description Récupère les connaissances de tous les jeux jamais recherchés, une requête à la fois (en arrière-plan).
+         * @description Récupère les connaissances de tous les jeux jamais recherchés, une requête à la fois (en arrière-plan) ;
+         *     avec `refresh`, de tous les jeux à nouveau (par exemple pour ajouter une nouvelle source comme Sega Retro).
          */
         post: operations["knowledge_start_api_knowledge_start_post"];
         delete?: never;
@@ -1966,6 +2063,11 @@ export interface components {
             on_screen_message: boolean;
             /** Clock */
             clock: boolean;
+            /**
+             * Screenshot
+             * @default false
+             */
+            screenshot: boolean;
         };
         /** CatalogPlatformOut */
         CatalogPlatformOut: {
@@ -2193,6 +2295,8 @@ export interface components {
             builtin: boolean;
             /** Usb Id */
             usb_id?: string | null;
+            /** Remote */
+            remote?: string | null;
         };
         /** DayOut */
         DayOut: {
@@ -2621,6 +2725,19 @@ export interface components {
             present: boolean;
             /** Youtube Url */
             youtube_url?: string | null;
+        };
+        /** GameShotsOut */
+        GameShotsOut: {
+            /** Game Id */
+            game_id: number;
+            /** Title */
+            title: string;
+            /** Platform Code */
+            platform_code?: string | null;
+            /** Platform Label */
+            platform_label?: string | null;
+            /** Shots */
+            shots: components["schemas"]["ShotOut"][];
         };
         /** GameTimeOut */
         GameTimeOut: {
@@ -3082,7 +3199,9 @@ export interface components {
         /** PlayersIn */
         PlayersIn: {
             /** Players */
-            players: number[];
+            players?: number[] | null;
+            /** Directions */
+            directions?: number[] | null;
         };
         /** PlayersOut */
         PlayersOut: {
@@ -3090,6 +3209,8 @@ export interface components {
             controllers: components["schemas"]["ControllerOut"][];
             /** Players */
             players: (number | null)[];
+            /** Directions */
+            directions: (number | null)[];
             /** Applied */
             applied: boolean;
             /** Game Running */
@@ -3345,6 +3466,25 @@ export interface components {
             /** Host Key Trusted */
             host_key_trusted: boolean;
         };
+        /** ShotOut */
+        ShotOut: {
+            /** Name */
+            name: string;
+            /** Taken At */
+            taken_at: string;
+            /** Size */
+            size: number;
+            /** Url */
+            url: string;
+        };
+        /** SoundTestOut */
+        SoundTestOut: {
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "played" | "in_use";
+        };
         /** StartItem */
         StartItem: {
             /** Upload Id */
@@ -3412,6 +3552,14 @@ export interface components {
             /** Makers */
             makers: string[];
             capabilities: components["schemas"]["CapabilitiesOut"];
+        };
+        /** TakenOut */
+        TakenOut: {
+            /** Game Id */
+            game_id: number;
+            /** Title */
+            title: string;
+            shot: components["schemas"]["ShotOut"];
         };
         /** TransferOut */
         TransferOut: {
@@ -5281,6 +5429,139 @@ export interface operations {
             };
         };
     };
+    take_screenshot_api_device_screenshot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TakenOut"];
+                };
+            };
+        };
+    };
+    all_screenshots_api_screenshots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameShotsOut"][];
+                };
+            };
+        };
+    };
+    game_screenshots_api_games__game_id__screenshots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShotOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screenshot_file_api_screenshots__game_id___name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_screenshot_api_screenshots__game_id___name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     bt_status_api_bluetooth_get: {
         parameters: {
             query?: never;
@@ -5440,6 +5721,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BtStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bt_sound_test_api_bluetooth_test_sound_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoundTestOut"];
                 };
             };
             /** @description Validation Error */
@@ -6092,7 +6406,10 @@ export interface operations {
     };
     knowledge_start_api_knowledge_start_post: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Tous les jeux à nouveau */
+                refresh?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6106,6 +6423,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

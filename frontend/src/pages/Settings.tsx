@@ -8,6 +8,7 @@ import {
   useCaps, useDetectSystem, useDeviceStatus, useGame, useLlmSettings, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
 import { GitHubStar } from "../components/GitHubStar";
+import { AnalyticsPanel } from "../components/AnalyticsNotice";
 import { GamePicker, type PickedGame } from "../components/GamePicker";
 import { StepCards } from "../components/StepCards";
 import { CheatsPanel, KnowledgePanel } from "../components/KnowledgePanel";
@@ -79,7 +80,7 @@ export function SettingsPage() {
       {current === "videos" && <YouTubePanel />}
       {current === "ia" && <LlmPanel />}
       {current === "connaissances" && <><KnowledgePanel /><CheatsPanel /><DescriptionsPanel /></>}
-      {current === "a-propos" && <><AboutPanel /><CreditsPanel /></>}
+      {current === "a-propos" && <><AboutPanel /><AnalyticsPanel /><CreditsPanel /></>}
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import type { Controller, Players } from "../api/client";
 
+export const PLAYERS = 4;
+
 /** Joueurs sans numéro dans la config : premier numéro libre. */
 export function completePlayers(players: Players["players"]): number[] {
   const used = new Set(players.filter((i): i is number => i != null));
@@ -24,4 +26,12 @@ export function assignPlayer(players: number[], player: number, index: number): 
 
 export function controllerName(c: Controller, t: (key: string, vars?: Record<string, string | number>) => string): string {
   return c.builtin ? t("players.builtin") : `${c.name} · ${t("players.number", { n: c.index })}`;
+}
+
+/** Manette de chacun des `slots` premiers joueurs, parmi `options` (numéros de manette, ou « pc:N » pour une manette
+ * de l'ordinateur) : celle de la config si elle est là, sinon une manette libre. */
+export function defaultSlots(players: number[], options: string[], slots: number): string[] {
+  const out = Array.from({ length: slots }, (_, n) => (options.includes(String(players[n])) ? String(players[n]) : ""));
+  const free = options.filter((o) => !out.includes(o));
+  return out.map((v) => v || free.shift() || "");
 }

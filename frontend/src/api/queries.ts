@@ -71,7 +71,7 @@ export function useKnowledgeMutations() {
   const qc = useQueryClient();
   const onSuccess = (d: KnowledgeStatus) => qc.setQueryData(["knowledge"], d);
   return {
-    start: useMutation({ mutationFn: api.startKnowledge, onSuccess }),
+    start: useMutation({ mutationFn: (refresh: boolean = false) => api.startKnowledge(refresh), onSuccess }),
     stop: useMutation({ mutationFn: api.stopKnowledge, onSuccess }),
     auto: useMutation({ mutationFn: api.knowledgeSettings, onSuccess }),
   };
@@ -128,6 +128,21 @@ export function useQuitGame() {
 
 export function useSaveStateNow() {
   return useMutation({ mutationFn: api.saveStateNow });
+}
+
+/** Captures d'écran des jeux, gardées sur le Mac (toutes, ou celles d'un jeu). */
+export const useScreenshots = () => useQuery({ queryKey: ["screenshots"], queryFn: api.screenshots });
+export const useGameScreenshots = (id: number) =>
+  useQuery({ queryKey: ["screenshots", id], queryFn: () => api.gameScreenshots(id) });
+
+export function useTakeScreenshot() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.takeScreenshot, onSuccess: () => qc.invalidateQueries({ queryKey: ["screenshots"] }) });
+}
+
+export function useDeleteScreenshot() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteScreenshot, onSuccess: () => qc.invalidateQueries({ queryKey: ["screenshots"] }) });
 }
 
 /** Sauvegardes de la carte : une lecture SFTP de quelques dossiers, relancée à la demande. */
@@ -212,6 +227,7 @@ export function useBluetoothActions() {
     disconnect: useMutation({ mutationFn: api.btDisconnect, onSuccess: set }),
     forget: useMutation({ mutationFn: api.btForget, onSuccess: set }),
     audio: useMutation({ mutationFn: api.btAudioOutput, onSuccess: set }),
+    testSound: useMutation({ mutationFn: api.btTestSound }),  // carillon sur l'enceinte : l'état ne change pas
   };
 }
 
@@ -222,6 +238,12 @@ export const usePlayers = (enabled: boolean) =>
 export function useSetPlayers() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: api.setPlayers, onSuccess: (d) => qc.setQueryData(["players"], d) });
+}
+
+/** Ce qui dirige chaque joueur : la croix seule, ou la croix et un stick. */
+export function useSetDirections() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.setDirections, onSuccess: (d) => qc.setQueryData(["players"], d) });
 }
 
 /** Volume du son des jeux (console ou appareil Bluetooth). */
@@ -255,6 +277,7 @@ export const useSystems = () => useQuery({ queryKey: ["systems"], queryFn: api.s
 const ALL_CAPS: Capabilities = {
   launch: true, resume_slot: true, quit: true, save_state: true, now_playing: true, saves: true,
   retroarch_logs: true, bluetooth: true, bluetooth_audio: true, players: true, volume: true, on_screen_message: true, clock: true,
+  screenshot: true,
 };
 /** Fonctions disponibles. Tant que le système n'est pas connu, tout reste affiché (le serveur refuse proprement). */
 export const useCaps = (): Capabilities => useSystem().data?.capabilities ?? ALL_CAPS;

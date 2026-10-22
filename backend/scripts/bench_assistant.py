@@ -9,6 +9,7 @@ met les réponses côte à côte pour la relecture humaine.
 Usage (depuis backend/) :
     .venv/bin/python scripts/bench_assistant.py modeles mistral          # identifiants des modèles de l'API Mistral
     .venv/bin/python scripts/bench_assistant.py lancer                   # moteurs par défaut, jeu : Alex Kidd
+    .venv/bin/python scripts/bench_assistant.py lancer --jeu wonder_boy  # questions de scripts/bench/wonder_boy.json
     .venv/bin/python scripts/bench_assistant.py lancer --moteurs mistral:mistral-large-2610,mistral:ministral-14b-2512,local:google/gemma-4-12b
     .venv/bin/python scripts/bench_assistant.py lancer --sans-juge --questions fr-cheats,fr-trap-moon
 
@@ -36,12 +37,14 @@ from app.config import data_dir  # noqa: E402
 from app.services import cheats as ch  # noqa: E402
 from app.services import llm as llm_mod  # noqa: E402
 
-QUESTIONS = Path(__file__).parent / "bench" / "alex_kidd_miracle_world.json"
+BENCH_DIR = Path(__file__).parent / "bench"
+QUESTIONS = BENCH_DIR / "alex_kidd_miracle_world.json"
 DEFAULT_ENGINES = "mistral:large-4,mistral:ministral-14b,local:google/gemma-4-12b"
 # Alias -> motif cherché dans la liste des modèles du fournisseur (jamais un nom inventé).
 ALIASES = {"large-4": r"mistral-large-(4|26\d\d)[\w.-]*", "large-3": r"mistral-large-(3|2512)[\w.-]*",
            "ministral-14b": r"ministral-(3-)?14b[\w.-]*", "ministral-8b": r"ministral-(3-)?8b[\w.-]*"}
 JUDGE_MODEL = "claude-opus-5-5"
+GAME_LABEL = "« Alex Kidd in Miracle World » (Sega Master System, 1986)"
 
 FR = {"le", "la", "les", "des", "est", "tu", "pour", "une", "dans", "pas", "avec", "que", "et", "du", "au"}
 EN = {"the", "you", "to", "and", "is", "of", "in", "it", "for", "with", "your", "can", "this", "a", "on"}
@@ -104,7 +107,7 @@ def checks(q: dict, answer: str, meta: dict, base_codes: set[str]) -> dict:
 
 
 JUDGE_SYSTEM = """You grade the answers of Duke, the game assistant of a retro game app, for the game
-« Alex Kidd in Miracle World » (Sega Master System, 1986). You get the question, what a human reviewer expects,
+{game}. You get the question, what a human reviewer expects,
 the CONTEXT Duke was given, and Duke's answer. Grade strictly:
 - accuracy (0-5): facts correct for this exact game (use the context and your own reliable knowledge);
 - faithful (bool): nothing invented (no fake codes, items, levels, rules);
@@ -123,7 +126,7 @@ def judge(judge_llm, q: dict, answer: str, context: str) -> dict | None:
     prompt = (f"QUESTION ({q['lang']}): {q['question']}\nREVIEWER EXPECTS: {q.get('review', '')}\n\n"
               f"CONTEXT GIVEN TO DUKE:\n{context[:6000]}\n\nDUKE'S ANSWER:\n{answer}")
     try:
-        return judge_llm.complete_json(JUDGE_SYSTEM, prompt, JUDGE_SCHEMA, max_tokens=1500, effort="low", name="grade")
+        return judge_llm.complete_json(JUDGE_SYSTEM.replace("{game}", GAME_LABEL), prompt, JUDGE_SCHEMA, max_tokens=1500, effort="low", name="grade")
     except errors.AppError as exc:
         return {"error": exc.message}
 
@@ -181,7 +184,9 @@ async def prepare(client: httpx.AsyncClient, game: dict) -> tuple[int, set[str],
 async def run(args) -> Path:
     from app.main import create_app
 
+    global GAME_LABEL
     spec = json.loads(QUESTIONS.read_text())
+    GAME_LABEL = spec["game"].get("label", GAME_LABEL)
     questions = [q for q in spec["questions"] if not args.questions or q["id"] in args.questions.split(",")]
     app = create_app()
     st = app.state
@@ -195,7 +200,8 @@ async def run(args) -> Path:
     out_dir = data_dir() / "bench" / datetime.now().strftime("%Y%m%d-%H%M%S")
     out_dir.mkdir(parents=True, exist_ok=True)
     results = {"game": None, "engines": [e.label for e in engines], "judge": JUDGE_MODEL if judge_llm else None,
-               "started": datetime.now().isoformat(timespec="seconds"), "answers": []}
+               "started": datetime.now().isoformat(timespec="seconds"), "questions_file": QUESTIONS.name,
+               "answers": []}
     current = {"engine": None}
     llm_mod_resolve = llm_mod.resolve
     llm_mod.resolve = lambda state: current["engine"]
@@ -326,6 +332,7 @@ def main() -> int:
     r.add_argument("--moteurs", default=DEFAULT_ENGINES)
     r.add_argument("--questions", default="")
     r.add_argument("--sans-juge", action="store_true")
+    r.add_argument("--jeu", default="", help="fichier de questions dans scripts/bench (sans .json)")
     r.add_argument("--local-url", default="http://localhost:1234/v1")
     args = p.parse_args()
     if args.cmd == "modeles":
@@ -334,9 +341,14 @@ def main() -> int:
         engine = build_engine(f"{args.provider}:?", default_store(), args.local_url)
         print("\n".join(sorted(engine.list_models())))
         return 0
+    global QUESTIONS
+    if getattr(args, "jeu", ""):
+        QUESTIONS = BENCH_DIR / f"{args.jeu}.json"
     if args.cmd == "rapport":
         path = Path(args.dossier) / "results.json"
         results = json.loads(path.read_text())
+        if results.get("questions_file"):
+            QUESTIONS = BENCH_DIR / results["questions_file"]
         spec = {q["id"]: q for q in json.loads(QUESTIONS.read_text())["questions"]}
         codes = set()  # contrôles refaits sauf les codes (gardés tels quels)
         for a in results["answers"]:

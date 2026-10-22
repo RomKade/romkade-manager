@@ -153,7 +153,7 @@ async def test_console_actions_are_proposed_never_run(app_factory, monkeypatch):
         monkeypatch.setattr(llm, "resolve", lambda state: model)
         r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Mets le son à 50 %"}]})
         act = events(r.text)[1][1]
-        assert act == {"kind": "set_volume", "supported": True, "system": act["system"], "percent": 50, "games": []}
+        assert act == {"kind": "set_volume", "supported": True, "system": act["system"], "percent": 50, "games": [], "shots": []}
 
         model, _ = fake_llm({**ROUTE_ACTION, "action": "set_volume", "volume": 250}, ["x"])  # borné à 100
         monkeypatch.setattr(llm, "resolve", lambda state: model)
@@ -193,3 +193,46 @@ async def test_library_info_answers_favorites_and_consoles(app_factory, monkeypa
         assert evs[0][1]["intent"] == "library_info" and [g["id"] for g in evs[0][1]["games"]] == [game["id"]]
         system = seen["answers"][-1]["messages"][0]["content"]
         assert "Favorites of the user" in system and "Super Mario World" in system and "Consoles (name: number of games)" in system
+
+
+async def test_screenshots_shown_then_analysed(app_factory, monkeypatch):
+    """« Montre mes captures » : aucune, puis celles du jeu ; « analyse-la » : l'image part au modèle."""
+    import base64
+    import json as _json
+
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        mario = next(g for g in (await c.get("/api/games", params={"platform": "SFC"})).json()["items"]
+                     if g["title"].startswith("Super Mario World"))
+        ask = {"scope": "game", "game_id": mario["id"], "lang": "fr",
+               "messages": [{"role": "user", "content": "Montre-moi mes captures"}]}
+        model, seen = fake_llm({**ROUTE_ACTION, "action": "show_screenshots"}, ["x"])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        act = events((await c.post("/api/assistant", json=ask)).text)[1][1]
+        assert act["kind"] == "show_screenshots" and act["supported"] and act["shots"] == []
+        assert act["games"][0]["id"] == mario["id"] and seen["answers"] == []
+
+        png = b"\x89PNG\r\n\x1a\n" + b"\0" * 64
+        shot = app.state.screenshots.add(mario["id"], png, {"title": "Super Mario World"})
+        act = events((await c.post("/api/assistant", json=ask)).text)[1][1]
+        assert [s["name"] for s in act["shots"]] == [shot["name"]]
+
+        sent = []
+
+        def vision(request):
+            body = _json.loads(request.content)
+            sent.append(body)
+            return httpx.Response(200, json={"choices": [{"message": {"content": "Écran des commandes : 1 saute, 2 court."}}]})
+
+        monkeypatch.setattr(llm, "resolve", lambda state: llm.LLM(llm.PROVIDERS["local"], "gemma-test",
+                                                                  "http://localhost:1234/v1", None,
+                                                                  transport=httpx.MockTransport(vision)))
+        r = await c.post(f"/api/games/{mario['id']}/screenshots/{shot['name']}/analyze", json={"lang": "fr"})
+        assert r.status_code == 200, r.text
+        assert r.json()["text"] == "Écran des commandes : 1 saute, 2 court."
+        image = sent[0]["messages"][1]["content"][1]["image_url"]["url"]
+        assert image == "data:image/png;base64," + base64.b64encode(png).decode()
+        assert "Super Mario World" in sent[0]["messages"][0]["content"]
+        assert (await c.post(f"/api/games/{mario['id']}/screenshots/20990101-000000.png/analyze",
+                             json={"lang": "fr"})).status_code == 404

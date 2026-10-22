@@ -9,6 +9,7 @@ const messages: Messages = {
     "nav.transfers": "Ajouter des jeux",
     "nav.sync": "Synchronisation",
     "nav.saves": "Sauvegardes",
+    "nav.screenshots": "Captures",
     "nav.playtime": "Temps de jeu",
     "nav.players": "Manettes",
     "nav.bluetooth": "Bluetooth",
@@ -43,6 +44,7 @@ const messages: Messages = {
     "device.playing": "En cours :",
     "device.live": "En cours sur la console",
     "device.quit": "Quitter le jeu",
+    "device.quitShort": "Quitter",
     "device.quitting": "Fermeture…",
 
     "unit.b": "o", "unit.kb": "Ko", "unit.mb": "Mo", "unit.gb": "Go", "unit.tb": "To",
@@ -139,6 +141,7 @@ const messages: Messages = {
     "nav.transfers": "Add games",
     "nav.sync": "Sync",
     "nav.saves": "Saves",
+    "nav.screenshots": "Screenshots",
     "nav.playtime": "Play time",
     "nav.players": "Controllers",
     "nav.bluetooth": "Bluetooth",
@@ -173,6 +176,7 @@ const messages: Messages = {
     "device.playing": "Now playing:",
     "device.live": "Now playing on the console",
     "device.quit": "Quit game",
+    "device.quitShort": "Quit",
     "device.quitting": "Closing…",
 
     "unit.b": "B", "unit.kb": "KB", "unit.mb": "MB", "unit.gb": "GB", "unit.tb": "TB",
@@ -335,6 +339,7 @@ const messages: Messages = {
     "nav.transfers": "Añadir juegos",
     "nav.sync": "Sincronización",
     "nav.saves": "Partidas",
+    "nav.screenshots": "Capturas",
     "nav.playtime": "Tiempo de juego",
     "nav.players": "Mandos",
     "nav.bluetooth": "Bluetooth",
@@ -369,6 +374,7 @@ const messages: Messages = {
     "device.playing": "Jugando:",
     "device.live": "Jugando en la consola",
     "device.quit": "Salir del juego",
+    "device.quitShort": "Salir",
     "device.quitting": "Cerrando…",
 
     "unit.b": "B", "unit.kb": "KB", "unit.mb": "MB", "unit.gb": "GB", "unit.tb": "TB",

@@ -4,7 +4,7 @@ Seule partie de l'application qui exécute des commandes sur la console (en plus
 Firmware Anbernic avec « Stock OS Mod » (/mnt/mod/ctrl/RA_launch.sh) : voir launch.sh. Batocera et Knulli
 (et ROCKNIX quand il l'a) : serveur web d'EmulationStation (ES_HTTP, /launch, /runningGame, /emukill).
 Rien n'est écrit sur la carte ; le script est passé en argument à bash et son journal va dans /tmp.
-Android (Termux) : intention `am start` vers RetroArch, état et sortie par les commandes réseau de RetroArch.
+Android (Termux) : intention `am start` vers RetroArch ; ni état du jeu ni sortie à distance (voir android_status).
 """
 
 import re
@@ -48,13 +48,19 @@ async def ssh_run(client: DeviceClient, command: str, timeout: float = 20) -> tu
 
 
 def launch_command(platform_dir: str, rom_path: str, slot: str | None = None) -> str:
-    from app.device.volume import ASOUNDRC, VERSION, asoundrc  # volume importe Runner d'ici
+    from app.device.bluetooth import ALSA_CONF, alsa_conf  # bluetooth et volume importent Runner d'ici
+    from app.device.volume import ASOUNDRC, VERSION, asoundrc
 
     # Volume des jeux (voir volume.py) : /.asoundrc installé s'il manque ou date d'une autre version (en gardant
     # la sortie Bluetooth si elle était choisie).
     rc = (f"grep -q {VERSION} {ASOUNDRC} 2>/dev/null || {{ if grep -q agm_bt {ASOUNDRC} 2>/dev/null; "
           f"then printf %s {shlex.quote(asoundrc('agm_bt'))} > {ASOUNDRC}; "
           f"else printf %s {shlex.quote(asoundrc())} > {ASOUNDRC}; fi; }}; ")
+    # Sortie Bluetooth choisie avec une version précédente de bluetooth.alsa_conf (sans agm_bt_clock) : réécrite
+    # pour la même enceinte.
+    mac = "$(sed -n 's/^defaults.bluealsa.device \"\\(.*\\)\"$/\\1/p' " + ALSA_CONF + ")"
+    rc += (f"[ -f {ALSA_CONF} ] && ! grep -q agm_bt_clock {ALSA_CONF} && m={mac} && [ -n \"$m\" ] && "
+           f"printf %s {shlex.quote(alsa_conf('@MAC@'))} | sed \"s/@MAC@/$m/g\" > {ALSA_CONF}; ")
     # setsid + nohup : le jeu continue après la fermeture de la session SSH. AGM_VOLKEYS : touches de volume
     # pendant le jeu (volume_keys.py, lancé par launch.sh). AGM_PLAYERS : manette de chaque joueur
     # (players_apply.sh, lancé par launch.sh une fois RetroArch fermé).
@@ -106,7 +112,7 @@ def onion_launch_command(rom_path: str) -> str:
             f"sh /tmp/agm-onion-launch.sh {shlex.quote(rom_path)}")
 
 
-# ---------- Android : RetroArch par intention, état par commandes réseau ----------
+# ---------- Android : RetroArch par intention ----------
 # Cœur RetroArch de chaque console (code canonique de app.platforms), parmi ceux du « Online Updater » d'Android.
 ANDROID_CORES: dict[str, str] = {
     "A2600": "stella", "A5200": "a5200", "A7800": "prosystem", "A800": "atari800", "AMIGA": "puae",
@@ -114,7 +120,7 @@ ANDROID_CORES: dict[str, str] = {
     "CPS3": "fbneo", "DOS": "dosbox_pure", "DREAMCAST": "flycast", "EASYRPG": "easyrpg", "FBNEO": "fbneo",
     "FC": "fceumm", "FDS": "fceumm", "GB": "gambatte", "GBA": "mgba", "GBC": "gambatte", "GG": "genesis_plus_gx",
     "GW": "gw", "LYNX": "handy", "MAME": "mame2003_plus", "MD": "genesis_plus_gx", "MDCD": "genesis_plus_gx",
-    "MSX": "bluemsx", "N64": "mupen64plus_next", "NAOMI": "flycast", "NDS": "melonds", "NEOCD": "neocd",
+    "MSX": "bluemsx", "N64": "mupen64plus_next_gles3", "NAOMI": "flycast", "NDS": "melonds", "NEOCD": "neocd",
     "NEOGEO": "fbneo", "NGP": "mednafen_ngp", "PCE": "mednafen_pce_fast", "PCECD": "mednafen_pce_fast",
     "PICO": "retro8", "POKE": "pokemini", "PS": "pcsx_rearmed", "PSP": "ppsspp", "SATURN": "yabasanshiro",
     "SCUMMVM": "scummvm", "SEGA32X": "picodrive", "SFC": "snes9x", "SMS": "genesis_plus_gx", "VB": "mednafen_vb",
@@ -123,23 +129,6 @@ ANDROID_CORES: dict[str, str] = {
 # Paquets de RetroArch, du plus courant au moins courant (Play Store « Plus », site officiel, 32 bits).
 ANDROID_PACKAGES = ("com.retroarch.aarch64", "com.retroarch", "com.retroarch.ra32")
 ANDROID_ACTIVITY = "com.retroarch.browser.retroactivity.RetroActivityFuture"
-# Question à RetroArch (commandes réseau, port UDP 55355) : « GET_STATUS PLAYING super_nes,Titre,crc32=… »,
-# « GET_STATUS CONTENTLESS » dans le menu, rien si RetroArch est fermé ou ses commandes réseau coupées.
-# La réponse est un datagramme : « read » de bash le lirait octet par octet et en perdrait la suite, d'où dd.
-RA_ASK = ("ra_ask() { exec 3<>/dev/udp/127.0.0.1/55355 2>/dev/null || return 0; printf %s \"$1\" >&3; T=; "
-          "command -v timeout >/dev/null 2>&1 && T='timeout 2'; $T dd bs=4096 count=1 <&3 2>/dev/null | tr -d '\\n'; "
-          "exec 3>&-; }; ")
-ANDROID_STATUS_COMMAND = RA_ASK + 'echo "ra=$(ra_ask GET_STATUS)"'
-ANDROID_QUIT_COMMAND = (
-    RA_ASK + 'playing() { case "$(ra_ask GET_STATUS)" in *PLAYING*|*PAUSED*) return 0;; esac; return 1; }; '
-    "playing || { echo none; exit 0; }; "
-    # CLOSE_CONTENT : RetroArch ferme le jeu (sauvegarde en jeu écrite) et reste ouvert sur son menu.
-    "printf CLOSE_CONTENT > /dev/udp/127.0.0.1/55355; "
-    "for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0.5; playing || { echo quit; exit 0; }; done; echo still")
-# Chemin complet du jeu en cours, retrouvé d'après son nom (GET_STATUS ne donne que le nom) ; gardé en mémoire.
-_android_paths: dict[str, str] = {}
-
-
 def android_launch_command(platform_dir: str, rom_path: str) -> str | None:
     """Commande `am start` qui ouvre le jeu dans RetroArch, None si aucun cœur n'est connu pour cette console."""
     from app.platforms import canonical
@@ -160,37 +149,10 @@ def android_launch_command(platform_dir: str, rom_path: str) -> str | None:
         'echo "no-ra $out"')
 
 
-def parse_ra_status(line: str) -> tuple[str | None, str | None]:
-    """(« PLAYING » | « PAUSED » | « CONTENTLESS » | None, nom du jeu) d'une réponse GET_STATUS."""
-    m = re.match(r"\s*GET_STATUS\s+(\w+)\s*(.*)$", line or "")
-    if not m:
-        return None, None
-    state, rest = m.group(1), m.group(2)
-    rest = re.sub(r",crc32=[0-9a-fA-F]*\s*$", "", rest)
-    _system, _, label = rest.partition(",")
-    return state, (label.strip() or None)
-
-
-def _find_by_name(root: str, label: str) -> str:
-    pattern = re.sub(r"([\\\[\]*?])", r"\\\1", label) + ".*"
-    return f"find {shlex.quote(root)} -maxdepth 4 -type f -name {shlex.quote(pattern)} 2>/dev/null | head -1"
-
-
-async def android_status(run: Runner, client: DeviceClient) -> dict:
-    _, out = await run(client, ANDROID_STATUS_COMMAND)
-    line = next((x[3:] for x in out.splitlines() if x.startswith("ra=")), "")
-    state, label = parse_ra_status(line)
-    playing = state in ("PLAYING", "PAUSED")
-    rom = None
-    if playing and label:
-        rom = _android_paths.get(label)
-        if rom is None:
-            _, found = await run(client, _find_by_name(client.settings.roms_root, label))
-            rom = found.strip().splitlines()[0] if found.strip() else None
-            if rom:
-                _android_paths[label] = rom
-    return {"playing": playing, "process": "retroarch" if playing else None, "rom_path": rom,
-            "menu": state == "CONTENTLESS"}
+def android_status() -> dict:
+    """Android : l'état du jeu n'est pas lisible. RetroArch pour Android est compilé sans ses commandes réseau
+    (GET_STATUS, QUIT…, vérifié sur la 1.22.2) et Android cache ses processus aux autres applications (Termux)."""
+    return {"playing": False, "process": None, "rom_path": None, "menu": False}
 
 
 async def android_launch(run: Runner, client: DeviceClient, platform_dir: str, rom_path: str, profile) -> None:
@@ -200,7 +162,6 @@ async def android_launch(run: Runner, client: DeviceClient, platform_dir: str, r
                               "lance le jeu depuis la console.", 409, {"system": profile.id})
     code, out = await run(client, command)
     if "started" in out:
-        _android_paths[rom_path.rsplit("/", 1)[-1].rsplit(".", 1)[0]] = rom_path
         return
     if "no-am" in out:
         raise errors.AppError("launch_unsupported", "Termux ne trouve pas la commande « am » : mets Termux à jour "
@@ -273,7 +234,7 @@ def parse_status(out: str) -> dict:
 
 async def status(run: Runner, client: DeviceClient, profile=None) -> dict:
     if profile is not None and profile.launcher == "android":
-        return await android_status(run, client)
+        return android_status()
     es = profile is not None and profile.launcher == "es-http"
     _, out = await run(client, ES_STATUS_COMMAND if es else STATUS_COMMAND)
     return parse_status(out)
@@ -284,8 +245,6 @@ def quit_command(profile=None) -> str:
         return QUIT_COMMAND
     if profile.quit == "es-http":
         return ES_QUIT_COMMAND
-    if profile.quit == "ra-cmd":
-        return ANDROID_QUIT_COMMAND
     if profile.quit == "none":
         raise errors.AppError("quit_unsupported", f"Quitter le jeu à distance est impossible sur {profile.label}.", 409)
     return QUIT_GENERIC_COMMAND

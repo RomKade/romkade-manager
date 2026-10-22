@@ -1,6 +1,6 @@
 import httpx
 
-from app.device import players as pl
+from app.device import launcher, players as pl
 
 DEVICES = """I: Bus=0000 Vendor=0000 Product=0000 Version=0000
 N: Name="axp2202-pek"
@@ -31,8 +31,8 @@ input_player4_joypad_index = "3"
 
 def test_parse_status():
     st = pl.parse_status(SAMPLE)
-    assert st["controllers"] == [{"index": 0, "name": "ANBERNIC-keys", "builtin": True, "usb_id": "0001:0001"},
-                                 {"index": 1, "name": "Xbox Wireless Controller", "builtin": False, "usb_id": "045e:0b13"}]
+    assert st["controllers"] == [{"index": 0, "name": "ANBERNIC-keys", "builtin": True, "usb_id": "0001:0001", "remote": None},
+                                 {"index": 1, "name": "Xbox Wireless Controller", "builtin": False, "usb_id": "045e:0b13", "remote": None}]
     assert st["players"] == [2, 1, 0, 3] and st["applied"] and not st["game_running"]
 
 
@@ -82,3 +82,79 @@ def test_launch_command_carries_players_script():
 
     cmd = launcher.launch_command("SMS", "/mnt/mmc/Roms/SMS/California Games.sms")
     assert "AGM_PLAYERS=" in cmd and "reservation_type" in cmd
+
+
+def test_directions_read_from_config_then_wanted():
+    """Ce qui dirige chaque joueur : la config de RetroArch tant que rien n'a été choisi (firmware : stick droit)."""
+    cfg = '@@CFG\ninput_player1_analog_dpad_mode = "2"\ninput_player2_analog_dpad_mode = "4"\n'
+    out = SAMPLE.replace("@@CFG\n", cfg)
+    st = pl.parse_status(out)
+    assert st["directions"] == [2, 2, None, None] and st["applied"]  # 4 = stick droit forcé, lu comme 2
+    want = pl.file_text([2, 1, 0, 3], [1, 0, 0, 0])
+    st = pl.parse_status(out.replace("@@WANT\n", "@@WANT\n" + want))
+    assert st["directions"] == [1, 0, 0, 0] and not st["applied"]
+    st = pl.parse_status(out.replace("@@WANT\n", "@@WANT\n" + want).replace("@@RA\n", "@@APPLIED\n" + want + "@@RA\n"))
+    assert st["applied"]
+
+
+async def test_directions_api_keeps_players(app_factory):
+    console = FakeConsole()
+    app = app_factory()
+    app.state.device_runner = console
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        assert (await c.put("/api/players", json={"directions": [3, 0, 0, 0]})).status_code == 422
+        assert (await c.put("/api/players", json={"directions": [1, 0, 0]})).status_code == 422
+        assert (await c.put("/api/players", json={"directions": [1, 0, 0, 0]})).status_code == 200
+        sent = console.commands[-2]
+        # Les manettes ne changent pas (lues sur la console : 2 1 0 3), seule la direction est choisie
+        assert 'input_player1_joypad_index = "2"' in sent and 'input_player1_analog_dpad_mode = "1"' in sent
+        assert "analog_dpad_mode" in sent.split("bash -c", 1)[1]  # players_apply.sh les recopie
+
+
+def test_apply_script_writes_directions(tmp_path):
+    """players_apply.sh sur une fausse console : numéros traduits, directions recopiées, le reste intact."""
+    import subprocess
+
+    root = tmp_path
+    (root / "proc").mkdir()
+    (root / "proc/devices").write_text(DEVICES.replace("H: Handlers=kbd js0", "S: Sysfs=/b\nH: Handlers=kbd js0")
+                                       .replace("H: Handlers=event3 js1", "S: Sysfs=/a\nH: Handlers=event3 js1"))
+    cfg = root / "retroarch.cfg"
+    cfg.write_text('video_smooth = "false"\ninput_player1_analog_dpad_mode = "2"\ninput_player1_joypad_index = "0"\n')
+    players = root / "agm-players"
+    players.write_text(pl.file_text([0, 1, 2, 3], [0, 1, 0, 0]))
+    rmp = root / "remaps/FinalBurn Neo/VARCADE.rmp"  # remappage du firmware : passe avant retroarch.cfg
+    rmp.parent.mkdir(parents=True)
+    rmp.write_text('input_player1_analog_dpad_mode = "1"\ninput_player2_analog_dpad_mode = "1"\n'
+                   'input_player5_analog_dpad_mode = "1"\n')
+    script = (pl.APPLY_SCRIPT.replace("/proc/bus/input/devices", str(root / "proc/devices"))
+              .replace("/.config/retroarch/retroarch.cfg", str(cfg)).replace("/.config/agm-players", str(players))
+              .replace("/mnt/vendor/deep/retro/remaps", str(root / "remaps")).replace("/tmp/agm-dpad.sed", str(root / "d.sed")))
+    subprocess.run(["bash", "-c", script], check=True, capture_output=True)
+    assert rmp.read_text() == ('input_player1_analog_dpad_mode = "0"\ninput_player2_analog_dpad_mode = "1"\n'
+                               'input_player5_analog_dpad_mode = "1"\n')
+    assert 'input_player1_analog_dpad_mode = "1"' in (rmp.parent / "VARCADE.rmp.agm-orig").read_text()
+    text = cfg.read_text()
+    assert 'video_smooth = "false"' in text
+    assert text.count("analog_dpad_mode") == 4 and 'input_player1_analog_dpad_mode = "0"' in text
+    assert 'input_player2_analog_dpad_mode = "1"' in text
+    assert 'input_player1_joypad_index = "1"' in text  # console : 2e par chemin sysfs (/a avant /b)
+    assert (root / "agm-players.applied").read_text() == players.read_text()
+    assert (root / "d.sed").read_text().startswith("s|^input_player1_analog_dpad_mode = .*|")  # pour ra_launch
+    # launch.sh applique le choix au remappage que RA_launch.sh réécrit juste avant RetroArch
+    assert 'sed -i -f /tmp/agm-dpad.sed "${REMAP_FILE}"; eval ${RUNTHIS}' in launcher.LAUNCH_SCRIPT
+
+
+def test_apply_script_without_directions_keeps_config(tmp_path):
+    """Ancien fichier sans directions : la config de RetroArch garde les siennes."""
+    import subprocess
+
+    (tmp_path / "devices").write_text(DEVICES)
+    cfg = tmp_path / "retroarch.cfg"
+    cfg.write_text('input_player1_analog_dpad_mode = "2"\n')
+    players = tmp_path / "agm-players"
+    players.write_text(pl.file_text([0, 1, 2, 3]))
+    script = (pl.APPLY_SCRIPT.replace("/proc/bus/input/devices", str(tmp_path / "devices"))
+              .replace("/.config/retroarch/retroarch.cfg", str(cfg)).replace("/.config/agm-players", str(players)))
+    subprocess.run(["bash", "-c", script], check=True, capture_output=True)
+    assert 'input_player1_analog_dpad_mode = "2"' in cfg.read_text()

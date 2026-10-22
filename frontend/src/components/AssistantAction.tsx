@@ -1,10 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Play, Save, Square, Volume2, VolumeX, X } from "lucide-react";
+import { Camera, Check, Loader2, Play, Save, Square, Volume2, VolumeX, X } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../api/client";
 import { useT } from "../i18n";
+import type { Shot } from "../api/client";
 import type { ActionState, ConsoleAction } from "../lib/assistant";
+import { AssistantShots, ShotCard } from "./AssistantShots";
 import { errorMessage } from "./ui";
 
 const STEP = 20; // « plus fort », « moins fort » : de 20 points
@@ -27,6 +29,12 @@ export function AssistantAction({ action, state, note, onSettle }: {
       if (k === "launch_game" && gameId != null) await api.launchGame(gameId, null);
       else if (k === "quit_game") await api.quitGame();
       else if (k === "save_state") await api.saveStateNow();
+      else if (k === "take_screenshot") {
+        const taken = await api.takeScreenshot();
+        qc.invalidateQueries({ queryKey: ["screenshots"] });
+        onSettle("done", JSON.stringify({ game_id: taken.game_id, title: taken.title, shot: taken.shot }));
+        return;
+      }
       else if (k === "set_volume") await api.setVolume({ percent: action.percent ?? 50 });
       else if (k === "mute" || k === "unmute") await api.setVolume({ muted: k === "mute" });
       else if (k === "volume_up" || k === "volume_down") {
@@ -42,21 +50,27 @@ export function AssistantAction({ action, state, note, onSettle }: {
     }
   };
 
+  if (k === "show_screenshots" || k === "analyze_screenshot") return <AssistantShots kind={k} game={action.games[0]} shots={action.shots ?? []} />;
   if (!action.supported) return <p className="assistant__action assistant__action--off">{t("assistant.action.unsupported", { system: action.system })}</p>;
   if (k === "launch_game" && action.games.length === 0) return <p className="assistant__action assistant__action--off">{t("assistant.action.notFound")}</p>;
 
   const first = action.games[0];
   const question = k === "launch_game" && first ? t("assistant.action.ask.launch_game", { title: first.title, platform: first.platform })
     : t(`assistant.action.ask.${k}`, { percent: action.percent ?? 0 });
-  const Icon = k === "launch_game" ? Play : k === "quit_game" ? Square : k === "save_state" ? Save : k === "mute" ? VolumeX : Volume2;
+  const Icon = k === "launch_game" ? Play : k === "quit_game" ? Square : k === "save_state" ? Save : k === "take_screenshot" ? Camera
+    : k === "mute" ? VolumeX : Volume2;
+  const taken = k === "take_screenshot" && state === "done" && note ? (JSON.parse(note) as { game_id: number; title: string; shot: Shot }) : null;
 
   return (
     <div className="assistant__action" role="group" aria-label={question}>
       <p className="assistant__action-q"><Icon size={14} aria-hidden /> {question}</p>
       {state ? (
-        <p className={`assistant__action-result is-${state}`} role="status">
-          {state === "done" && <Check size={13} aria-hidden />} {state === "failed" ? note : t(`assistant.action.${state}`)}
-        </p>
+        <>
+          <p className={`assistant__action-result is-${state}`} role="status">
+            {state === "done" && <Check size={13} aria-hidden />} {state === "failed" ? note : taken ? t("assistant.shots.taken") : t(`assistant.action.${state}`)}
+          </p>
+          {taken && <div className="assistant__shots"><ShotCard gameId={taken.game_id} title={taken.title} shot={taken.shot} /></div>}
+        </>
       ) : (
         <div className="assistant__action-buttons">
           {k === "launch_game" ? action.games.map((g, i) => (

@@ -92,7 +92,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           } else update((m) => ({ ...m, intent: e.intent, games: e.games, sources: e.sources }));
         } else if (e.type === "delta") update((m) => ({ ...m, content: m.content + e.text }));
         else if (e.type === "action") {
-          update((m) => ({ ...m, action: { kind: e.kind, supported: e.supported, system: e.system, percent: e.percent, games: e.games } }));
+          update((m) => ({ ...m, action: { kind: e.kind, supported: e.supported, system: e.system, percent: e.percent, games: e.games, shots: e.shots } }));
         }
         else if (e.type === "error") {
           const list = assistant.messages(target);
@@ -250,7 +250,7 @@ function Message({ m, game, onOpenGame, onSettle }: {
         <span className="assistant__sources">
           {m.sources!.map((s) => (
             <a key={s.url} href={s.url} target="_blank" rel="noreferrer noopener">
-              {s.source === "wikipedia" ? "Wikipédia" : s.source === "retroarch" ? "RetroArch" : "StrategyWiki"} · {s.license} <ExternalLink size={11} aria-hidden />
+              {({ wikipedia: "Wikipédia", retroarch: "RetroArch", segaretro: "Sega Retro" } as Record<string, string>)[s.source] ?? "StrategyWiki"} · {s.license} <ExternalLink size={11} aria-hidden />
             </a>
           ))}
         </span>

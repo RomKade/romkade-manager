@@ -94,6 +94,7 @@ Options, dans un fichier `.env` à côté de `compose.yaml` : `ROMKADE_PORT` (d�
 Même numéro dans `backend/pyproject.toml` et `frontend/package.json`, puis `git tag vX.Y.Z && git push origin vX.Y.Z`.
 Le workflow [Image Docker](.github/workflows/docker.yml) publie l'image (`X.Y.Z`, `X.Y`, `latest`, amd64 + arm64) et
 une release GitHub avec `compose.yaml`. Chaque push sur `main` publie `edge`.
+La variable du dépôt `POSTHOG_KEY` (clé publique `phc_…`) active dans l'image les statistiques anonymes sur accord.
 
 ## Lancer depuis le code source (macOS)
 
@@ -580,7 +581,7 @@ les ROMs et les sauvegardes, comment lancer et quitter un jeu, et ce qui est dis
 | Onion OS | Miyoo Mini / Mini Plus | `/mnt/SDCARD/Roms` | oui (comme le menu d'Onion), quitter | testé |
 | spruce | Miyoo A30, Flip | `/mnt/SDCARD/Roms` | quitter | expérimental |
 | MinUI / NextUI | Miyoo, TrimUI, Anbernic | `/mnt/SDCARD/Roms` | non | expérimental |
-| Android + RetroArch | Retroid Pocket, AYN Odin/Thor, Anbernic et Ayaneo sous Android | `/storage/emulated/0/ROMs` | oui (RetroArch), quitter, sauvegarder | expérimental |
+| Android + RetroArch | Retroid Pocket, AYN Odin/Thor, Anbernic et Ayaneo sous Android | `/storage/emulated/0/ROMs` | lancer (dans RetroArch) ; quitter sur la console | expérimental |
 | Autre (Linux + SSH) | — | à régler | quitter (RetroArch) | expérimental |
 
 Noms de dossiers : chaque firmware a les siens (« snes », « SFC », « Super Nintendo Entertainment System (SFC) »,
@@ -606,15 +607,16 @@ compris) ; la bibliothèque, l'ajout de jeux et les sauvegardes marchent alors c
 2. Dans Termux : `termux-setup-storage`, `pkg install openssh`, `passwd` (choisir un mot de passe), `sshd`.
 3. Réglages Android → Applications → Termux → autoriser **« Afficher par-dessus les autres applis »** (sans cela,
    Android bloque un jeu lancé depuis l'ordinateur pendant que Termux est en arrière-plan).
-4. RetroArch → Réglages → Réseau → **Commandes réseau** activées (jeu en cours, quitter, sauvegarder).
-5. Dans ROMKADE Manager : l'adresse IP de la console, le port **8022**, un nom d'utilisateur quelconque, le mot de passe
+4. Dans ROMKADE Manager : l'adresse IP de la console, le port **8022**, un nom d'utilisateur quelconque, le mot de passe
    de Termux.
 
 Les jeux se lancent par une intention Android (`am start` vers RetroArch, extras `ROM` et `LIBRETRO` ; un cœur par
-console, `ANDROID_CORES` dans `launcher.py`). Android cache aux autres applications les processus de RetroArch : le jeu
-en cours se lit par la commande réseau `GET_STATUS` de RetroArch (son fichier est ensuite retrouvé par son nom), et on
-quitte un jeu par `CLOSE_CONTENT` (RetroArch reste ouvert sur son menu). Indisponible sous Android : reprendre sur une
-sauvegarde instantanée, volume, Bluetooth, manettes par joueur, heure de la console (root nécessaire). Les sauvegardes
+console, `ANDROID_CORES` dans `launcher.py`, vérifié sur la liste des cœurs Android de RetroArch). Le jeu en cours ne
+se lit pas et ne se quitte pas depuis l'ordinateur : RetroArch pour Android est compilé sans ses commandes réseau
+(vérifié sur la 1.22.2) et Android cache ses processus aux autres applications. Indisponible aussi sous Android :
+sauvegarder maintenant, reprendre sur une sauvegarde instantanée, volume, Bluetooth, manettes par joueur, heure de la
+console (root nécessaire). Essayé sur un émulateur Android 14 (Termux 0.118.3, RetroArch 1.22.2) : connexion,
+détection, synchronisation, lancement d'un jeu avec Termux en arrière-plan. Les sauvegardes
 sont lues dans `RetroArch/saves` et `RetroArch/states`, à côté du dossier des ROMs (dossiers par défaut de RetroArch
 sous Android).
 
@@ -626,6 +628,12 @@ sous Android).
   pas des manipulations de l'utilisateur sur la console ou sa carte mémoire (perte de données, carte corrompue,
   sauvegardes perdues). Un bandeau les rappelle au premier lancement, jusqu'à « J'ai compris » (`romkade-terms-v1`
   dans le navigateur). Texte à faire relire par un juriste avant une diffusion publique.
+- Statistiques d'utilisation anonymes (PostHog Cloud EU), **sur accord** : demandé une fois au premier lancement,
+  puis Paramètres > À propos (`romkade-analytics` dans le navigateur). Textes et attributs des éléments masqués,
+  adresses réduites au chemin, ni provenance ni enregistrement de session, aucun script externe
+  (`frontend/src/lib/analytics.ts`). Proposé seulement si le build reçoit une clé : `VITE_POSTHOG_KEY` (variable du
+  dépôt `POSTHOG_KEY` pour l'image Docker, `frontend/.env.local` en développement) ; sans clé, rien n'est demandé ni
+  envoyé.
 - Logo et icônes ROMKADE Manager (`frontend/src/assets/brand/`, `frontend/public/icon-*.png`), tirés des fichiers de
   marque du dépôt romkade-website.
 

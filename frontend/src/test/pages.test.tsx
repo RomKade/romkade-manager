@@ -36,6 +36,7 @@ let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
 let hostKeyTrusted = true;
+let relayToken = "";
 let assistantBodies: Record<string, unknown>[] = [];
 let assistantAction: Record<string, unknown> | null = null;
 let controlsSourced = false;
@@ -65,6 +66,9 @@ function llmStatus() {
 }
 let systemCaps: Record<string, boolean> | null = null; // null : système inconnu (tout reste affiché)
 let volume = { percent: 60, muted: false };
+// Captures d'écran gardées sur le Mac (deux pour Super Mario World), supprimées par DELETE.
+const shot = (name: string) => ({ name, taken_at: "2026-10-19T20:30:00Z", size: 1000, url: `/api/screenshots/1/${name}` });
+let shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
 let playAlerts: { id: number; created_at: string; minutes: number; scope: string; game_title: string }[] = [];
 
 function mockFetch() {
@@ -129,14 +133,28 @@ function mockFetch() {
       sessions: [{ id: 1, title: "Super Mario World", platform: "SFC", game: game(1, "Super Mario World"),
         started_at: "2026-10-16T08:00:00Z", ended_at: "2026-10-16T10:00:00Z", seconds: 7200 }],
     });
+    if (url === "/api/device/screenshot") {
+      shots = [shot("20261019-210000.png"), ...shots];
+      return json({ game_id: 1, title: "Super Mario World", shot: shots[0] });
+    }
+    if (url.startsWith("/api/screenshots/") && init?.method !== "DELETE")
+      return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { "Content-Type": "image/png" } });
+    if (url.startsWith("/api/screenshots/") && init?.method === "DELETE") {
+      shots = shots.filter((s) => s.url !== url);
+      return new Response(null, { status: 204 });
+    }
+    if (url === "/api/screenshots") return json(shots.length ? [{ game_id: 1, title: "Super Mario World", platform_code: "SFC", platform_label: "Super Nintendo", shots }] : []);
+    if (url === "/api/games/1/screenshots") return json(shots);
     if (url.startsWith("/api/device/now-playing")) return json(playingId
       ? { playing: true, process: "retroarch", rom_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc", menu: false, game: game(playingId, "Super Mario World") }
       : { playing: false, process: null, rom_path: null, menu: true, game: null });
     const dev = (address: string, name: string, kind: string, paired: boolean, connected: boolean, rssi: number | null) =>
       ({ address, name, icon: "", kind, paired, trusted: paired, connected, rssi });
+    if (url === "/api/bluetooth/test-sound") return json({ result: "played" });
     if (url.startsWith("/api/bluetooth")) return json({
       adapter: { present: true, powered: true, discovering: false, name: "ANBERNIC" }, bluealsa: true, audio_output: null,
-      devices: [dev("AA:00:00:00:00:01", "Voisin 1", "other", false, false, -40), dev("70:77:81:54:FF:14", "KD-43X8309C", "audio", false, false, -70)],
+      devices: [dev("AA:00:00:00:00:01", "Voisin 1", "other", false, false, -40), dev("70:77:81:54:FF:14", "KD-43X8309C", "audio", false, false, -70),
+        dev("F8:DF:15:00:00:02", "JBL Flip", "audio", true, true, -50)],
     });
     if (url === "/api/device/clock") return json({ console_epoch: 1662019043, timezone: "Etc/UTC", utc_offset: "+0000", mac_epoch: 1792188582, drift_seconds: -130169539 });
     if (url === "/api/device/clock/sync") return json({ console_epoch: 1792188582, timezone: "Europe/Paris", utc_offset: "+0200", mac_epoch: 1792188582, drift_seconds: 0 });
@@ -150,9 +168,12 @@ function mockFetch() {
       return json({ mode: "game_manager", adjustable: true, game_running: true, ...volume });
     }
     if (url.startsWith("/api/players")) {
-      const players = init?.method === "PUT" ? (JSON.parse(String(init.body)) as { players: number[] }).players : [2, 1, 0, 3];
-      return json({ controllers: [{ index: 0, name: "ANBERNIC-keys", builtin: true }, { index: 1, name: "8BitDo Pro 2", builtin: false }],
-        players, applied: !(playingId && init?.method === "PUT"), game_running: playingId != null });
+      const body = init?.method === "PUT" ? JSON.parse(String(init.body)) as { players?: number[]; directions?: number[] } : {};
+      // Manette de l'ordinateur relayée (WebSocket simulé) : manette virtuelle n°4 de la console.
+      const relayed = relayToken ? [{ index: 4, name: "Microsoft X-Box 360 pad", builtin: false, remote: relayToken }] : [];
+      return json({ controllers: [{ index: 0, name: "ANBERNIC-keys", builtin: true }, { index: 1, name: "8BitDo Pro 2", builtin: false }, ...relayed],
+        players: body.players ?? [2, 1, 0, 3], directions: body.directions ?? [2, null, null, null],
+        applied: !(playingId && init?.method === "PUT"), game_running: playingId != null });
     }
     if (url.startsWith("/api/saves/howto")) return json([{ action: "save_state", combo: ["Menu", "R1"] }, { action: "quit", combo: ["Menu", "Start"] }]);
     if (url.startsWith("/api/saves/backups")) return json([]);
@@ -280,8 +301,10 @@ beforeEach(() => {
   bodies = [];
   deviceOnline = true;
   playingId = null;
+  shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
   favoriteIds = [];
   hostKeyTrusted = true;
+  relayToken = "";
   assistantBodies = [];
   assistantAction = null;
   sessionStorage.clear();
@@ -437,16 +460,20 @@ describe("Jeu en cours", () => {
 });
 
 describe("Jouer avec une manette branchée", () => {
-  it("demande qui joue, donne le joueur 1 à cette manette puis lance le jeu", async () => {
+  it("« Qui joue ? » : une manette par joueur, échangées entre joueurs, enregistrées puis le jeu lancé", async () => {
     renderAt("/bibliotheque?all=1");
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(await within(dialog).findByRole("button", { name: /Jouer sur la console/ }));
-    const choice = within(dialog).getByRole("group", { name: "Qui joue ?" });
-    await userEvent.click(within(choice).getByRole("button", { name: /8BitDo Pro 2/ }));
+    const who = await within(dialog).findByRole("group", { name: "Qui joue ?" });
+    // Deux manettes : deux joueurs. Le joueur 1 prend la 8BitDo, le joueur 2 reçoit les boutons de la console.
+    expect(within(who).getByLabelText("Joueur 1")).toHaveDisplayValue("Boutons de la console");
+    expect(within(who).queryByLabelText("Joueur 3")).not.toBeInTheDocument();
+    await userEvent.selectOptions(within(who).getByLabelText("Joueur 1"), "8BitDo Pro 2 · manette n°1");
+    expect(within(who).getByLabelText("Joueur 2")).toHaveDisplayValue("Boutons de la console");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Jouer sur la console/ }));
     await waitFor(() => expect(bodies.some((b) => b.url === "/api/games/1/launch")).toBe(true));
     const put = bodies.findIndex((b) => b.url === "/api/players");
-    expect(bodies[put]).toEqual({ url: "/api/players", players: [1, 2, 0, 3] });
+    expect(bodies[put]).toEqual({ url: "/api/players", players: [1, 0, 2, 3] });
     expect(put).toBeLessThan(bodies.findIndex((b) => b.url === "/api/games/1/launch"));
   });
 });
@@ -556,7 +583,11 @@ describe("Paramètres : assistant et connaissances", () => {
     const panel = (await screen.findByRole("heading", { name: /Connaissances de l'assistant/ })).closest("section")!;
     expect(within(panel).getByText(/ce n'est pas un simple essai/)).toBeInTheDocument();
     expect(await within(panel).findByText(/1 jeux documentés sur 2/)).toBeInTheDocument();
-    await userEvent.click(within(panel).getByRole("button", { name: /Récupérer pour le jeu restant/ }));
+    expect(within(panel).getByRole("button", { name: /Tout récupérer à nouveau \(2 jeux/ })).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: /Tout récupérer à nouveau/ }));
+    await waitFor(() => expect(calls).toContain("/api/knowledge/start?refresh=true"));
+    knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null, stopping: false };
+    await userEvent.click(await within(panel).findByRole("button", { name: /Récupérer pour le jeu restant/ }));
     expect(await within(panel).findByText(/Récupération : 0 sur 1/)).toBeInTheDocument();
 
     await userEvent.type(within(panel).getByRole("searchbox", { name: "Jeu" }), "mario");
@@ -960,6 +991,48 @@ describe("Manettes", () => {
     expect(await screen.findByRole("heading", { name: "Bibliothèque", level: 1 })).toBeInTheDocument();
   });
 
+  it("donne au joueur 1 une manette connectée à l'ordinateur, relayée vers la console", async () => {
+    const sent: string[] = [];
+    vi.stubGlobal("WebSocket", class {
+      static OPEN = 1;
+      readyState = 0;
+      onmessage: ((e: { data: string }) => void) | null = null;
+      onclose: (() => void) | null = null;
+      constructor(url: string) {
+        relayToken = new URL(url).searchParams.get("token")!;
+        setTimeout(() => { this.readyState = 1; this.onmessage?.({ data: '{"ready": true}' }); }, 0);
+      }
+      send(data: string) { sent.push(data); }
+      close() { this.readyState = 3; }
+    });
+    const pad = { index: 0, id: "Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e Product: 0b13)", connected: true,
+                  mapping: "standard", buttons: [{ value: 1, pressed: true }], axes: [0, 0, 0, 0] };
+    Object.defineProperty(navigator, "getGamepads", { value: () => [pad], configurable: true });
+    Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => setTimeout(() => cb(0), 0));
+
+    renderAt("/manettes");
+    await userEvent.selectOptions(await screen.findByLabelText("Joueur 1"), "Manette de l'ordinateur · Xbox Wireless Controller");
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [4, 1, 0, 3] }), { timeout: 3000 });
+    expect(relayToken).toMatch(/^[a-z0-9]{4,16}$/);
+    await waitFor(() => expect(JSON.parse(sent[0]!)).toEqual({ b: [1], a: [0, 0, 0, 0] }));
+    expect(screen.getByLabelText("Joueur 1")).toHaveDisplayValue("Manette de l'ordinateur · Xbox Wireless Controller");
+
+    // Le joueur 1 reprend les boutons de la console : échange, la manette de l'ordinateur passe au joueur 3.
+    await userEvent.selectOptions(screen.getByLabelText("Joueur 1"), "Boutons de la console");
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [0, 1, 4, 3] }));
+    expect(screen.getByLabelText("Joueur 3")).toHaveDisplayValue("Manette de l'ordinateur · Xbox Wireless Controller");
+  });
+
+  it("choisit ce qui dirige le joueur 1 : la croix seule, ou la croix et un stick", async () => {
+    renderAt("/manettes");
+    const [p1] = await screen.findAllByLabelText("Direction");
+    expect(p1).toHaveValue("2");  // réglage d'origine de la console : stick droit
+    await userEvent.selectOptions(p1!, "Croix + stick gauche");
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", directions: [1, 0, 0, 0] }));
+    expect(screen.getAllByLabelText("Direction")[0]).toHaveValue("1");
+  });
+
   it("pendant un jeu, relance le jeu pour appliquer la manette", async () => {
     playingId = 1;
     renderAt("/manettes");
@@ -990,6 +1063,105 @@ describe("Bluetooth", () => {
     const mine = screen.getByRole("region", { name: "Mes appareils" });
     expect(within(mine).getByText("KD-43X8309C")).toBeInTheDocument();
     expect(within(near).queryByText("KD-43X8309C")).not.toBeInTheDocument();
+  });
+
+  it("propose de relancer le jeu en cours quand la sortie du son change", async () => {
+    playingId = 1;
+    renderAt("/bluetooth");
+    const speaker = (await screen.findByText("JBL Flip")).closest("li")!;
+    await userEvent.click(within(speaker).getByRole("button", { name: /Envoyer le son des jeux sur cet appareil/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/bluetooth/audio-output", address: "F8:DF:15:00:00:02" }));
+    expect(await screen.findByText(/Super Mario World était déjà lancé/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Relancer le jeu/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/games/1/launch", slot: "auto" }));
+  });
+
+  it("teste le son sur l'enceinte connectée", async () => {
+    renderAt("/bluetooth");
+    const speaker = (await screen.findByText("JBL Flip")).closest("li")!;
+    await userEvent.click(within(speaker).getByRole("button", { name: /Tester le son/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/bluetooth/test-sound", address: "F8:DF:15:00:00:02" }));
+    expect(await within(speaker).findByText(/Un carillon vient de sonner/)).toBeInTheDocument();
+  });
+
+  it("sans jeu en cours, ne parle pas de relancer", async () => {
+    renderAt("/bluetooth");
+    const speaker = (await screen.findByText("JBL Flip")).closest("li")!;
+    await userEvent.click(within(speaker).getByRole("button", { name: /Envoyer le son des jeux sur cet appareil/ }));
+    await waitFor(() => expect(bodies.at(-1)).toMatchObject({ url: "/api/bluetooth/audio-output" }));
+    expect(screen.queryByText(/était déjà lancé/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Captures d'écran", () => {
+  it("prend une capture du jeu en cours depuis le tableau de bord, puis mène à ses captures", async () => {
+    playingId = 1;
+    renderAt("/");
+    await userEvent.click(await screen.findByRole("button", { name: /Capture d'écran/ }));
+    const done = await screen.findByRole("link", { name: /Capture enregistrée/ });
+    expect(calls).toContain("/api/device/screenshot");
+    await userEvent.click(done);
+    const game = await screen.findByRole("region", { name: /Super Mario World/ });
+    expect(within(game).getAllByRole("img")).toHaveLength(3);
+    expect(within(game).getByText("3 captures")).toBeInTheDocument();
+  });
+
+  it("prend une capture depuis le jeu en cours de la barre du haut, sur les autres pages", async () => {
+    playingId = 1;
+    renderAt("/bluetooth");
+    const chip = await screen.findByRole("status", { name: "En cours sur la console" });
+    await userEvent.click(await within(chip).findByRole("button", { name: /Capture d'écran/ }));
+    expect(await within(chip).findByRole("link", { name: /Capture enregistrée/ })).toBeInTheDocument();
+    expect(calls).toContain("/api/device/screenshot");
+  });
+
+  it("liste les captures par jeu et en supprime une", async () => {
+    renderAt("/captures");
+    const game = await screen.findByRole("region", { name: /Super Mario World/ });
+    expect(within(game).getAllByRole("img")).toHaveLength(2);
+    await userEvent.click(within(game).getAllByRole("button", { name: "Supprimer la capture" })[0]!);
+    await waitFor(() => expect(within(game).getAllByRole("img")).toHaveLength(1));
+    expect(within(game).getByText("1 capture")).toBeInTheDocument();
+  });
+
+  it("partage une capture sur X (image copiée, éditeur ouvert) puis sur Reddit (image téléchargée)", async () => {
+    const opened: string[] = [];
+    const open = vi.spyOn(window, "open").mockImplementation((u) => { opened.push(String(u)); return {} as Window; });
+    const write = vi.fn(async () => undefined);
+    Object.assign(navigator, { clipboard: { write, writeText: vi.fn(async () => undefined) } });
+    vi.stubGlobal("ClipboardItem", class { constructor(public items: unknown) {} });
+    URL.createObjectURL = vi.fn(() => "blob:x");
+    URL.revokeObjectURL = vi.fn();
+    renderAt("/captures");
+    const game = await screen.findByRole("region", { name: /Super Mario World/ });
+    await userEvent.click(within(game).getAllByRole("button", { name: "Partager sur les réseaux" })[0]!);
+    const dialog = await screen.findByRole("dialog", { name: "Partager la capture" });
+    expect(within(dialog).getByLabelText("Texte du message")).toHaveValue("Super Mario World · Super Nintendo\n#retrogaming #SuperNintendo");
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "X" })).toBeEnabled());
+    await userEvent.click(within(dialog).getByRole("button", { name: "X" }));
+    expect(await within(dialog).findByText(/Image copiée : colle-la/)).toBeInTheDocument();
+    expect(write).toHaveBeenCalled();
+    expect(opened.at(-1)).toBe("https://x.com/intent/post?text=" + encodeURIComponent("Super Mario World · Super Nintendo\n#retrogaming #SuperNintendo"));
+    await userEvent.selectOptions(within(dialog).getByLabelText("Communauté Reddit"), "retrogaming");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reddit" }));
+    expect(await within(dialog).findByText(/Image téléchargée : ajoute-la au post Reddit/)).toBeInTheDocument();
+    expect(opened.at(-1)).toBe("https://www.reddit.com/r/retrogaming/submit?type=IMAGE&title=" + encodeURIComponent("Super Mario World · Super Nintendo"));
+    open.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it("sans capture, explique comment en prendre ; la section est dans le menu", async () => {
+    shots = [];
+    renderAt("/captures");
+    expect(await screen.findByText("Pas encore de capture")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Captures" })).toBeInTheDocument();
+  });
+
+  it("la fiche du jeu montre ses captures", async () => {
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const section = await within(await screen.findByRole("dialog")).findByRole("region", { name: "Mes captures" });
+    expect(within(section).getAllByRole("img")).toHaveLength(2);
   });
 });
 

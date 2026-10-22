@@ -9,8 +9,9 @@ profils suivent la documentation de leur firmware et sont marqués « experiment
 
 Android (Retroid, AYN, Anbernic sous Android…) : pas de SSH d'origine. L'application Termux en fournit un (port
 8022, SFTP compris), si bien que la bibliothèque, l'ajout de jeux et les sauvegardes marchent comme ailleurs. Les
-jeux se lancent dans RetroArch par une intention Android (`am start`), et l'état du jeu se lit par les commandes
-réseau de RetroArch (GET_STATUS) : Android cache aux autres applications les processus de RetroArch.
+jeux se lancent dans RetroArch par une intention Android (`am start`). Le jeu en cours ne se lit pas et ne se quitte
+pas à distance : RetroArch pour Android est compilé sans ses commandes réseau, et Android cache ses processus aux
+autres applications.
 """
 
 import re
@@ -40,7 +41,7 @@ class SystemProfile:
     roms_roots: tuple[str, ...]       # emplacements habituels du dossier des ROMs, dans l'ordre
     launcher: str | None              # stock-mod | es-http | onion | android | None (lancement à distance impossible)
     quit: str                         # ra-udp (Anbernic) | es-http (repli : generic) | generic (QUIT puis SIGTERM)
-                                      # | ra-cmd (CLOSE_CONTENT de RetroArch, Android) | none
+                                      # | none
     save_sources: tuple[SaveSource, ...] = ()
     states_in_rom_folder: bool = False  # sauvegardes instantanées rangées à côté des jeux
     ra_config: str | None = None
@@ -51,6 +52,7 @@ class SystemProfile:
     makers: tuple[str, ...] = field(default=())
     ra_network: bool = False          # commandes réseau de RetroArch actives (SAVE_STATE, SHOW_MSG)
     clock: bool = True                # heure de la console réglable (root nécessaire : pas sur Android)
+    now_playing: bool = True          # jeu en cours lisible (pas sur Android : processus cachés, voir launcher.py)
 
     def capabilities(self, es_http: bool = False) -> dict[str, bool]:
         launch = self.launcher in ("stock-mod", "onion", "android") or (self.launcher == "es-http" and es_http)
@@ -59,7 +61,7 @@ class SystemProfile:
             "resume_slot": self.launcher == "stock-mod",
             "quit": self.quit != "none",
             "save_state": self.ra_network,
-            "now_playing": True,
+            "now_playing": self.now_playing,
             "saves": True,  # au pire, les sauvegardes rangées à côté des jeux
             "retroarch_logs": self.ra_logs is not None,
             "bluetooth": self.bluetooth is not None,
@@ -68,6 +70,7 @@ class SystemProfile:
             "volume": self.bluetooth == "stock",  # mixeur de la puce son du firmware d'origine (app/device/volume.py)  # firmware d'origine : config RetroArch fixe (app/device/players.py)
             "on_screen_message": self.ra_network,
             "clock": self.clock,
+            "screenshot": self.bluetooth == "stock",  # écran lu dans /dev/fb0 (app/device/screen.py), essayé sur H700
         }
 
 
@@ -136,11 +139,11 @@ PROFILES: dict[str, SystemProfile] = {p.id: p for p in [
         makers=("Miyoo", "TrimUI", "Anbernic")),
     SystemProfile(
         "android", "Android + RetroArch", "experimental",
-        ("/storage/emulated/0/ROMs", "/storage/emulated/0/Roms", "/storage/emulated/0/roms"), "android", "ra-cmd",
-        (("RetroArch/saves", "retroarch", 3), ("RetroArch/states", "retroarch", 3)), ra_network=True, clock=False,
+        ("/storage/emulated/0/ROMs", "/storage/emulated/0/Roms", "/storage/emulated/0/roms"), "android", "none",
+        (("RetroArch/saves", "retroarch", 3), ("RetroArch/states", "retroarch", 3)), clock=False, now_playing=False,
         notes="Retroid Pocket, AYN Odin/Thor, Anbernic et Ayaneo sous Android. Sur la console : Termux (serveur SSH, "
-              "port 8022, « Afficher par-dessus les autres applis » autorisé) et RetroArch avec les commandes réseau "
-              "activées. Les jeux se lancent dans RetroArch, avec le cœur installé pour chaque console.",
+              "port 8022, « Afficher par-dessus les autres applis » autorisé) et RetroArch. Les jeux se lancent dans "
+              "RetroArch, avec le cœur installé pour chaque console ; on les quitte depuis la console.",
         makers=("Retroid", "AYN", "Anbernic", "Ayaneo")),
     SystemProfile(
         "generic", "Autre système (Linux + SSH)", "experimental", (), None, "generic", (),

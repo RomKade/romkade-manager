@@ -25,6 +25,7 @@ class CapabilitiesOut(BaseModel):
     volume: bool
     on_screen_message: bool
     clock: bool
+    screenshot: bool = False
 
 
 class SystemProfileOut(BaseModel):

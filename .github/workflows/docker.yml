@@ -46,6 +46,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Variable du dépôt POSTHOG_KEY (clé publique phc_…) : statistiques anonymes, sur accord de l'utilisateur.
+          build-args: |
+            VITE_POSTHOG_KEY=${{ vars.POSTHOG_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

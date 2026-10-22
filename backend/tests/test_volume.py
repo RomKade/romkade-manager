@@ -29,9 +29,13 @@ def test_asoundrc():
     assert "pcm.!default agm_vol" in rc and 'slave.pcm "agm_speakers"' in rc and vol.VERSION in rc
     assert 'slave.pcm "hw:audiocodec"' in rc and "format S16_LE" in rc and '"SPK Switch" preserve true lock true value 1' in rc
     assert 'slave.pcm "agm_bt"' in vol.asoundrc("agm_bt")
+    # TV branchée : le RetroArch du firmware ouvre « playback_hdmi », redirigé vers l'enceinte, pas vers les haut-parleurs
+    assert "pcm.!playback_hdmi agm_vol" in vol.asoundrc("agm_bt") and "playback_hdmi" not in rc
     cmd = launcher.launch_command("SFC", "/mnt/mmc/Roms/SFC/x.smc")
     assert cmd.index(f"grep -q {vol.VERSION} /.asoundrc") < cmd.index("setsid nohup")
     assert "AGM_VOLKEYS=" in cmd and "KEY_VOLUMEUP" in cmd  # touches Vol+ / Vol- pendant le jeu
+    # Sortie Bluetooth d'une version précédente réécrite (horloge HDMI en silence)
+    assert cmd.index("! grep -q agm_bt_clock /etc/alsa/conf.d/60-agm-bluetooth.conf") < cmd.index("setsid nohup")
     assert "AGM_LAUNCH=1" in launcher.LAUNCH_SCRIPT and "pcsx" in vol._status_command()
 
 

@@ -95,7 +95,8 @@ async def test_bluetooth_api(app_factory):
         assert "|env -u LD_LIBRARY_PATH aplay" in sent and "exec cat > /dev/null" in sent
         assert "|| env -u LD_LIBRARY_PATH aplay -q -t raw -f S16_LE -r 48000 -c 2 -D agm_speakers -" in sent  # enceinte absente
         assert 'slave.pcm "agm_bt"' in sent and "pcm.!default agm_vol" in sent and "> /.asoundrc" in sent
-        assert 'slave.pcm "plughw:ahubhdmi"' in sent  # horloge temps réel : la sortie HDMI, muette sans câble
+        assert 'pcm "plughw:ahubhdmi"' in sent and 'slave.pcm "agm_bt_clock"' in sent  # horloge temps réel : la sortie HDMI
+        assert "ttable.0.0 0" in sent and "ttable.1.1 0" in sent  # en silence : une TV branchée ne joue pas le son
         await c.post("/api/bluetooth/audio-output", json={"address": None})
         back = next(cmd for cmd in console.commands if cmd.startswith("rm -f /etc/alsa/conf.d/60-agm-bluetooth.conf;"))
         assert 'slave.pcm "agm_speakers"' in back and "> /.asoundrc" in back
@@ -111,3 +112,40 @@ async def test_launch_with_slot(app_factory):
         assert console.commands[-1].rstrip().endswith("'/mnt/mmc/Roms/SFC/Super Mario World (USA).smc' 2 > /tmp/agm-launch.log 2>&1 < /dev/null & echo started")
         r = await c.post(f"/api/games/{mario['id']}/launch", json={"slot": "1; reboot"})
         assert r.status_code == 422
+
+
+class SoundTestConsole(FakeBtConsole):
+    """Test sonore : la console répond selon l'appareil (joué, occupé par un jeu, pas connecté, échec)."""
+    ANSWERS = {"00:0C:8A:76:CE:E3": "@@RESULT played\n", "40:8E:2C:5E:AC:1C": "@@RESULT in_use\n",
+               "E4:17:D8:01:02:03": "@@RESULT absent\n", "11:22:33:44:55:66": "@@RESULT failed\naplay: oops\n"}
+
+    async def __call__(self, client, command, timeout=20):
+        if "bluealsa:DEV=" in command:
+            self.commands.append(command)
+            return 0, next(v for k, v in self.ANSWERS.items() if f"DEV={k}" in command)
+        return await super().__call__(client, command, timeout)
+
+
+async def test_sound_test_api(app_factory):
+    console = SoundTestConsole()
+    async with client_for(app_factory, console) as c:
+        test = lambda mac: c.post("/api/bluetooth/test-sound", json={"address": mac})  # noqa: E731
+        r = await test("00:0C:8A:76:CE:E3")
+        assert r.status_code == 200 and r.json() == {"result": "played"}
+        sent = console.commands[-1]
+        assert "bluealsa -p a2dp-source" in sent and "PROFILE=a2dp" in sent and "python3 -c" in sent
+        assert "env -u LD_LIBRARY_PATH timeout 15 aplay" in sent  # aplay 64 bits, jamais bloqué
+        assert (await test("40:8E:2C:5E:AC:1C")).json() == {"result": "in_use"}  # un jeu y joue déjà son son
+        r = await test("E4:17:D8:01:02:03")
+        assert r.status_code == 409 and r.json()["error"]["code"] == "bt_test_not_connected"
+        r = await test("11:22:33:44:55:66")
+        assert r.status_code == 502 and r.json()["error"]["details"]["detail"] == "aplay: oops"
+        assert (await test("00:0C:8A:76:CE:E3; reboot")).status_code == 422
+
+
+def test_chime_is_short_stereo_pcm():
+    import subprocess
+    import sys
+
+    data = subprocess.run([sys.executable, "-c", bt.CHIME], capture_output=True, check=True).stdout
+    assert len(data) % 4 == 0 and 1.0 <= len(data) / 4 / 48000 <= 1.5  # 16 bits stéréo, 48 kHz, ~1,2 s
