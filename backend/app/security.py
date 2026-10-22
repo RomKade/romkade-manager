@@ -6,6 +6,8 @@ requêtes à http://127.0.0.1:8765 depuis le navigateur de l'utilisateur. Deux c
 - en-tête Origin : une requête qui modifie quelque chose (POST, PUT, DELETE…) venant d'une autre
   origine que l'interface elle-même est refusée.
 Un WebSocket doit en plus venir de l'interface (Origin obligatoire) : il peut piloter la console.
+Un téléphone associé par QR code (app.services.phone) passe par le serveur du réseau local : son adresse y
+remplace localhost pour ces deux contrôles.
 """
 
 from starlette.responses import JSONResponse
@@ -34,12 +36,13 @@ class LocalOnlyMiddleware:
             return await self.app(scope, receive, send)
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
         host = _hostname(headers.get("host", ""))
-        if host not in self.hosts:
+        hosts = self._hosts(scope, host)
+        if host not in hosts:
             return await self._deny(scope, receive, send, "host_not_allowed", "Accès réservé à ce Mac (localhost)")
         origin = headers.get("origin")
         if scope["method"] not in SAFE_METHODS and origin and origin != "null":
             o = origin.split("://", 1)[-1]
-            if _hostname(o) not in self.hosts:
+            if _hostname(o) not in hosts:
                 return await self._deny(scope, receive, send, "origin_not_allowed",
                                         "Requête refusée : elle ne vient pas de l'interface de l'application")
         if scope["method"] not in SAFE_METHODS and origin == "null":
@@ -50,11 +53,16 @@ class LocalOnlyMiddleware:
         """WebSocket (manette à distance) : les navigateurs ne l'empêchent pas entre sites, l'Origin est donc exigée."""
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
         origin = headers.get("origin", "")
-        if (_hostname(headers.get("host", "")) not in self.hosts
-                or _hostname(origin.split("://", 1)[-1]) not in self.hosts):
+        host = _hostname(headers.get("host", ""))
+        hosts = self._hosts(scope, host)
+        if host not in hosts or _hostname(origin.split("://", 1)[-1]) not in hosts:
             await receive()  # websocket.connect
             return await send({"type": "websocket.close", "code": 1008})
         return await self.app(scope, receive, send)
+
+    def _hosts(self, scope: Scope, host: str) -> set[str]:
+        """Téléphone associé (serveur du réseau local, app.services.phone.PhoneGate) : son adresse aussi."""
+        return self.hosts | {host} if scope.get("romkade_phone") else self.hosts
 
     @staticmethod
     async def _deny(scope, receive, send, code: str, message: str) -> None:

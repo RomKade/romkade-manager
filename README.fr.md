@@ -403,6 +403,16 @@ Un jeu lancé depuis le menu de la console n'utilise pas `/.asoundrc` : seule la
 
 ## Depuis le téléphone (ngrok)
 
+**À la maison, même Wi-Fi** : le bouton téléphone, en haut de l'interface, affiche un QR code. Scanne-le avec
+l'appareil photo du téléphone : le Manager s'ouvre sur le téléphone, sans se reconnecter au compte (c'est
+l'ordinateur, connecté, qui l'a associé). Le code vaut 5 minutes et ne sert qu'une fois ; le téléphone reste ensuite
+associé 90 jours. Tant qu'un téléphone est associé, le serveur écoute aussi sur l'adresse de l'ordinateur dans le
+réseau local, mais ne répond qu'aux téléphones associés ; « Déconnecter », dans la même fenêtre, les dissocie tous
+et ferme cet accès. Pas encore avec Docker. Sur macOS, la première fois, autorise les connexions entrantes pour
+Python si la question est posée.
+
+**Hors de la maison**, avec ngrok :
+
 ```bash
 ./run.sh --telephone
 ```

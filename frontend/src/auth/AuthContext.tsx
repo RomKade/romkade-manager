@@ -2,12 +2,14 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { useT } from "../i18n";
+import { onPhone } from "../lib/phone";
 import { AuthScreen } from "./AuthScreen";
 import { supabase } from "./supabase";
 
 /**
  * Compte ROMKADE obligatoire : le Manager ne s'ouvre qu'une fois connecté (et la double authentification passée
- * si elle est activée). La session est mémorisée : on ne se reconnecte pas à chaque ouverture.
+ * si elle est activée). La session est mémorisée : on ne se reconnecte pas à chaque ouverture. Sauf sur un téléphone
+ * associé par QR code (lib/phone).
  */
 type Status = "loading" | "signedOut" | "needsMfa" | "signedIn";
 
@@ -48,6 +50,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setStatus("signedOut");
   }, []);
 
+  // Téléphone associé par QR code depuis l'ordinateur connecté : pas d'écran de connexion (sa vérification
+  // anti-robot n'est autorisée que sur localhost et romkade.com) ; le compte se gère sur l'ordinateur.
+  if (onPhone()) return <>{children}</>;
   if (status === "loading") {
     return <div className="auth-loading" role="status"><span className="auth-spin" aria-hidden />{t("auth.loading")}</div>;
   }

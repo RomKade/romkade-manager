@@ -400,6 +400,15 @@ A game launched from the console's menu does not use `/.asoundrc`: only muting w
 
 ## From your phone (ngrok)
 
+**At home, same Wi-Fi**: the phone button at the top of the interface shows a QR code. Scan it with the phone's
+camera and the Manager opens on the phone, without signing in again (the computer, signed in, paired it). The code
+is valid for 5 minutes and works once; the phone then stays paired for 90 days. While a phone is paired, the server
+also listens on the computer's local network address, but only answers paired phones; "Disconnect" in the same
+window unpairs them all and closes that access. Not available with Docker yet. On macOS, the first time, allow
+incoming connections for Python if asked.
+
+**Away from home**, with ngrok:
+
 ```bash
 ./run.sh --telephone
 ```
