@@ -4,6 +4,8 @@ import { defineConfig } from "vite";
 
 import pkg from "./package.json" with { type: "json" };
 
+const API_PORT = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.ROMKADE_API_PORT ?? "8765";
+
 // Version affichée dans l'application (barre latérale, À propos) : celle de package.json, alignée sur le backend
 // (pyproject.toml), ce que vérifie backend/tests/test_version.py.
 
@@ -16,7 +18,7 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     // ROMKADE_API_PORT : moteur sur un autre port (instance de test à côté du Manager habituel).
-    proxy: { "/api": { target: `http://127.0.0.1:${process.env.ROMKADE_API_PORT ?? 8765}`, ws: true } },  // ws : manette à distance
+    proxy: { "/api": { target: `http://127.0.0.1:${API_PORT}`, ws: true } },  // ws : manette à distance
   },
   build: { outDir: "dist", sourcemap: false, chunkSizeWarningLimit: 700 },
   test: {

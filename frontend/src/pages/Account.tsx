@@ -1,6 +1,7 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
-import { AppWindow, Cloud, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { AppWindow, Cloud, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldAlert, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { NavLink, useParams } from "react-router-dom";
 
 import { useDeviceStatus } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
@@ -16,20 +17,37 @@ import { locale, useT } from "../i18n";
  * authentification, applications connectées), sauf les consoles reliées et la suppression du compte (ROMKADE Cloud),
  * et la liaison de la console branchée (moteur local du Manager, qui installe l'agent ROMKADE).
  */
+const TABS = [
+  { slug: "", label: "account.tab.profile", icon: UserRound },
+  { slug: "securite", label: "account.tab.security", icon: ShieldCheck },
+  { slug: "consoles", label: "account.tab.consoles", icon: Cloud },
+  { slug: "applications", label: "account.tab.apps", icon: AppWindow },
+  { slug: "zone-dangereuse", label: "account.tab.danger", icon: ShieldAlert },
+] as const;
+
 export function AccountPage() {
   const t = useT();
+  translate = t as typeof translate;
+  const { tab = "" } = useParams();
+  const current = TABS.some((x) => x.slug === tab) ? tab : "";
   return (
     <div className="page account">
       <PageHeader title={t("account.title")} lead={t("account.lead")} />
-      <div className="account__grid">
-        <Profile />
-        <EmailChange />
-        <PasswordChange />
-        <TwoFactor />
-        <Consoles />
-        <ConnectedApps />
-        <Sessions />
-        <DeleteAccount />
+      <nav className="subnav" aria-label={t("account.tab.label")}>
+        {TABS.map(({ slug, label, icon: Icon }) => (
+          <NavLink key={slug} to={slug ? `/compte/${slug}` : "/compte"} end
+            className={() => `subnav__item ${current === slug ? "is-active" : ""} ${slug === "zone-dangereuse" ? "subnav__item--danger" : ""}`}
+            aria-current={current === slug ? "page" : undefined}>
+            <Icon size={16} aria-hidden /> {t(label)}
+          </NavLink>
+        ))}
+      </nav>
+      <div className="account__tab">
+        {current === "" && <><Profile /><EmailChange /></>}
+        {current === "securite" && <><PasswordChange /><TwoFactor /><Sessions /></>}
+        {current === "consoles" && <Consoles />}
+        {current === "applications" && <ConnectedApps />}
+        {current === "zone-dangereuse" && <DeleteAccount />}
       </div>
     </div>
   );
@@ -66,7 +84,19 @@ function Result({ a }: { a: ReturnType<typeof useAction> }) {
   return null;
 }
 
-const fail = (error: { message?: string } | null) => { if (error) throw new Error(error.message ?? String(error)); };
+/** Codes d'erreur de Supabase Auth traduits (sinon message générique, suivi du détail). */
+const AUTH_ERRORS = ["same_password", "weak_password", "otp_expired", "otp_disabled", "email_exists", "user_already_exists",
+  "email_address_invalid", "reauthentication_needed", "reauthentication_not_valid", "over_email_send_rate_limit",
+  "over_request_rate_limit", "mfa_verification_failed", "insufficient_aal", "session_not_found", "validation_failed"];
+let translate: (key: string, vars?: Record<string, string>) => string = (k) => k;
+const fail = (error: { code?: string; message?: string } | null) => {
+  if (!error) return;
+  const code = error.code ?? "";
+  if (AUTH_ERRORS.includes(code)) throw new Error(translate(`account.err.${code}`));
+  if (/expired|invalid.*(otp|token|nonce)/i.test(error.message ?? "")) throw new Error(translate("account.err.otp_expired"));
+  if (/different from the old/i.test(error.message ?? "")) throw new Error(translate("account.err.same_password"));
+  throw new Error(translate("account.err.generic", { detail: error.message ?? String(error) }));
+};
 const date = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(locale(), { dateStyle: "long" }) : "");
 
 /* ---------- sections ---------- */
@@ -116,7 +146,7 @@ function EmailChange() {
         <form onSubmit={(e: FormEvent) => { e.preventDefault();
           a.run(async () => { const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email_change" }); fail(error);
             setSent(false); setCode(""); setEmail(""); return t("account.email.done"); }); }}>
-          <CodeInput id="acc-email-code" value={code} onChange={setCode} />
+          <CodeInput id="acc-email-code" value={code} onChange={setCode} compact />
           <div className="actions account__actions">
             <button className="button button--primary" disabled={a.busy || code.length !== 6}>{t("account.confirm")}</button>
             <button type="button" className="button" onClick={() => { setSent(false); setCode(""); }}>{t("account.cancel")}</button>
@@ -145,7 +175,7 @@ function PasswordChange() {
         <form onSubmit={(e: FormEvent) => { e.preventDefault();
           a.run(async () => { const { error } = await supabase.auth.updateUser({ password, nonce: code }); fail(error);
             setSent(false); setCode(""); setPassword(""); return t("account.password.done"); }); }}>
-          <CodeInput id="acc-pw-code" value={code} onChange={setCode} />
+          <CodeInput id="acc-pw-code" value={code} onChange={setCode} compact />
           <div className="field auth__field">
             <label htmlFor="acc-pw">{t("auth.newPassword")}</label>
             <PasswordInput id="acc-pw" value={password} onChange={setPassword} autoComplete="new-password" />
@@ -203,7 +233,7 @@ function TwoFactor() {
           <div>
             <p className="muted">{t("account.mfa.scan")}</p>
             <p className="field__hint">{t("account.mfa.secret")} <code className="account__secret">{enrolling.secret}</code></p>
-            <CodeInput id="acc-mfa-code" value={code} onChange={setCode} />
+            <CodeInput id="acc-mfa-code" value={code} onChange={setCode} compact />
             <div className="actions account__actions">
               <button className="button button--primary" disabled={a.busy || code.length !== 6}>{t("account.confirm")}</button>
               <button type="button" className="button" onClick={async () => { await supabase.auth.mfa.unenroll({ factorId: enrolling.id }); setEnrolling(null); setCode(""); }}>

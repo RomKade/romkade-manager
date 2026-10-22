@@ -113,7 +113,7 @@ export function PasswordInput({ id, value, onChange, autoComplete }: { id: strin
 }
 
 /** Code à 6 chiffres en 6 cases : avance seul, retour arrière, collage du code entier, remplissage automatique. */
-export function CodeInput({ value, onChange, id = "auth-code" }: { value: string; onChange: (v: string) => void; id?: string }) {
+export function CodeInput({ value, onChange, id = "auth-code", compact = false }: { value: string; onChange: (v: string) => void; id?: string; compact?: boolean }) {
   const t = useT();
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
@@ -128,7 +128,7 @@ export function CodeInput({ value, onChange, id = "auth-code" }: { value: string
   return (
     <div className="field auth__field">
       <label htmlFor={`${id}-0`}>{t("auth.code")}</label>
-      <div className="auth__digits" role="group" aria-label={t("auth.code")}>
+      <div className={`auth__digits ${compact ? "auth__digits--compact" : ""}`} role="group" aria-label={t("auth.code")}>
         {digits.map((d, i) => (
           <input key={i} id={`${id}-${i}`} ref={(el) => { refs.current[i] = el; }} className="auth__digit"
             type="text" inputMode="numeric" pattern="[0-9]" maxLength={i === 0 ? 6 : 1} value={d} autoFocus={i === 0}

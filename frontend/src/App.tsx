@@ -105,6 +105,7 @@ export function AppRoutes() {
         <Route path="parametres/:tab" element={<SettingsPage />} />
         <Route path="conditions" element={<TermsPage />} />
         <Route path="compte" element={<AccountPage />} />
+        <Route path="compte/:tab" element={<AccountPage />} />
         <Route path="*" element={<div className="page"><Empty title={t("common.nav.notFound")} /></div>} />
       </Route>
     </Routes>

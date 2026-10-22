@@ -183,23 +183,37 @@
 /* ---------- Mon compte ---------- */
 a.account-chip__who { color: inherit; text-decoration: none; border-radius: 6px; }
 a.account-chip__who:hover .account-chip__name { color: var(--accent); }
-.account__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 18px; align-items: start; }
-.account__block { display: flex; flex-direction: column; gap: 12px; }
+.subnav__item--danger.is-active { border-bottom-color: var(--err); box-shadow: 0 6px 10px -8px var(--err); }
+.subnav__item--danger.is-active svg, .subnav__item--danger:hover svg { color: var(--err); }
+.account__tab { display: flex; flex-direction: column; gap: 18px; max-width: 760px; }
+.account__block { display: flex; flex-direction: column; gap: 14px; }
 .account__block h2 { font-size: var(--fs-lg); }
 .account__lead { margin: 0; font-size: var(--fs-sm); }
+/* Champs et boutons à la même hauteur, alignés en bas */
+.account .field input, .account .field select { min-height: 42px; height: 42px; }
+.account .button { min-height: 42px; }
 .account__row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-.account__grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.account__actions { margin-top: 12px; }
+.account__row > .button { flex: none; }
+.account__grow { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; }
+.account__actions { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
 .account__status { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 700; }
 .account__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.account__list li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.account__list li { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
 .account__list li:first-child { border-top: 0; }
-.account__link { margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; }
+.account__list li .account__grow { flex: 1 1 auto; }
+.account__link { margin-top: 4px; padding-top: 14px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 10px; }
 .account__link h3 { margin: 0; font-size: var(--fs-md); display: flex; align-items: center; gap: 8px; }
 .account__link h3 svg { color: var(--accent); }
-.account__mfa { display: grid; grid-template-columns: 180px 1fr; gap: 16px; align-items: start; }
+.account__mfa { display: grid; grid-template-columns: 180px 1fr; gap: 18px; align-items: start; }
+.account__mfa > div { display: flex; flex-direction: column; gap: 10px; }
 .account__qr { width: 180px; height: 180px; border-radius: 12px; background: #fff; padding: 8px; }
 .account__secret { word-break: break-all; font-size: var(--fs-xs); }
-.account__block--danger { border-color: color-mix(in srgb, var(--err) 45%, var(--line)); }
+.account__block--danger { border-color: color-mix(in srgb, var(--err) 55%, var(--line));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--err) 7%, var(--panel)), var(--panel)); }
 .account__block--danger h2 svg { color: var(--err); }
+.account .auth__field { margin-top: 0; }
+.account .auth__notice { margin: 0; }
+/* Code à 6 chiffres, taille réduite dans le compte */
+.auth__digits--compact { grid-template-columns: repeat(6, 44px); gap: 8px; }
+.field .auth__digits--compact .auth__digit, .account .field .auth__digits--compact .auth__digit { width: 44px; min-height: 48px; height: 48px; font-size: 1.25rem; }
 @media (max-width: 560px) { .account__mfa { grid-template-columns: 1fr; } }
