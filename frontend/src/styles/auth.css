@@ -267,3 +267,4 @@
 .account__linked.is-online .account__linked-state { color: var(--ok); }
 .account__linked .field__hint { margin: 0; }
 .account__replace { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.account__new { color: var(--accent); }

@@ -37,8 +37,10 @@ async def agent_status(request: Request) -> dict:
     profile = await request.app.state.system.ensure()
     async with request.app.state.pool.session(client) as (_conn, sftp):
         config = await cloud_agent.read_agent(sftp, client.settings.roms_root)
+        version = await cloud_agent.read_version(sftp, client.settings.roms_root) if config else None
     return {"supported": profile.id in cloud_agent.SUPPORTED, "installed": bool(config and config.get("secret")),
-            "server": (config or {}).get("server"), "cloud": cloud_agent.CLOUD_URL}
+            "server": (config or {}).get("server"), "cloud": cloud_agent.CLOUD_URL,
+            "version": version, "latest": cloud_agent.manager_version()}
 
 
 @router.post("/link")
@@ -58,8 +60,9 @@ async def link(request: Request, body: LinkIn | None = None) -> dict:
     secret = (current or {}).get("secret") if (current or {}).get("server", "").rstrip("/") == cloud_agent.CLOUD_URL else None
     reply = await cloud_agent.register(token, (body.name if body else None), info, secret)
     async with request.app.state.pool.session(client) as (_conn, sftp):
-        await cloud_agent.install(request.app.state.device_runner, client, sftp, roms_root, reply["server"], reply["secret"])
-    return {"console": reply["console"], "reused": bool(reply.get("reused"))}
+        shown = await cloud_agent.install(request.app.state.device_runner, client, sftp, roms_root, reply["server"],
+                                          reply["secret"], splash="updated" if secret else "installed")
+    return {"console": reply["console"], "reused": bool(reply.get("reused")), "splash": shown}
 
 
 @router.delete("/agent")

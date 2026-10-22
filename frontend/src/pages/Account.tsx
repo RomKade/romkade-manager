@@ -8,7 +8,7 @@ import { useDeviceStatus } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { CodeInput, PasswordInput } from "../auth/AuthScreen";
 import { ACCOUNT_TABS, accountPath } from "../auth/accountTabs";
-import { CLOUD_URL, cloud, localAgent, type CloudConsole } from "../auth/cloud";
+import { CLOUD_URL, cloud, localAgent, type AgentStatus, type CloudConsole } from "../auth/cloud";
 import { PasswordStrength, passwordValid } from "../auth/password";
 import { supabase } from "../auth/supabase";
 import { SubNav } from "../components/SubNav";
@@ -296,7 +296,7 @@ function Consoles() {
   const t = useT();
   const connected = useDeviceStatus().data?.connected === true;
   const [list, setList] = useState<CloudConsole[] | null>(null);
-  const [agent, setAgent] = useState<{ supported: boolean; installed: boolean } | null>(null);
+  const [agent, setAgent] = useState<AgentStatus | null>(null);
   const [name, setName] = useState("");
   const a = useAction();
   const qc = useQueryClient();
@@ -346,9 +346,13 @@ function Consoles() {
               </button>
             </div>
           )}
-          {here && (
-            <p className="field__hint">{t("account.linked.update")}{" "}
-              <button className="auth__link" disabled={a.busy} onClick={() => a.run(async () => { await localAgent.link(); await load(); return t("account.linked.updated"); })}>
+          {here && agent && (
+            <p className="field__hint">
+              {t("account.linked.update", { version: agent.version ?? "?" })}{" "}
+              {agent.version !== agent.latest && <strong className="account__new">{t("account.linked.available", { version: agent.latest })} </strong>}
+              <button className="auth__link" disabled={a.busy} onClick={() => a.run(async () => {
+                const r = await localAgent.link(); await load();
+                return t(r.splash ? "account.linked.updatedLook" : "account.linked.updated"); })}>
                 {a.busy ? <span className="auth-spin" aria-hidden /> : null}{t("account.linked.updateGo")}
               </button>
             </p>
@@ -361,7 +365,8 @@ function Consoles() {
           {!connected ? <p className="field__hint">{t("account.link.offline")}</p>
             : agent && !agent.supported ? <p className="field__hint">{t("account.link.unsupported")}</p> : (
             <form className="field" onSubmit={(e: FormEvent) => { e.preventDefault();
-              a.run(async () => { await localAgent.link(name.trim()); await load(); return t("account.link.done"); }); }}>
+              a.run(async () => { const r = await localAgent.link(name.trim()); await load();
+                return t(r.splash ? "account.link.doneLook" : "account.link.done"); }); }}>
               <label htmlFor="acc-console-name">{t("account.link.name")}</label>
               <div className="account__inline">
                 <input id="acc-console-name" value={name} maxLength={40} placeholder={t("account.link.namePh")} onChange={(e) => setName(e.target.value)} />

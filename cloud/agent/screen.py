@@ -41,6 +41,7 @@ WARN = (245, 184, 74)
 # Écran de chaque modèle (board.ini) : largeur, hauteur, rotation. Les autres : 640 x 480.
 BOARDS = {"RGcubexx": (720, 720, 0), "RG34xx": (720, 480, 0), "RG34xxSP": (720, 480, 0), "RG28xx": (640, 480, 90)}
 KEY_A, KEY_B, KEY_MENU = 304, 305, 312
+EVIOCGRAB = 0x40044590  # accès exclusif aux touches (le menu de la console ne les reçoit plus)
 
 TEXT = {
     "fr": {"code": "CODE D'APPAIRAGE", "where": "Dans ChatGPT ou Claude, avec le connecteur ROMKADE :",
@@ -48,21 +49,32 @@ TEXT = {
            "connected": "Console connectée", "games": "jeux", "available": "disponibles dans ChatGPT et Claude",
            "try": "Essaie :", "ex1": "« Lance Sonic sur ma console »", "ex2": "« Des codes de triche pour Contra ? »",
            "connecting": "Connexion au cloud ROMKADE", "offline": "Pas de connexion au cloud",
-           "offline_hint": "Vérifie que le Wi-Fi est activé, puis rouvre l'app.", "back": "Retour"},
+           "offline_hint": "Vérifie que le Wi-Fi est activé, puis rouvre l'app.", "back": "Retour",
+           "updated": "App ROMKADE mise à jour", "installed": "App ROMKADE installée", "version": "Version {v}", "linked": "Reliée à ton compte ROMKADE", "ready": "Pilotable depuis ChatGPT et Claude", "close": "Fermer"},
     "en": {"code": "PAIRING CODE", "where": "In ChatGPT or Claude, with the ROMKADE connector:",
            "say": "“Connect my console, code {code}”", "valid": "Valid for {min} more min",
            "connected": "Console connected", "games": "games", "available": "available in ChatGPT and Claude",
            "try": "Try:", "ex1": "“Launch Sonic on my console”", "ex2": "“Cheat codes for Contra?”",
            "connecting": "Connecting to ROMKADE cloud", "offline": "No connection to the cloud",
-           "offline_hint": "Check that Wi-Fi is on, then open the app again.", "back": "Back"},
+           "offline_hint": "Check that Wi-Fi is on, then open the app again.", "back": "Back",
+           "updated": "ROMKADE app updated", "installed": "ROMKADE app installed", "version": "Version {v}", "linked": "Linked to your ROMKADE account", "ready": "Ready to drive from ChatGPT and Claude", "close": "Close"},
     "es": {"code": "CÓDIGO DE EMPAREJAMIENTO", "where": "En ChatGPT o Claude, con el conector ROMKADE:",
            "say": "«Conecta mi consola, código {code}»", "valid": "Válido {min} min más",
            "connected": "Consola conectada", "games": "juegos", "available": "disponibles en ChatGPT y Claude",
            "try": "Prueba:", "ex1": "«Inicia Sonic en mi consola»", "ex2": "«¿Trucos para Contra?»",
            "connecting": "Conectando con la nube ROMKADE", "offline": "Sin conexión con la nube",
-           "offline_hint": "Comprueba que el Wi-Fi está activado y vuelve a abrir la app.", "back": "Volver"},
+           "offline_hint": "Comprueba que el Wi-Fi está activado y vuelve a abrir la app.", "back": "Volver",
+           "updated": "App ROMKADE actualizada", "installed": "App ROMKADE instalada", "version": "Versión {v}", "linked": "Conectada a tu cuenta ROMKADE", "ready": "Lista para controlar desde ChatGPT y Claude", "close": "Cerrar"},
 }
 LANGS = ["zh", "zh", "en", "ja", "ko", "es", "ru", "de", "fr", "pt"]  # /mnt/vendor/oem/language.ini
+
+
+def app_version() -> str:
+    """Version de l'app, écrite par le Manager qui l'installe (fichier VERSION à côté de l'agent)."""
+    try:
+        return (HERE / "VERSION").read_text().strip()
+    except OSError:
+        return ""
 
 
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
@@ -160,6 +172,29 @@ def render(state: dict, lang: str, size=(640, 480), tick: int = 0) -> Image.Imag
         centered(d, w, y + sc(70), "!", font(sc(44), True), WARN)
         centered(d, w, y + sc(122), T["offline"], font(sc(26), True), INK)
         centered(d, w, y + sc(158), T["offline_hint"], font(sc(17)), INK_2)
+    elif status in ("updated", "installed"):  # juste après une installation ou une mise à jour par le Manager
+        r = sc(34)
+        cy = y + sc(58)
+        halo = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        ImageDraw.Draw(halo).ellipse((cx - r - sc(10), cy - r - sc(10), cx + r + sc(10), cy + r + sc(10)), fill=(*LIME, 150))
+        halo = halo.filter(ImageFilter.GaussianBlur(sc(12)))
+        img.paste(halo, (0, 0), halo)
+        d = ImageDraw.Draw(img)
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=LIME)
+        d.line((cx - sc(15), cy + sc(1), cx - sc(4), cy + sc(13), cx + sc(17), cy - sc(12)), fill=SHELL, width=sc(7), joint="curve")
+        centered(d, w, cy + r + sc(18), T[status], font(sc(32), True), INK)
+        ver = state.get("version") or app_version()
+        if ver:
+            f = font(sc(18), True)
+            label = T["version"].format(v=ver)
+            tw = d.textlength(label, font=f)
+            yv = cy + r + sc(66)
+            d.rounded_rectangle((cx - tw / 2 - sc(14), yv - sc(4), cx + tw / 2 + sc(14), yv + sc(28)), sc(16),
+                                fill=PANEL_2, outline=CYAN, width=1)
+            centered(d, w, yv, label, f, CYAN)
+        yy = cy + r + sc(116)
+        centered(d, w, yy, T["linked"] + (f" · {state['name']}" if state.get("name") else ""), font(sc(18)), INK_2)
+        centered(d, w, yy + sc(30), T["ready"], font(sc(18), True), PINK)
     elif status == "paired":
         r = sc(9)
         title = T["connected"]
@@ -226,8 +261,9 @@ def render(state: dict, lang: str, size=(640, 480), tick: int = 0) -> Image.Imag
     centered_in = font(sc(14), True)
     d.text((sc(24) + (sc(24) - d.textlength("B", font=centered_in)) / 2, fy + sc(3)), "B", font=centered_in,
            fill=(230, 200, 60))
-    d.text((sc(56), fy + sc(2)), T["back"], font=font(sc(15)), fill=INK_2)
-    rights = "© 2026 ROMKADE · romkade.com"
+    d.text((sc(56), fy + sc(2)), T["close"] if status in ("updated", "installed") else T["back"], font=font(sc(15)), fill=INK_2)
+    ver = app_version()
+    rights = (f"v{ver} · " if ver else "") + "© 2026 ROMKADE · romkade.com"
     fr = font(sc(14))
     d.text((w - sc(24) - d.textlength(rights, font=fr), fy + sc(3)), rights, font=fr, fill=INK_3)
     return img
@@ -264,9 +300,13 @@ class Screen:
         self.mm.seek(0)
         self.mm.write(Image.merge("RGBA", (b, g, r, a)).tobytes())  # l'écran attend du BGRA
 
-    def close(self) -> None:
+    def snapshot(self) -> bytes:
         self.mm.seek(0)
-        self.mm.write(bytes(self.w * self.h * 4))
+        return self.mm.read(self.w * self.h * 4)
+
+    def close(self, restore: bytes | None = None) -> None:
+        self.mm.seek(0)
+        self.mm.write(restore if restore is not None else bytes(self.w * self.h * 4))
         self.mm.close()
         os.close(self.fd)
 
@@ -302,6 +342,48 @@ def current_state(started: float) -> dict:
     return st
 
 
+def splash(kind: str, seconds: float) -> None:
+    """Écran « app installée / mise à jour » lancé par le Manager, par-dessus le menu de la console : l'image du menu
+    est gardée puis remise, et les touches sont prises le temps de l'écran (le menu ne les reçoit pas). B, A ou
+    MENU le ferment plus tôt."""
+    lang = system_lang()
+    screen = Screen()
+    before = screen.snapshot()
+    keys = grab = None
+    try:
+        keys = os.open("/dev/input/event1", os.O_RDONLY | os.O_NONBLOCK)
+        from fcntl import ioctl
+        ioctl(keys, EVIOCGRAB, 1)
+        grab = True
+    except OSError:
+        pass
+    end = time.time() + seconds
+    last = None
+    try:
+        while time.time() < end:
+            try:
+                st = json.loads(STATUS.read_text())
+            except (OSError, ValueError):
+                st = {}
+            state = {"status": kind if kind in ("updated", "installed") else "updated", "name": st.get("name")}
+            if state != last:
+                screen.show(render(state, lang, screen.size))
+                last = state
+            if keys is not None and any(k in (KEY_A, KEY_B, KEY_MENU) for k in read_keys(keys)):
+                break
+            time.sleep(0.2)
+    finally:
+        if keys is not None:
+            if grab:
+                try:
+                    from fcntl import ioctl
+                    ioctl(keys, EVIOCGRAB, 0)
+                except OSError:
+                    pass
+            os.close(keys)
+        screen.close(before)
+
+
 def main() -> None:
     if "--preview" in sys.argv:
         out = sys.argv[sys.argv.index("--preview") + 1]
@@ -309,6 +391,10 @@ def main() -> None:
         lang = sys.argv[sys.argv.index("--lang") + 1] if "--lang" in sys.argv else "fr"
         size = tuple(int(v) for v in sys.argv[sys.argv.index("--size") + 1].split("x")) if "--size" in sys.argv else (640, 480)
         render(state, lang, size).save(out)
+        return
+    if "--splash" in sys.argv:
+        i = sys.argv.index("--splash")
+        splash(sys.argv[i + 1], float(sys.argv[i + 2]) if len(sys.argv) > i + 2 else 6)
         return
     started = float(sys.argv[1]) if len(sys.argv) > 1 else time.time()
     lang = system_lang()
