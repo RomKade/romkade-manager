@@ -13,8 +13,13 @@ ordres. Rien à ouvrir sur la box, pas d'IP, pas de SSH.
 ## Serveur (`server/`)
 
 - `romkade_cloud/tools.py` : outils MCP (`pair_console`, `list_consoles`, `rename_console`, `search_games`,
-  `game_details`, `library_overview`, `get_cheats`, `console_status`, `launch_game`, `quit_game`, `save_state`,
-  `set_volume`). Chacun renvoie une vue (`view`) de l'interface ROMKADE.
+  `favorite_games`, `game_details`, `library_overview`, `get_cheats`, `console_status`, `launch_game`, `quit_game`,
+  `save_state`, `set_volume`). Chacun renvoie une vue (`view`) de l'interface ROMKADE. `game_details` dit aussi si
+  le jeu est un favori et quelles sauvegardes il a sur la console (en jeu, instantanées, avec leur date), lues par
+  l'agent quand la console est allumée.
+- Favoris : ceux de la console dans le Manager (étoile d'un jeu). Le Manager les pose à côté de l'agent
+  (`romkade/favorites.json`) à chaque favori ajouté ou retiré, à chaque synchronisation et à la liaison ; l'agent
+  les envoie (`/agent/favorites`). Le cloud les garde par chemin : ils survivent au recalcul du catalogue.
 - `romkade_cloud/ui/app.html` : interface ROMKADE dans ChatGPT, Claude… (extension **MCP Apps**, ressource
   `ui://romkade/app.html`). Même charte que le Manager : grille de jaquettes, fiche du jeu, carte « En cours sur la
   console » (volume, sauvegarder, quitter), bibliothèque par console, cheats, consoles. Boutons reliés aux outils
@@ -42,7 +47,8 @@ ROMKADE) avant toute ouverture au public : c'est aussi ce qu'exigent les annuair
 
 Python 3.10+ de la console, bibliothèque standard seule. Il embarque les modules de pilotage du Manager
 (`launcher`, `volume`, `systems`), qui s'exécutent sur place au lieu de passer par SSH. Il n'accepte que des
-actions nommées (`status`, `launch`, `quit`, `save_state`, `volume`, `rescan`), jamais de commande libre.
+actions nommées (`status`, `launch`, `quit`, `save_state`, `volume`, `rescan`, `saves`), jamais de commande
+libre. `saves` lit les sauvegardes de la carte avec le module du Manager (`services/saves.py`), en lecture seule.
 
 ```sh
 cd cloud/agent && ./build.sh https://mcp.romkade.com   # -> dist/sd, à copier à la racine de la carte SD

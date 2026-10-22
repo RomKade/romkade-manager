@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from app import errors
 from app.services import assistant as asst
+from app.api import saves as saves_api
 from app.api.catalog import console_id
 from app.services import catalog_query as cq
 from app.services import knowledge as kn
@@ -94,6 +95,14 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
             library_ids = None
 
     console_key = console_id(request)  # favoris de la console branchée
+    # « Ai-je une sauvegarde de Zelda ? » : sauvegardes lues sur la carte à l'instant (None : console injoignable).
+    want_saves = intent in ("game_help", "library_info", "app_help") and bool(asst.SAVES_RE.search(question))
+    saves = None
+    if want_saves:
+        try:
+            saves = await asyncio.wait_for(saves_api._scan(request), 10)
+        except Exception as exc:  # noqa: BLE001 — console éteinte, hors Wi-Fi…
+            log.info("sauvegardes non lues pour l'assistant : %s", exc)
 
     def build():
         with st.sessions() as s:
@@ -166,6 +175,16 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                 return text, srcs
 
         context, sources = await asyncio.to_thread(card)
+
+    if want_saves:
+        def saves_block():
+            with st.sessions() as s:
+                targets = ([cq.get_file(s, target.id)] if target is not None else
+                           [cq.get_file(s, game[0])] if game else
+                           asst.find_library_games(s, mentioned, None) if mentioned else [])
+                return asst.saves_text(s, saves, targets)
+
+        context = ((context or "") + "\n\n" + await asyncio.to_thread(saves_block)).strip()
 
     if game:
         scope = (f"This conversation is only about the game « {game[1]} » and about using the app with it: "

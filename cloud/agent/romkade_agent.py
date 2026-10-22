@@ -6,7 +6,8 @@ sortant : rien à ouvrir sur la box, pas d'adresse IP à connaître, pas de SSH.
 
 - Au démarrage : se présente (modèle, firmware), reçoit la première fois un secret (gardé dans agent.json) et,
   tant que la console n'est liée à aucun compte, un code d'appairage (écrit dans /tmp pour l'app ROMKADE).
-- Envoie la liste des fichiers du dossier des ROMs (noms et tailles seulement), puis de nouveau si elle change.
+- Envoie la liste des fichiers du dossier des ROMs (noms et tailles seulement), puis de nouveau si elle change ;
+  de même pour les favoris que le Manager pose à côté de l'agent (favorites.json).
 - Attend les ordres (long polling) et n'exécute que ceux de la liste ACTIONS : jamais de commande libre venue
   du réseau. Les commandes de la console sont celles du Manager (vendor/app/device : launcher, volume, systems).
 """
@@ -22,6 +23,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,9 +32,13 @@ sys.path.insert(0, str(HERE / "vendor"))
 
 from app import errors  # noqa: E402
 from app.device import launcher, systems, volume  # noqa: E402
+from app.services import saves  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 CONFIG = HERE / "agent.json"            # {"server": "https://…", "secret": "…"} (sur la carte : survit au redémarrage)
+FAVORITES = HERE / "favorites.json"   # écrit par le Manager : {"favorites": [[dossier, chemin relatif], …]}
+MAX_FAVORITES = 500
+MAX_SAVES = 300
 STATUS = Path("/tmp/romkade-status.json")  # état lu par l'app ROMKADE (RomKade.sh) pour l'écran de la console
 LOG = Path("/tmp/romkade-agent.log")
 PIDFILE = Path("/tmp/romkade-agent.pid")
@@ -116,6 +122,41 @@ async def http(cfg: dict, method: str, path: str, body=None, timeout: float = 30
     return await asyncio.to_thread(_request, cfg, method, path, body, timeout, compress)
 
 
+class LocalFS:
+    """Lecture des dossiers de la carte pour services/saves.py (qui, dans le Manager, passe par SFTP)."""
+
+    async def listdir(self, path: str) -> list:
+        return await asyncio.to_thread(self._listdir, path)
+
+    @staticmethod
+    def _listdir(path: str) -> list:
+        out = []
+        with os.scandir(path) as entries:
+            for e in entries:
+                try:
+                    st = e.stat()
+                except OSError:
+                    continue
+                kind = "dir" if e.is_dir() else "file" if e.is_file() else "other"
+                out.append(SimpleNamespace(name=e.name, path=e.path, kind=kind, size=st.st_size,
+                                           modified_at=datetime.fromtimestamp(st.st_mtime, timezone.utc)))
+        return out
+
+
+def read_favorites() -> tuple[tuple | None, list | None]:
+    """(signature du fichier, favoris) ; (None, None) sans fichier, (signature, None) s'il est illisible."""
+    try:
+        st = FAVORITES.stat()
+    except OSError:
+        return None, None
+    sig = (st.st_mtime_ns, st.st_size)
+    try:
+        favs = json.loads(FAVORITES.read_text())["favorites"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return sig, None  # en cours d'écriture par le Manager : relu au tour suivant
+    return sig, [[str(f[0]), str(f[1])] for f in favs if isinstance(f, list) and len(f) == 2][:MAX_FAVORITES]
+
+
 # ---------- catalogue ----------
 def scan(root: str) -> list[list]:
     """[[dossier de plateforme, chemin relatif, taille], …] : noms et tailles seulement."""
@@ -153,6 +194,7 @@ class Agent:
         self.detection = None
         self.catalog_digest = None
         self.catalog_at = 0.0
+        self.favorites_sig = None
         self.device_lock = asyncio.Lock()  # un ordre à la fois sur la console
 
     @property
@@ -214,6 +256,14 @@ class Agent:
         write_status(games=r.get("games"))
         log.info("catalogue envoyé : %s fichiers, %s jeux", len(files), r.get("games"))
 
+    async def sync_favorites(self, force: bool = False) -> None:
+        sig, favs = await asyncio.to_thread(read_favorites)
+        if sig is None or favs is None or (sig == self.favorites_sig and not force):
+            return
+        await http(self.cfg, "POST", "/agent/favorites", {"favorites": favs})
+        self.favorites_sig = sig
+        log.info("favoris envoyés : %s", len(favs))
+
     # ---------- ordres ----------
     def rom_path(self, platform_dir: str, relative_path: str) -> str:
         """Chemin complet d'un jeu, refusé s'il sort du dossier des ROMs ou n'existe pas."""
@@ -270,12 +320,28 @@ class Agent:
                                     bool(muted) if muted is not None else None)
         return {"percent": v["percent"], "muted": v["muted"]}
 
+    async def do_saves(self, p: dict) -> dict:
+        """Sauvegardes de la carte (en jeu, instantanées), celles des noms demandés seulement si `names` est donné
+        (noms de fichiers du jeu, en minuscules). Lecture seule."""
+        names = {str(n).lower() for n in p.get("names") or []}
+        root = self.roms_root
+        try:
+            dirs = [d for d in os.listdir(root) if not d.startswith(".") and os.path.isdir(os.path.join(root, d))]
+        except OSError:
+            dirs = []
+        found = await saves.scan(LocalFS(), saves.base_dir(root), root, dirs, sources=self.profile.save_sources,
+                                 rom_states=self.profile.states_in_rom_folder)
+        out = [{"platform": f.platform, "name": f.stem, "kind": f.kind, "slot": f.slot, "source": f.source,
+                "size": f.size, "modified": f.mtime.timestamp() if f.mtime else None}
+               for f in found if not names or f.stem.lower() in names]
+        return {"saves": out[:MAX_SAVES], "total": len(out)}
+
     async def do_rescan(self, _p: dict) -> dict:
         await self.sync_catalog(force=True)
         return {"rescanned": True}
 
     ACTIONS = {"status": do_status, "launch": do_launch, "quit": do_quit, "save_state": do_save_state,
-               "volume": do_volume, "rescan": do_rescan}
+               "volume": do_volume, "rescan": do_rescan, "saves": do_saves}
 
     async def handle(self, command: dict) -> None:
         action = command.get("action")
@@ -305,6 +371,7 @@ class Agent:
             try:
                 await self.hello()
                 await self.sync_catalog(force=True)
+                await self.sync_favorites(force=True)
                 last_scan = time.time()
                 backoff = 2
                 while True:
@@ -319,6 +386,7 @@ class Agent:
                             await self.hello()  # appairée (ou détachée) depuis : l'écran de l'app suit
                         elif not r["paired"] and (status.get("code_until") or 0) < time.time() + 30:
                             await self.hello()  # code bientôt expiré : le cloud en donne un nouveau
+                    await self.sync_favorites()  # un stat par tour : favori ajouté dans le Manager
                     if time.time() - last_scan > RESCAN_EVERY:
                         last_scan = time.time()
                         await self.sync_catalog()

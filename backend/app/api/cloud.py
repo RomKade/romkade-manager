@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app import errors
+from app.api.catalog import console_id
 from app.device.ssh_client import DeviceClient
 from app.services import cloud_agent
 
@@ -59,6 +60,7 @@ async def link(request: Request, body: LinkIn | None = None) -> dict:
     reply = await cloud_agent.register(token, (body.name if body else None), info, secret)
     async with request.app.state.pool.session(client) as (_conn, sftp):
         await cloud_agent.install(request.app.state.device_runner, client, sftp, roms_root, reply["server"], reply["secret"])
+    await cloud_agent.push_favorites(request.app.state, console_id(request))
     return {"console": reply["console"], "reused": bool(reply.get("reused"))}
 
 

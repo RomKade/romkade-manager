@@ -6,6 +6,8 @@ import io
 import httpx
 from PIL import Image
 
+from app.services import cloud_agent
+
 from conftest import PasswordServer
 from test_catalog import games, sync
 
@@ -43,10 +45,11 @@ async def test_grid_burst_uses_one_ssh_connection(client, ssh_server):
     await sync(client)
     items = (await games(client, platform="SFC", has_image=True, limit=100))["items"]
     assert len(items) == 30
+    await asyncio.gather(*cloud_agent._pushes)  # favoris vers l'agent après la synchronisation : connexion du pool
     before = PasswordServer.connections
     results = await asyncio.gather(*(client.get(g["image_url"], params={"size": "thumb"}) for g in items))
     assert all(r.status_code == 200 for r in results)
-    assert PasswordServer.connections - before == 1
+    assert PasswordServer.connections - before <= 1  # la connexion partagée, jamais une par image
     assert ssh_server["sftp"].write_attempts == []
 
 

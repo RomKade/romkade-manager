@@ -156,6 +156,9 @@ h2 { font-size: var(--fs-lg); font-weight: 680; font-stretch: 108%; }
 .sheet__body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--fs-sm); color: var(--ink-2); }
 .facts b { color: var(--ink); font-weight: 650; }
+.fav { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-weight: 650; }
+.fav svg, .saves svg, .chip svg, .section-head h2 svg { width: 15px; height: 15px; flex: none; }
+.saves { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: var(--fs-sm); color: var(--ink-2); }
 .desc { font-size: var(--fs-sm); color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
 .desc.is-open { -webkit-line-clamp: unset; display: block; }
 .link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: var(--fs-sm); font-weight: 650; }
@@ -264,7 +267,11 @@ const TEXT = {
     developer: "Développeur", publisher: "Éditeur", year: "Année", genre: "Genre", region: "Région",
     libraryOf: "Bibliothèque de", genresTitle: "Genres", systemsTitle: "Consoles", updated: (m) => `Catalogue mis à jour il y a ${fmtAgo(m)}`,
     sentToConsole: "Envoyé à la console.", error: "Erreur", loading: "Chargement…", rights: "© 2026 ROMKADE · Tous droits réservés",
-    covers: "Jaquettes : libretro-thumbnails", cheatSource: "Codes : libretro-database, CC BY-SA 4.0" },
+    covers: "Jaquettes : libretro-thumbnails", cheatSource: "Codes : libretro-database, CC BY-SA 4.0",
+    favorites: "Mes favoris", favorite: "Favori", noFavorites: "Aucun favori pour l'instant : l'étoile d'un jeu dans ROMKADE Manager l'ajoute ici.",
+    inGameSave: "Sauvegarde en jeu", states: (n) => `${fmt(n)} sauvegarde${n > 1 ? "s" : ""} instantanée${n > 1 ? "s" : ""}`,
+    lastSaved: (d) => `dernière le ${d}`, noSave: "Aucune sauvegarde de ce jeu sur la console",
+    savesUnchecked: "Sauvegardes visibles quand la console est allumée", savesUpdate: "Mets à jour l'app ROMKADE de la console pour voir ses sauvegardes" },
   en: { games: (n) => `${fmt(n)} game${n > 1 ? "s" : ""}`, of: "on", consoles: (n) => `system${n > 1 ? "s" : ""}`,
     play: "Play", resume: "Resume", cheats: "Cheat codes", back: "Back", more: "Show more", readMore: "Read more",
     nowPlaying: "Now playing on the console", launching: "Launching on the console", save: "Save now", quit: "Quit game",
@@ -276,7 +283,11 @@ const TEXT = {
     developer: "Developer", publisher: "Publisher", year: "Year", genre: "Genre", region: "Region",
     libraryOf: "Library of", genresTitle: "Genres", systemsTitle: "Systems", updated: (m) => `Catalog updated ${fmtAgo(m)} ago`,
     sentToConsole: "Sent to the console.", error: "Error", loading: "Loading…", rights: "© 2026 ROMKADE · All rights reserved",
-    covers: "Box art: libretro-thumbnails", cheatSource: "Codes: libretro-database, CC BY-SA 4.0" },
+    covers: "Box art: libretro-thumbnails", cheatSource: "Codes: libretro-database, CC BY-SA 4.0",
+    favorites: "My favorites", favorite: "Favorite", noFavorites: "No favorite yet: the star on a game in ROMKADE Manager adds it here.",
+    inGameSave: "In-game save", states: (n) => `${fmt(n)} save state${n > 1 ? "s" : ""}`,
+    lastSaved: (d) => `latest on ${d}`, noSave: "No save of this game on the console",
+    savesUnchecked: "Saves are shown while the console is on", savesUpdate: "Update the ROMKADE app on the console to see its saves" },
   es: { games: (n) => `${fmt(n)} juego${n > 1 ? "s" : ""}`, of: "en", consoles: (n) => `consola${n > 1 ? "s" : ""}`,
     play: "Jugar", resume: "Continuar", cheats: "Trucos", back: "Volver", more: "Mostrar más", readMore: "Leer más",
     nowPlaying: "Jugando en la consola", launching: "Iniciando en la consola", save: "Guardar ahora", quit: "Salir del juego",
@@ -288,7 +299,11 @@ const TEXT = {
     developer: "Desarrollador", publisher: "Editor", year: "Año", genre: "Género", region: "Región",
     libraryOf: "Biblioteca de", genresTitle: "Géneros", systemsTitle: "Consolas", updated: (m) => `Catálogo actualizado hace ${fmtAgo(m)}`,
     sentToConsole: "Enviado a la consola.", error: "Error", loading: "Cargando…", rights: "© 2026 ROMKADE · Todos los derechos reservados",
-    covers: "Carátulas: libretro-thumbnails", cheatSource: "Códigos: libretro-database, CC BY-SA 4.0" },
+    covers: "Carátulas: libretro-thumbnails", cheatSource: "Códigos: libretro-database, CC BY-SA 4.0",
+    favorites: "Mis favoritos", favorite: "Favorito", noFavorites: "Aún no hay favoritos: la estrella de un juego en ROMKADE Manager lo añade aquí.",
+    inGameSave: "Partida guardada en el juego", states: (n) => `${fmt(n)} guardado${n > 1 ? "s" : ""} rápido${n > 1 ? "s" : ""}`,
+    lastSaved: (d) => `el último el ${d}`, noSave: "Ninguna partida guardada de este juego en la consola",
+    savesUnchecked: "Las partidas guardadas se ven con la consola encendida", savesUpdate: "Actualiza la app ROMKADE de la consola para ver sus partidas guardadas" },
 };
 const GENRE = {
   fr: { action: "Action", aventure: "Aventure", beat: "Beat'em up", combat: "Combat", course: "Course", plateforme: "Plateforme", rpg: "Jeu de rôle", shmup: "Shoot'em up", tir: "Tir", sport: "Sport", reflexion: "Réflexion", labyrinthe: "Labyrinthe", strategie: "Stratégie", simulation: "Simulation", flipper: "Flipper", societe: "Société et casino", quiz: "Quiz", musique: "Musique et rythme", educatif: "Éducatif", compilation: "Compilation", autre: "Autre" },
@@ -299,6 +314,7 @@ let lang = "fr";
 const t = (k, ...a) => { const v = (TEXT[lang] || TEXT.fr)[k]; return typeof v === "function" ? v(...a) : v; };
 const genreName = (g) => g ? ((GENRE[lang] || GENRE.fr)[g] || g) : "";
 function fmt(n) { try { return new Intl.NumberFormat(lang).format(n); } catch { return String(n); } }
+function fmtDate(iso) { try { return new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)); } catch { return String(iso).slice(0, 10); } }
 function fmtAgo(m) { if (m < 60) return `${m} min`; const h = Math.round(m / 60); if (h < 48) return `${h} h`; return `${Math.round(h / 24)} j`.replace(" j", lang === "en" ? " d" : lang === "es" ? " d" : " j"); }
 function setLang(locale) { const l = String(locale || navigator.language || "fr").slice(0, 2).toLowerCase(); lang = TEXT[l] ? l : "en"; document.documentElement.lang = lang; }
 
@@ -312,6 +328,7 @@ const P = {
   mute: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   check: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+  star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
   pad: '<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>',
 };
 const icon = (n, fill) => `<svg viewBox="0 0 24 24" fill="${fill ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
@@ -445,10 +462,11 @@ function gamesView(d) {
       <span class="tile__title">${esc(g.title)}</span>
       <span class="tile__meta"><span class="badge">${esc(g.platform_code)}</span><span>${esc([g.year, genreName(g.genre)].filter(Boolean).join(" · "))}</span></span>
     </button>`).join("");
+  const head = d.favorites ? `${icon("star", true)} ${esc(t("favorites"))} <span class="muted">${esc(fmt(d.total || 0))}</span>` : esc(t("games", d.total));
   const more = d.total > d.shown && d.shown < 60 ? `<div class="more"><button type="button" class="btn btn--neon" data-more>${esc(t("more"))}</button></div>` : "";
   return shell(`
-    <div class="section-head"><h2>${esc(t("games", d.total))}</h2><span class="muted">${esc(context)}</span></div>
-    <div class="screen">${tiles ? `<div class="grid">${tiles}</div>${more}` : `<div class="empty">${esc(t("noGames"))}</div>`}</div>`,
+    <div class="section-head"><h2 style="display:flex;align-items:center;gap:8px">${head}</h2><span class="muted">${esc(context)}</span></div>
+    <div class="screen">${tiles ? `<div class="grid">${tiles}</div>${more}` : `<div class="empty">${esc(t(d.favorites ? "noFavorites" : "noGames"))}</div>`}</div>`,
     { credits: [t("covers")] });
 }
 
@@ -457,6 +475,7 @@ function gameView(d) {
   const g = d.game || {};
   const caps = d.console?.capabilities || {};
   const facts = [
+    g.favorite && `<span class="fav">${icon("star", true)} ${esc(t("favorite"))}</span>`,
     g.year && `<span>${esc(t("year"))} <b>${esc(g.year)}</b></span>`,
     g.genre && `<span>${esc(t("genre"))} <b>${esc(genreName(g.genre))}</b></span>`,
     g.developer && `<span>${esc(t("developer"))} <b>${esc(g.developer)}</b></span>`,
@@ -471,6 +490,7 @@ function gameView(d) {
         <div class="now__sub"><span class="badge">${esc(g.platform_code)}</span>${esc(g.platform)}</div>
         <h1>${esc(g.title)}</h1>
         ${facts ? `<div class="facts">${facts}</div>` : ""}
+        ${savesLine(d.saves)}
         ${g.description ? `<p class="desc" id="desc">${esc(g.description)}</p><button type="button" class="link" data-readmore>${esc(t("readMore"))}</button>` : ""}
         <div class="actions">
           <button type="button" class="btn btn--primary" data-launch="${g.game_id}">${icon("play", true)} ${esc(t("play"))}</button>
@@ -479,6 +499,14 @@ function gameView(d) {
         </div>
       </div>
     </div>`, { console: d.console, credits: [t("covers")] });
+}
+
+function savesLine(sv) {
+  if (!sv) return "";
+  if (!sv.checked) return `<p class="saves muted">${icon("save")} ${esc(t(sv.reason === "app_update_needed" ? "savesUpdate" : "savesUnchecked"))}</p>`;
+  if (!sv.has_save) return `<p class="saves">${icon("save")} ${esc(t("noSave"))}</p>`;
+  const kinds = [sv.in_game_save && t("inGameSave"), sv.save_states?.length && t("states", sv.save_states.length)].filter(Boolean).join(" · ");
+  return `<p class="saves">${icon("save")} <span><b>${esc(kinds)}</b>${sv.last_saved_at ? ` · ${esc(t("lastSaved", fmtDate(sv.last_saved_at)))}` : ""}</span></p>`;
 }
 
 /* En cours sur la console */
@@ -528,7 +556,8 @@ function libraryView(d) {
       <span class="system__name">${esc(s.platform)}</span>
       <span class="bar"><i style="--w:${Math.max(4, Math.round((s.games / max) * 100))}%"></i>${esc(fmt(s.games))}</span>
     </button>`).join("");
-  const genres = (d.genres || []).slice(0, 14).map((g) => `<button type="button" class="chip" data-genre="${esc(g.genre)}">${esc(genreName(g.genre))} <b>${esc(fmt(g.games))}</b></button>`).join("");
+  const favs = d.favorites ? `<button type="button" class="chip" data-favorites>${icon("star", true)} ${esc(t("favorites"))} <b>${esc(fmt(d.favorites))}</b></button>` : "";
+  const genres = favs + (d.genres || []).slice(0, 14).map((g) => `<button type="button" class="chip" data-genre="${esc(g.genre)}">${esc(genreName(g.genre))} <b>${esc(fmt(g.games))}</b></button>`).join("");
   const n = d.games || 0;
   return shell(`
     <div class="hero"><span class="n1">${esc(fmt(n))}</span> ${esc(lang === "fr" ? (n > 1 ? "jeux" : "jeu") : lang === "es" ? "juegos" : "games")} ${esc(t("of"))} <span class="n2">${esc(fmt(systems.length))}</span> ${esc(t("consoles", systems.length))}</div>
@@ -622,7 +651,10 @@ function wire(data) {
   root.querySelectorAll("[data-refresh]").forEach((b) => b.addEventListener("click", () =>
     act(b, async () => show(await callTool("console_status", {}), false))));
   root.querySelectorAll("[data-more]").forEach((b) => b.addEventListener("click", () => act(b, async () =>
-    show(await callTool("search_games", { query: data.query || "", platform: data.platform || undefined, genre: data.genre || undefined, limit: 60 }), false))));
+    show(await (data.favorites ? callTool("favorite_games", { limit: 60 })
+      : callTool("search_games", { query: data.query || "", platform: data.platform || undefined, genre: data.genre || undefined, limit: 60 })), false))));
+  root.querySelectorAll("[data-favorites]").forEach((b) => b.addEventListener("click", () =>
+    act(null, async () => show(await callTool("favorite_games", { limit: 60 })))));
   root.querySelectorAll("[data-platform]").forEach((b) => b.addEventListener("click", () =>
     act(null, async () => show(await callTool("search_games", { platform: b.dataset.platform, limit: 60 })))));
   root.querySelectorAll("[data-genre]").forEach((b) => b.addEventListener("click", () =>

@@ -1,7 +1,8 @@
 """Outils MCP de ROMKADE : ce que ChatGPT, Claude… peuvent faire avec la console et son catalogue.
 
-Le catalogue et les cheats sont lus dans le cloud (marchent console éteinte) ; jouer, quitter, le son et la
-sauvegarde passent par le relais jusqu'à l'agent de la console (console allumée, en Wi-Fi).
+Le catalogue, les favoris et les cheats sont lus dans le cloud (marchent console éteinte) ; jouer, quitter, le son,
+la sauvegarde et la liste des sauvegardes d'un jeu passent par le relais jusqu'à l'agent de la console (console
+allumée, en Wi-Fi).
 
 Chaque outil est relié à l'interface ROMKADE (MCP Apps, ui://romkade/app.html, voir ui/app.html) : l'assistant
 affiche la vue indiquée par le champ « view » du résultat (jeux, fiche, en cours, bibliothèque, cheats, consoles).
@@ -13,6 +14,7 @@ import asyncio
 import base64
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 from mcp.server import MCPServer
@@ -24,7 +26,7 @@ from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from app.platforms import PLATFORMS, canonical
 from app.services import boxart
 from app.services import cheats as cheat_db
-from app.services.classify import normalize_title
+from app.services.classify import normalize_title, stem_of
 from app.services.genres import GENRES
 
 from .relay import CommandFailed, CommandTimeout, ConsoleOffline, Relay
@@ -36,7 +38,10 @@ STATIC = Path(__file__).parent / "static"
 VERSION = "0.2.0"
 
 INSTRUCTIONS = """ROMKADE connects the user's retro handheld console (Anbernic…) to this conversation.
-- The library lives in the cloud: searching games, counting them, cheat codes work even if the console is off.
+- The library lives in the cloud: searching games, counting them, favorites, cheat codes work even if the console
+  is off. Favorites (favorite_games) are the games the user starred in ROMKADE Manager.
+- game_details also tells whether the user has saves for the game on the console (in-game save, save states, with
+  their date); it can only check them while the console is on.
 - Playing (launch_game), quitting, volume and save states need the console switched on and on Wi-Fi.
 - If no console is paired yet, ask the user to open the ROMKADE app on the console (APPS menu): it shows a
   6-character code, then call pair_console with it.
@@ -174,6 +179,32 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                 "capabilities": info.get("capabilities") or {},
                 "last_seen_minutes_ago": round((time.time() - seen) / 60) if seen else None}
 
+    def saved_at(ts: float | None) -> str | None:
+        return datetime.fromtimestamp(ts, UTC).isoformat(timespec="minutes") if ts else None
+
+    async def game_saves(c: Console, row) -> dict:
+        """Sauvegardes du jeu sur la carte, lues par l'agent : sauvegarde en jeu, sauvegardes instantanées (de la
+        plus récente à la plus ancienne). Console éteinte, ou agent d'avant cet ordre : `checked` à False."""
+        if not relay.online(c.id):
+            return {"checked": False, "reason": "console_offline"}
+        filename = row["relative_path"].rsplit("/", 1)[-1]
+        try:
+            r = await relay.call(c.id, "saves", {"names": sorted({stem_of(filename).lower(), filename.lower()})},
+                                 timeout=12)
+        except CommandFailed as exc:
+            return {"checked": False, "reason": "app_update_needed" if exc.code == "unknown_action" else "error"}
+        except (ConsoleOffline, CommandTimeout):
+            return {"checked": False, "reason": "console_offline"}
+        code = canonical(row["platform_dir"])
+        mine = sorted((x for x in r.get("saves") or [] if x.get("platform") and canonical(x["platform"]) == code),
+                      key=lambda x: -(x.get("modified") or 0))
+        in_game = next((x for x in mine if x.get("kind") == "sram"), None)
+        states = [x for x in mine if x.get("kind") == "state"]
+        return {"checked": True, "has_save": bool(mine),
+                "in_game_save": {"saved_at": saved_at(in_game.get("modified"))} if in_game else None,
+                "save_states": [{"slot": x.get("slot"), "saved_at": saved_at(x.get("modified"))} for x in states[:10]],
+                "last_saved_at": saved_at(mine[0].get("modified")) if mine else None}
+
     def game_out(row, c: Console | None = None, full: bool = False) -> CallToolResult:
         cover = (f"{base}/art/{row['art_key']}.webp" if base and boxart.has_source(row["platform_dir"]) else None)
         out = {"game_id": row["id"], "title": row["title"], "platform": row["platform_label"],
@@ -240,14 +271,26 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                      "games": [game_out(r, by_id[r["console_id"]] if len(by_id) > 1 else None) for r in rows]})
 
     @ui_tool(title="Fiche du jeu", annotations=READ)
-    def game_details(game_id: int, ctx: Context) -> CallToolResult:
-        """Full sheet of one game: cover, year, genre, developer, publisher, summary. Use it when the user asks
-        about a game."""
+    async def game_details(game_id: int, ctx: Context) -> CallToolResult:
+        """Full sheet of one game: cover, year, genre, developer, publisher, summary, whether it is a favorite,
+        and the user's saves for it on the console (in-game save, save states, with dates; checked only while the
+        console is on). Use it when the user asks about a game or whether they have a save for it."""
         row = store.game(game_id, account_of(ctx))
         if row is None:
             raise UserError("Jeu introuvable dans la bibliothèque (game_id d'après search_games).")
         c = store.console(row["console_id"])
-        return view({"view": "game", "game": game_out(row, full=True), "console": describe(c)})
+        game = {**game_out(row, full=True),
+                "favorite": store.is_favorite(c.id, row["platform_dir"], row["relative_path"])}
+        return view({"view": "game", "game": game, "console": describe(c), "saves": await game_saves(c, row)})
+
+    @ui_tool(title="Mes favoris", annotations=READ)
+    def favorite_games(ctx: Context, console: str | None = None, limit: int = 24) -> CallToolResult:
+        """The user's favorite games on their console (starred in ROMKADE Manager), the most recently added
+        first. Shows covers; returns game_id values for launch_game, game_details and get_cheats."""
+        c = pick(account_of(ctx), console)
+        rows, total = store.favorites(c.id, max(1, min(limit, 60)))
+        return view({"view": "games", "favorites": True, "total": total, "shown": len(rows),
+                     "games": [game_out(r) for r in rows]})
 
     @ui_tool(title="Ma bibliothèque", annotations=READ)
     def library_overview(ctx: Context, console: str | None = None) -> CallToolResult:
@@ -255,7 +298,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         c = pick(account_of(ctx), console)
         systems = [{"platform": r["platform_label"], "code": r["platform_code"], "games": r["games"],
                     "art": console_art(r["platform_code"])} for r in store.platforms(c.id)]
-        return view({"view": "library", **describe(c), "systems": systems,
+        return view({"view": "library", **describe(c), "systems": systems, "favorites": store.favorites(c.id, 0)[1],
                      "genres": [{"genre": r["genre"], "games": r["games"]} for r in store.genres(c.id)],
                      "catalog_updated_minutes_ago": round((time.time() - c.catalog_at) / 60) if c.catalog_at else None})
 

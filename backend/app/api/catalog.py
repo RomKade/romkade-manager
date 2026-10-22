@@ -20,6 +20,7 @@ from app.db.models import PlatformImage
 from app.device.ssh_client import DeviceClient
 from app.services import boxart
 from app.services import catalog_query as cq
+from app.services import cloud_agent
 from app.services.genres import load_index
 from app.services.images import media_type
 
@@ -35,11 +36,14 @@ def _client(request: Request) -> DeviceClient:
     return DeviceClient(st.settings_store.load(), st.credentials, st.host_keys)
 
 
-def console_id(request: Request) -> str:
+def console_key(st) -> str:
     """Identité de la console configurée : empreinte de sa clé SSH approuvée, sinon « hôte:port »."""
-    st = request.app.state
     s = st.settings_store.load()
     return st.host_keys.fingerprint(s.host, s.port) or f"{s.host}:{s.port}"
+
+
+def console_id(request: Request) -> str:
+    return console_key(request.app.state)
 
 
 # ---------- synchronisation ----------
@@ -162,11 +166,13 @@ async def favorites(request: Request, limit: int | None = Query(None, ge=1, le=5
 @router.put("/games/{game_id}/favorite", status_code=204, tags=["catalog"])
 async def add_favorite(game_id: int, request: Request) -> None:
     await asyncio.to_thread(_with_write, request, cq.set_favorite, console_id(request), game_id, True)
+    cloud_agent.push_favorites_later(request.app.state, console_id(request))  # ChatGPT, Claude… (ROMKADE Cloud)
 
 
 @router.delete("/games/{game_id}/favorite", status_code=204, tags=["catalog"])
 async def remove_favorite(game_id: int, request: Request) -> None:
     await asyncio.to_thread(_with_write, request, cq.set_favorite, console_id(request), game_id, False)
+    cloud_agent.push_favorites_later(request.app.state, console_id(request))
 
 
 @router.put("/games/{game_id}/broken", status_code=204, tags=["catalog"])

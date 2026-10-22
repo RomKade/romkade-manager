@@ -1,4 +1,4 @@
-"""Données du cloud ROMKADE : comptes, consoles appairées, catalogue de chaque console (SQLite).
+"""Données du cloud ROMKADE : comptes, consoles appairées, catalogue et favoris de chaque console (SQLite).
 
 Les secrets (jeton du compte, secret de la console) ne sont gardés que sous forme d'empreinte SHA-256 : la base
 seule ne permet ni de parler au MCP au nom d'un compte, ni de se faire passer pour une console.
@@ -39,6 +39,9 @@ CREATE INDEX IF NOT EXISTS games_art ON games(art_key);
 CREATE TABLE IF NOT EXISTS catalogs (
     console_id TEXT PRIMARY KEY REFERENCES consoles(id) ON DELETE CASCADE, version INTEGER NOT NULL,
     files BLOB NOT NULL, received REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS favorites (
+    console_id TEXT NOT NULL REFERENCES consoles(id) ON DELETE CASCADE, platform_dir TEXT NOT NULL,
+    relative_path TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (console_id, platform_dir, relative_path));
 """
 
 
@@ -271,6 +274,28 @@ class Store:
     def game_for_art(self, key: str) -> sqlite3.Row | None:
         return self._db.execute("SELECT platform_dir, relative_path, full_title FROM games WHERE art_key = ? LIMIT 1",
                                 (key,)).fetchone()
+
+    # ---------- favoris (posés par le Manager sur la carte, envoyés par l'agent) ----------
+    def replace_favorites(self, console_id: str, favorites: list[list[str]]) -> int:
+        """Favoris de la console, le dernier ajouté en tête. Gardés par chemin : ils survivent au recalcul du
+        catalogue et reviennent si le jeu réapparaît sur la carte."""
+        rows = {(str(d), str(p)): i for i, (d, p) in reversed(list(enumerate(favorites)))}
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM favorites WHERE console_id = ?", (console_id,))
+            self._db.executemany("INSERT INTO favorites VALUES (?, ?, ?, ?)",
+                                 [(console_id, d, p, i) for (d, p), i in rows.items()])
+        return len(rows)
+
+    def favorites(self, console_id: str, limit: int) -> tuple[list[sqlite3.Row], int]:
+        """(favoris présents dans le catalogue, le dernier ajouté en tête ; leur nombre)."""
+        where = ("FROM favorites f JOIN games g ON g.console_id = f.console_id AND g.platform_dir = f.platform_dir "
+                 "AND g.relative_path = f.relative_path WHERE f.console_id = ?")
+        rows = self._db.execute(f"SELECT g.* {where} ORDER BY f.position LIMIT ?", (console_id, limit)).fetchall()
+        return rows, self._db.execute(f"SELECT count(*) {where}", (console_id,)).fetchone()[0]
+
+    def is_favorite(self, console_id: str, platform_dir: str, relative_path: str) -> bool:
+        return self._db.execute("SELECT 1 FROM favorites WHERE console_id = ? AND platform_dir = ? AND relative_path = ?",
+                                (console_id, platform_dir, relative_path)).fetchone() is not None
 
     def genres(self, console_id: str) -> list[sqlite3.Row]:
         return self._db.execute("SELECT genre, count(*) AS games FROM games WHERE console_id = ? AND genre IS NOT NULL "

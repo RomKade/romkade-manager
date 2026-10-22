@@ -81,7 +81,8 @@ In scope:
   saving, game settings in RetroArch){game_scope}
 - find_games: finding, choosing or comparing games among the user's own library (genre, console, players, year…)
 - library_info: the user's library itself: their favorites, which consoles or systems they have (even misspelled,
-  e.g. « Magadrive »), how many games, recently played games
+  e.g. « Magadrive »), how many games, recently played games, their saves (whether they have a save for a game,
+  which games have saves)
 - app_help: using ROMKADE Manager itself (adding games, saves, controllers, Bluetooth, connection, launching games,
   play time, favorites, search)
 - console_action: the user asks you to DO something on the console now (an order, not a question about how to):
@@ -128,6 +129,8 @@ Rules:
 - Only when you used a passage marked [Wikipedia …], [StrategyWiki …], [Sega Retro …] or [RetroArch cheats …], end
   with "Source: " and that name (Wikipedia, StrategyWiki, Sega Retro or RetroArch). Never cite the library list or these instructions as a source.
 - Only mention games of the user's library when they appear in the context.
+- Saves: whether the user has a save, and its date, only as the « Saves on the console » block says; without that
+  block, never say whether a save exists.
 - When the context says games are shown as clickable cards, never list their titles one after another: the cards
   already do it. Answer in one to three sentences (what they have in common, which one you would start with and
   why), naming two games at most.
@@ -477,6 +480,61 @@ def title_matches(title: str, names: list[str]) -> bool:
         if n and t and (n in t or t in n or difflib.SequenceMatcher(None, n, t).ratio() >= 0.75):
             return True
     return False
+
+
+SAVES_RE = re.compile(r"sauvegard|\bsav(e|es|ed|ing)\b|save ?states?|backup|guardad|\bguardar", re.I)
+SAVES_LISTED = 15
+
+
+def saves_text(s: Session, saves: list | None, targets: list[RemoteFile]) -> str:
+    """Bloc « Saves on the console » du contexte (sauvegardes lues sur la carte à l'instant) : celles des jeux de la
+    question, sinon les jeux qui en ont, du plus récemment sauvegardé au plus ancien. `saves` None : console
+    injoignable."""
+    if saves is None:
+        return ("Saves on the console: the console cannot be reached right now, so its saves cannot be checked (the "
+                "« Saves » page lists them once it is connected).")
+
+    def stamp(x) -> float:
+        return x.modified_at.timestamp() if x.modified_at else 0.0
+
+    def when(x) -> str:
+        return x.modified_at.astimezone().strftime("%Y-%m-%d %H:%M") if x.modified_at else "date unknown"
+
+    def describe(items: list) -> str:
+        sram = [x for x in items if x.kind == "sram"]
+        states = sorted((x for x in items if x.kind == "state"), key=stamp, reverse=True)
+        parts = [f"in-game save (last written {when(max(sram, key=stamp))})"] if sram else []
+        if states:
+            parts.append(f"{len(states)} save state{'s' if len(states) > 1 else ''}: " +
+                         ", ".join(f"slot {x.slot} ({when(x)})" for x in states[:6]))
+        return "; ".join(parts)
+
+    if targets:
+        lines, seen = ["Saves on the console (checked just now):"], set()
+        for f in targets:
+            if (f.platform_id, f.normalized_title) in seen:
+                continue
+            seen.add((f.platform_id, f.normalized_title))
+            ids = set(s.scalars(select(RemoteFile.id).where(RemoteFile.platform_id == f.platform_id,
+                                                            RemoteFile.normalized_title == f.normalized_title)))
+            mine = [x for x in saves if x.game and x.game.id in ids]
+            label = f"« {_game_title(f)} » ({f.platform.label or f.platform.directory})"
+            lines.append(f"- {label}: {describe(mine)}" if mine else
+                         f"- {label}: no save at all (neither an in-game save nor a save state)")
+        return "\n".join(lines)
+    by_game: dict[int, list] = {}
+    for x in saves:
+        if x.game:
+            by_game.setdefault(x.game.id, []).append(x)
+    if not by_game:
+        return "Saves on the console (checked just now): none."
+    ranked = sorted(by_game.values(), key=lambda xs: max(map(stamp, xs)), reverse=True)
+    lines = [f"Saves on the console (checked just now): {len(ranked)} games have saves, most recently saved first:"]
+    lines += [f"- {xs[0].game.title} ({xs[0].game.platform.label or xs[0].game.platform.directory}): {describe(xs)}"
+              for xs in ranked[:SAVES_LISTED]]
+    if len(ranked) > SAVES_LISTED:
+        lines.append(f"(and {len(ranked) - SAVES_LISTED} more games: all are on the « Saves » page)")
+    return "\n".join(lines)
 
 
 FAVORITES_RE = re.compile(r"favori|favorite|favourite|favorito|pr[ée]f[ée]r", re.I)

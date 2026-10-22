@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import cloud, assistant, bluetooth, catalog, cheats, controls, descriptions, gamepad, knowledge, llm, play, players, playtime, saves, screenshots, system, transfers, videos, volume
+from app.api.catalog import console_key
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
 from app.credentials import CredentialStore, default_store
@@ -31,6 +32,7 @@ from app.services.knowledge import Fetcher, KnowledgeJobs
 from app.services.knowledge import settings_store as knowledge_settings
 from app.services.search import SearchService
 from app.device.systems import SystemService
+from app.services import cloud_agent
 from app.services.catalog_watch import CatalogWatcher
 from app.services.save_vault import SaveVault
 from app.services.screenshots import ScreenshotStore
@@ -96,6 +98,11 @@ def create_app(
     app.state.knowledge = KnowledgeJobs(st.sessions, Fetcher(getattr(st, "knowledge_transport", None)),
                                         knowledge_settings(cache_dir.parent if cache_dir else base))
     app.state.sync.after.append(app.state.knowledge.after_sync)
+    # Favoris de la console vers son agent ROMKADE (ChatGPT, Claude…), rattrapés à chaque synchronisation.
+    async def favorites_to_agent() -> None:  # en tâche de fond : la synchronisation suivante n'attend pas
+        cloud_agent.push_favorites_later(st, console_key(st))
+
+    app.state.sync.after.append(favorites_to_agent)
     app.state.play_settings = PlaySettingsStore((cache_dir.parent if cache_dir else base) / "play_settings.json")
     app.state.llm_config = LlmConfigStore((cache_dir.parent if cache_dir else base) / "llm.json")
     app.state.llm_transport = None  # les tests y branchent un faux fournisseur (httpx.MockTransport)

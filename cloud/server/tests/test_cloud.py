@@ -76,6 +76,7 @@ class FakeAgent:
         self.secret = None
         self.received: list[dict] = []
         self.playing = None
+        self.saves: list[dict] | None = []  # None : agent d'avant l'ordre « saves »
 
     async def hello(self) -> dict:
         headers = {"Authorization": f"Bearer {self.secret}"} if self.secret else {}
@@ -90,6 +91,9 @@ class FakeAgent:
 
     async def upload(self, files) -> dict:
         return (await self.http.post("/agent/catalog", json={"files": files}, headers=self.auth)).json()
+
+    async def favorites(self, favs) -> dict:
+        return (await self.http.post("/agent/favorites", json={"favorites": favs}, headers=self.auth)).json()
 
     async def serve(self) -> None:
         while True:
@@ -106,6 +110,11 @@ class FakeAgent:
                 reply = {"ok": True, "result": {"playing": bool(p), "menu": not p, "volume": {"percent": 40},
                                                 "platform_dir": p.get("platform_dir"),
                                                 "relative_path": p.get("relative_path")}}
+            elif cmd["action"] == "saves":
+                names = set(cmd["params"]["names"])
+                reply = ({"ok": False, "error": {"code": "unknown_action", "message": "Action inconnue : saves"}}
+                         if self.saves is None else
+                         {"ok": True, "result": {"saves": [x for x in self.saves if x["name"].lower() in names]}})
             elif cmd["action"] == "save_state":
                 reply = {"ok": False, "error": {"code": "no_retroarch_game", "message": "Aucun jeu RetroArch en cours"}}
             else:
@@ -368,6 +377,62 @@ def test_account_api_for_the_manager(env):
                 assert (await h.delete(f"/api/me/consoles/{other.id}", headers=ok)).status_code == 404  # pas à moi
                 assert (await h.delete(f"/api/me/consoles/{cid}", headers=ok)).json() == {"deleted": cid}
                 assert (await h.delete("/api/me", headers=ok)).status_code == 503  # sans clé d'administration
+        finally:
+            server.should_exit = True
+            await task
+
+    asyncio.run(scenario())
+
+
+def test_favorites_and_saves(env):
+    """Favoris posés par le Manager (envoyés par l'agent) et sauvegardes d'un jeu lues sur la console."""
+    store, token = env
+
+    async def scenario():
+        base, server, task = await serving(store, Relay())
+        agent = FakeAgent(base)
+        try:
+            code = (await agent.hello())["pairing_code"]
+            await agent.upload(FILES)
+            assert (await agent.favorites([["SFC", "Super Mario World (USA).sfc"], ["MD", "Sonic The Hedgehog 2 (World).md"],
+                                           ["GBA", "Plus sur la carte.gba"]]))["favorites"] == 3
+            async with Client(f"{base}/{token}") as mcp:
+                data(await mcp.call_tool("pair_console", {"code": code}))
+                # Console éteinte : les favoris restent consultables, les sauvegardes ne sont pas vérifiées.
+                favs = data(await mcp.call_tool("favorite_games", {}))
+                assert favs["view"] == "games" and favs["favorites"] and favs["total"] == 2
+                assert [g["title"] for g in favs["games"]] == ["Super Mario World", "Sonic The Hedgehog 2"]
+                mario = favs["games"][0]["game_id"]
+                sheet = data(await mcp.call_tool("game_details", {"game_id": mario}))
+                assert sheet["game"]["favorite"] and sheet["saves"] == {"checked": False, "reason": "console_offline"}
+                assert data(await mcp.call_tool("library_overview", {}))["favorites"] == 2
+
+                loop = asyncio.create_task(agent.serve())
+                await asyncio.sleep(0.2)
+                agent.saves = [
+                    {"platform": "SFC", "name": "Super Mario World (USA)", "kind": "sram", "slot": None, "modified": 1760000000},
+                    {"platform": "SFC", "name": "Super Mario World (USA)", "kind": "state", "slot": "auto", "modified": 1760100000},
+                    {"platform": "MD", "name": "Super Mario World (USA)", "kind": "state", "slot": "0", "modified": 1760200000},
+                ]
+                saves = data(await mcp.call_tool("game_details", {"game_id": mario}))["saves"]
+                assert saves["checked"] and saves["has_save"] and saves["in_game_save"]["saved_at"].startswith("2025-10-09")
+                assert [x["slot"] for x in saves["save_states"]] == ["auto"]          # pas celle d'une autre console
+                assert saves["last_saved_at"].startswith("2025-10-10")
+                assert agent.received[-1]["params"]["names"] == ["super mario world (usa)", "super mario world (usa).sfc"]
+                sonic = data(await mcp.call_tool("search_games", {"query": "Sonic The Hedgehog"}))["games"][0]["game_id"]
+                other = data(await mcp.call_tool("game_details", {"game_id": sonic}))
+                assert not other["game"]["favorite"] and other["saves"]["checked"] and not other["saves"]["has_save"]
+
+                agent.saves = None  # app ROMKADE de la console pas encore mise à jour
+                assert data(await mcp.call_tool("game_details", {"game_id": mario}))["saves"]["reason"] == "app_update_needed"
+
+                # Le Manager retire un favori : l'agent renvoie la liste.
+                await agent.favorites([["MD", "Sonic The Hedgehog 2 (World).md"]])
+                assert [g["title"] for g in data(await mcp.call_tool("favorite_games", {}))["games"]] == ["Sonic The Hedgehog 2"]
+                loop.cancel()
+            async with httpx.AsyncClient() as h:
+                assert (await h.post(f"{base}/agent/favorites", json={"favorites": []},
+                                     headers={"Authorization": "Bearer nope"})).status_code == 401
         finally:
             server.should_exit = True
             await task

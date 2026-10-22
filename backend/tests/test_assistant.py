@@ -197,6 +197,37 @@ async def test_library_info_answers_favorites_and_consoles(app_factory, monkeypa
         assert "Favorites of the user" in system and "Super Mario World" in system and "Consoles (name: number of games)" in system
 
 
+async def test_saves_questions_read_the_card(app_factory, monkeypatch):
+    """« Ai-je une sauvegarde de Mario ? », « Quels jeux ont une sauvegarde ? » : sauvegardes lues sur la carte."""
+    route = {"in_scope": True, "intent": "library_info", "search": "sauvegarde", "games_mentioned": ["Super Mario World"],
+             "genre": "", "console": "", "wants_solution": False, "action": "", "volume": -1}
+    model, seen = fake_llm(route, ["Oui."])
+    monkeypatch.setattr(llm, "resolve", lambda state: model)
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        ask = {"lang": "fr", "messages": [{"role": "user", "content": "Est-ce que j'ai une sauvegarde de Super Mario World ?"}]}
+        assert events((await c.post("/api/assistant", json=ask)).text)[0][1]["intent"] == "library_info"
+        system = seen["answers"][-1]["messages"][0]["content"]
+        assert "Saves on the console (checked just now):" in system
+        line = next(x for x in system.splitlines() if x.startswith("- « Super Mario World »"))
+        assert "in-game save" in line and "2 save states" in line and "slot auto" in line
+
+        model, seen = fake_llm({**route, "games_mentioned": []}, ["Deux jeux."])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        ask["messages"][0]["content"] = "Quels jeux ont une sauvegarde ?"
+        await c.post("/api/assistant", json=ask)
+        system = seen["answers"][-1]["messages"][0]["content"]
+        assert "2 games have saves" in system and "Sonic The Hedgehog" in system and "Unknown Game" not in system
+
+        # Console injoignable : Duke le dit au lieu de deviner.
+        app.state.settings_store.save(app.state.settings_store.load().model_copy(update={"host": "127.0.0.2"}))
+        model, seen = fake_llm(route, ["Je ne peux pas vérifier."])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        await c.post("/api/assistant", json=ask)
+        assert "cannot be reached right now" in seen["answers"][-1]["messages"][0]["content"]
+
+
 async def test_screenshots_shown_then_analysed(app_factory, monkeypatch):
     """« Montre mes captures » : aucune, puis celles du jeu ; « analyse-la » : l'image part au modèle."""
     import base64

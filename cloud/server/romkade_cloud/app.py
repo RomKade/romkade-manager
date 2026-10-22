@@ -7,6 +7,7 @@
                              la V1 passera à OAuth (comptes ROMKADE), exigé par les annuaires d'apps.
     /agent/hello             l'agent se présente (et reçoit son secret et un code d'appairage la première fois)
     /agent/catalog           l'agent envoie la liste des fichiers de son dossier de ROMs
+    /agent/favorites         l'agent envoie les favoris de la console (posés sur la carte par le Manager)
     /agent/poll, /result     ordres pour la console et leurs résultats (voir relay.py)
     /.well-known/oauth-protected-resource   serveur d'autorisation de ce serveur MCP (Supabase Auth)
     /api/me/…                API du compte pour ROMKADE Manager (jeton de session Supabase) : consoles reliées,
@@ -52,6 +53,7 @@ LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost)(:\d+)?$")  # ROMKAD
 LOGIN_PAGE = "https://romkade.com/authentification/"  # page de connexion ROMKADE (site romkade.com, OAuth Supabase)
 PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp", "romkade-logo.png"}  # .png : e-mails
 MAX_BODY = 8 * 1024 * 1024
+MAX_FAVORITES = 500
 # Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée.
 TOKEN_PATH = re.compile(r"^/(?:mcp/)?([A-Za-z0-9_-]{32,})/?$")
 WEB_CLIENTS = ["https://claude.ai", "https://chatgpt.com", "https://chat.openai.com", "https://www.perplexity.ai",
@@ -181,6 +183,18 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         games = await asyncio.to_thread(catalog.build, files)
         count = await asyncio.to_thread(store.replace_catalog, c.id, games, files, catalog.VERSION)
         return JSONResponse({"games": count})
+
+    async def upload_favorites(request: Request) -> Response:
+        c = console_of(request)
+        if c is None:
+            return JSONResponse({"error": "unauthorized"}, 401)
+        try:
+            payload = await body_json(request)
+            favs = [[str(f[0])[:255], str(f[1])[:1024]] for f in payload.get("favorites") or []
+                    if isinstance(f, list) and len(f) == 2][:MAX_FAVORITES]
+        except (ValueError, AttributeError):
+            return JSONResponse({"error": "bad_request"}, 400)
+        return JSONResponse({"favorites": await asyncio.to_thread(store.replace_favorites, c.id, favs)})
 
     async def poll(request: Request) -> Response:
         c = console_of(request)
@@ -345,6 +359,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     app.router.routes.extend([
         Route("/agent/hello", hello, methods=["POST"]),
         Route("/agent/catalog", upload_catalog, methods=["POST"]),
+        Route("/agent/favorites", upload_favorites, methods=["POST"]),
         Route("/agent/poll", poll, methods=["GET"]),
         Route("/agent/result", result, methods=["POST"]),
         Route("/art/{key}.webp", cover),

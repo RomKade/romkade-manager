@@ -9,11 +9,15 @@ pilotent alors la console, et le Manager voit les mêmes consoles que le compte 
    écrit agent.json (adresse du cloud + secret, lisible par root seul), ajoute le démarrage automatique et lance
    l'agent. L'agent embarque les modules de pilotage du Manager (launcher, volume, systems), exécutés sur place.
 
+Le Manager pose aussi à côté de l'agent les favoris de la console (favorites.json) : l'agent les envoie au cloud.
+
 Seul le firmware Anbernic + Stock OS Mod est pris en charge (Python 3, menu APPS, script de démarrage du mod).
 Écriture hors du dossier des ROMs, et dans APPS : exception voulue à remote_writer, limitée aux fichiers listés ici.
 """
 
+import asyncio
 import json
+import logging
 import os
 import shlex
 from pathlib import Path
@@ -22,6 +26,8 @@ import httpx
 
 from app import errors
 
+log = logging.getLogger(__name__)
+
 APP_DIR = Path(__file__).resolve().parents[1]                  # backend/app
 REPO = APP_DIR.parents[1]                                       # racine du dépôt (installation depuis les sources)
 CLOUD_URL = os.environ.get("ROMKADE_CLOUD_URL", "https://mcp.romkade.com").rstrip("/")
@@ -29,6 +35,7 @@ SUPPORTED = {"anbernic-stock-mod"}
 AUTOSTART = "/mnt/mod/ctrl/autostart"
 MARK = "# ROMKADE"
 VENDOR = ("__init__.py", "errors.py")
+VENDOR_SERVICES = ("__init__.py", "saves.py")  # sauvegardes de la carte, lues sur place (outil game_details)
 VENDOR_DEVICE = ("__init__.py", "launcher.py", "volume.py", "systems.py", "launch.sh", "onion_launch.sh",
                  "players_apply.sh", "volume_keys.py")
 
@@ -55,6 +62,8 @@ def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
         files[f"{base}/vendor/{stub.relative_to(src / 'stubs')}"] = (stub.read_bytes(), 0o644)
     for name in VENDOR:
         files[f"{base}/vendor/app/{name}"] = ((APP_DIR / name).read_bytes(), 0o644)
+    for name in VENDOR_SERVICES:
+        files[f"{base}/vendor/app/services/{name}"] = ((APP_DIR / "services" / name).read_bytes(), 0o644)
     for name in VENDOR_DEVICE:
         files[f"{base}/vendor/app/device/{name}"] = ((APP_DIR / "device" / name).read_bytes(), 0o644)
     for legal in ("LICENSE", "NOTICE"):  # à la racine du dépôt (ou de /app dans l'image Docker)
@@ -78,6 +87,47 @@ async def read_agent(sftp, roms_root: str) -> dict | None:
             return json.loads(await f.read())
     except Exception:  # noqa: BLE001 — fichier absent ou illisible : pas d'agent
         return None
+
+
+FAVORITES = "favorites.json"
+MAX_FAVORITES = 500
+_pushes: set[asyncio.Task] = set()  # envois en cours (référence gardée contre le ramasse-miettes)
+
+
+async def write_favorites(sftp, roms_root: str, favorites: list[list[str]]) -> bool:
+    """Pose les favoris de la console ([dossier de plateforme, chemin relatif], le dernier ajouté en tête) à côté de
+    l'agent, qui les envoie au cloud. Rien quand l'agent n'est pas installé : renvoie False."""
+    if await read_agent(sftp, roms_root) is None:
+        return False
+    data = json.dumps({"favorites": favorites[:MAX_FAVORITES]}, ensure_ascii=False).encode()
+    async with sftp.open(f"{agent_dir(roms_root)}/{FAVORITES}", "wb") as f:
+        await f.write(data)
+    return True
+
+
+async def push_favorites(st, console: str) -> None:
+    """Favoris de la console branchée vers son agent ROMKADE. Console injoignable : rien, le prochain envoi (favori
+    ajouté ou retiré, synchronisation du catalogue) rattrape."""
+    from app.device.ssh_client import DeviceClient
+    from app.services import catalog_query as cq
+
+    def rows() -> list[list[str]]:
+        with st.sessions() as s:
+            return [[g.platform.directory, g.relative_path] for g in cq.favorites(s, console)]
+
+    client = DeviceClient(st.settings_store.load(), st.credentials, st.host_keys)
+    try:
+        favorites = await asyncio.to_thread(rows)
+        async with st.pool.session(client) as (_conn, sftp):
+            await write_favorites(sftp, client.settings.roms_root, favorites)
+    except Exception as exc:  # noqa: BLE001 — console éteinte, hors Wi-Fi…
+        log.info("favoris non envoyés à l'agent ROMKADE : %s", exc)
+
+
+def push_favorites_later(st, console: str) -> None:
+    task = asyncio.create_task(push_favorites(st, console))
+    _pushes.add(task)
+    task.add_done_callback(_pushes.discard)
 
 
 async def register(token: str, name: str | None, info: dict, secret: str | None,
