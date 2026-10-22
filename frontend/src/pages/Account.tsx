@@ -300,7 +300,7 @@ function Consoles() {
             a.run(async () => { await localAgent.link(name.trim()); await load(); return t("account.link.done"); }); }}>
             <label htmlFor="acc-console-name">{t("account.link.name")}</label>
             <div className="account__inline">
-            <input id="acc-console-name" value={name} maxLength={40} placeholder="Ma RG35XX" onChange={(e) => setName(e.target.value)} />
+            <input id="acc-console-name" value={name} maxLength={40} placeholder={t("account.link.namePh")} onChange={(e) => setName(e.target.value)} />
             <button className="button button--primary" disabled={a.busy}>
               {a.busy ? <span className="auth-spin" aria-hidden /> : <Cloud size={16} aria-hidden />} {agent?.installed ? t("account.link.again") : t("account.link.go")}
             </button>

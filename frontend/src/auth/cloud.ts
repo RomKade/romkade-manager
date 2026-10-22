@@ -1,3 +1,4 @@
+import { t } from "../i18n/core";
 import { supabase } from "./supabase";
 
 /**
@@ -22,8 +23,15 @@ async function call<T>(url: string, init: RequestInit = {}, header = "Authorizat
   const r = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init.headers ?? {}),
     [header]: header === "Authorization" ? `Bearer ${t}` : t } });
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body?.error?.message ?? body?.error ?? `HTTP ${r.status}`);
+  if (!r.ok) throw new Error(errorMessage(url, r.status, body));
   return body as T;
+}
+
+/** Message lisible : un moteur local trop ancien n'a pas les routes /api/cloud (404, 405). */
+function errorMessage(url: string, status: number, body: { error?: { message?: string } | string }): string {
+  if (url.startsWith("/api/cloud") && (status === 404 || status === 405)) return t("account.link.outdated");
+  const err = body?.error;
+  return (typeof err === "string" ? err : err?.message) ?? t("account.err.generic", { detail: `HTTP ${status}` });
 }
 
 export const cloud = {
@@ -37,14 +45,14 @@ export const cloud = {
 export const localAgent = {
   status: async () => {
     const r = await fetch("/api/cloud/agent");
-    const body = await r.json();
-    if (!r.ok) throw new Error(body?.error?.message ?? `HTTP ${r.status}`);
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(errorMessage("/api/cloud/agent", r.status, body));
     return body as { supported: boolean; installed: boolean; server: string | null; cloud: string };
   },
   link: (name?: string) => call<{ console: CloudConsole; reused: boolean }>("/api/cloud/link",
     { method: "POST", body: JSON.stringify({ name: name || null }) }, "X-Romkade-Token"),
   unlink: async () => {
     const r = await fetch("/api/cloud/agent", { method: "DELETE" });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error?.message ?? `HTTP ${r.status}`);
+    if (!r.ok) throw new Error(errorMessage("/api/cloud/agent", r.status, await r.json().catch(() => ({}))));
   },
 };
