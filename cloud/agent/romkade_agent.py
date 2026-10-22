@@ -18,6 +18,7 @@ import hashlib
 import json
 import logging
 import os
+import signal
 import socket
 import sys
 import time
@@ -364,7 +365,17 @@ class Agent:
         except Exception as exc:  # noqa: BLE001
             log.warning("résultat non envoyé : %s", exc)
 
+    async def refresh(self) -> None:
+        """App ROMKADE rouverte (start.sh envoie SIGUSR1) : l'écran attend un état écrit depuis son ouverture."""
+        try:
+            await self.hello()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("cloud injoignable (%s)", exc)
+            write_status(**{**_read_status(), "online": False})
+
     async def run(self) -> None:
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGUSR1, lambda: asyncio.ensure_future(self.refresh()))
         await self.detect()
         backoff = 2
         while True:

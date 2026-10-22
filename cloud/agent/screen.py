@@ -42,6 +42,7 @@ WARN = (245, 184, 74)
 BOARDS = {"RGcubexx": (720, 720, 0), "RG34xx": (720, 480, 0), "RG34xxSP": (720, 480, 0), "RG28xx": (640, 480, 90)}
 KEY_A, KEY_B, KEY_MENU = 304, 305, 312
 EVIOCGRAB = 0x40044590  # accès exclusif aux touches (le menu de la console ne les reçoit plus)
+BASELINE = "Retro Games Played from Anywhere"  # sous le logo, en anglais quelle que soit la langue de la console
 
 TEXT = {
     "fr": {"code": "CODE D'APPAIRAGE", "where": "Dans ChatGPT ou Claude, avec le connecteur ROMKADE :",
@@ -152,8 +153,9 @@ def render(state: dict, lang: str, size=(640, 480), tick: int = 0) -> Image.Imag
     cx = w // 2
     top = round(18 * s) + (h - round(480 * s)) // 2
     logo_h = paste_asset(img, "romkade-logo.png", cx, top, round(250 * s))
-    y = top + logo_h + round(14 * s)
     sc = lambda v: round(v * s)  # noqa: E731
+    centered(d, w, top + logo_h - sc(10), BASELINE, font(sc(15), True), INK_2)
+    y = top + logo_h + sc(18)
 
     status = state.get("status")
     if status == "connecting":
