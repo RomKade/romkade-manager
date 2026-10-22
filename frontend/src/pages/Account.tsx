@@ -1,6 +1,6 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppWindow, ArrowRight, Bot, Check, Cloud, Copy, Gamepad2, KeyRound, LogOut, Mail, MonitorSmartphone, PlugZap, ShieldCheck, UserRound } from "lucide-react";
+import { AppWindow, ArrowRight, Bot, Check, CheckCircle2, Cloud, Copy, Gamepad2, KeyRound, LogOut, Mail, PlugZap, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, NavLink, useParams } from "react-router-dom";
 
@@ -306,8 +306,73 @@ function Consoles() {
     qc.invalidateQueries({ queryKey: ["cloud-consoles"] });  // voyant de l'onglet
   }, [qc]);
   useEffect(() => { load(); }, [load, connected]);
+  const linked = list?.[0];  // une seule console par compte pour l'instant
+  const here = connected && agent?.installed === true;  // la console branchée au Manager est celle qui est reliée
   return (
     <Block icon={<Cloud size={18} aria-hidden />} title={t("account.consoles.title")} lead={t("account.consoles.lead")}>
+      {list === null ? <span className="auth-spin" aria-hidden /> : linked ? (
+        // Console reliée : un seul état, dit en clair, et ce qu'on peut en faire.
+        <div className={`account__linked ${linked.online ? "is-online" : ""}`}>
+          <div className="account__linked-head">
+            <span className={`led ${linked.online ? "led--live" : ""}`} aria-hidden />
+            <span className="account__grow">
+              <strong>{linked.name}</strong>
+              <span className="muted small">{[linked.model, t("account.consoles.games", { count: linked.games })].filter(Boolean).join(" · ")}</span>
+            </span>
+            <button className="button button--ghost" disabled={a.busy} onClick={() => {
+              const next = window.prompt(t("account.consoles.rename"), linked.name)?.trim();
+              if (next) a.run(async () => { await cloud.rename(linked.id, next); await load(); });
+            }}>{t("account.consoles.rename")}</button>
+            <button className="button button--ghost" disabled={a.busy} onClick={() => {
+              if (!window.confirm(t("account.consoles.removeConfirm", { name: linked.name }))) return;
+              a.run(async () => {
+                await cloud.remove(linked.id);
+                if (here) await localAgent.unlink().catch(() => undefined);  // l'app ROMKADE s'arrête aussi sur la console
+                await load();
+              });
+            }}>{t("account.consoles.remove")}</button>
+          </div>
+          <p className="account__linked-state">
+            {linked.online ? <><CheckCircle2 size={16} aria-hidden /> {t("account.linked.ready")}</> : t("account.linked.asleep")}
+          </p>
+          {connected && agent?.supported && !agent.installed && (
+            // Console branchée sans l'app ROMKADE (autre console, ou app retirée) : une seule console par compte,
+            // la relier remplace celle du compte (son catalogue est renvoyé par l'app au démarrage).
+            <p className="field__hint">{t("account.link.limit", { name: linked.name })}{" "}
+              <button className="auth__link" disabled={a.busy} onClick={() => a.run(async () => {
+                await cloud.remove(linked.id); await localAgent.link(); await load(); return t("account.link.done"); })}>
+                {a.busy ? <span className="auth-spin" aria-hidden /> : null}{t("account.link.replace")}
+              </button>
+            </p>
+          )}
+          {here && (
+            <p className="field__hint">{t("account.linked.update")}{" "}
+              <button className="auth__link" disabled={a.busy} onClick={() => a.run(async () => { await localAgent.link(); await load(); return t("account.linked.updated"); })}>
+                {a.busy ? <span className="auth-spin" aria-hidden /> : null}{t("account.linked.updateGo")}
+              </button>
+            </p>
+          )}
+        </div>
+      ) : (
+        // Aucune console reliée : on relie celle qui est branchée au Manager.
+        <div className="account__link">
+          <p className="muted">{t("account.consoles.none")} {t("account.link.lead")}</p>
+          {!connected ? <p className="field__hint">{t("account.link.offline")}</p>
+            : agent && !agent.supported ? <p className="field__hint">{t("account.link.unsupported")}</p> : (
+            <form className="field" onSubmit={(e: FormEvent) => { e.preventDefault();
+              a.run(async () => { await localAgent.link(name.trim()); await load(); return t("account.link.done"); }); }}>
+              <label htmlFor="acc-console-name">{t("account.link.name")}</label>
+              <div className="account__inline">
+                <input id="acc-console-name" value={name} maxLength={40} placeholder={t("account.link.namePh")} onChange={(e) => setName(e.target.value)} />
+                <button className="button button--primary" disabled={a.busy}>
+                  {a.busy ? <span className="auth-spin" aria-hidden /> : <Cloud size={16} aria-hidden />} {t("account.link.go")}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+      <Result a={a} />
       <div className="account__cloud">
         <p className="account__cloud-head"><span className="account__badge">{t("account.cloud.free")}</span> {t("account.cloud.what")}</p>
         <ul>
@@ -317,50 +382,6 @@ function Consoles() {
         </ul>
         <p className="field__hint">{t("account.cloud.privacy")}</p>
       </div>
-      {list === null ? <span className="auth-spin" aria-hidden /> : list.length === 0 ? <p className="muted">{t("account.consoles.none")}</p> : (
-        <ul className="account__list">
-          {list.map((c) => (
-            <li key={c.id}>
-              <span className={`led ${c.online ? "led--live" : ""}`} aria-hidden />
-              <span className="account__grow">
-                <strong>{c.name}</strong>
-                <span className="muted small">{[c.model, t("account.consoles.games", { count: c.games }), c.online ? t("account.consoles.online") : t("account.consoles.offline")].filter(Boolean).join(" · ")}</span>
-              </span>
-              <button className="button button--ghost" onClick={() => {
-                const next = window.prompt(t("account.consoles.rename"), c.name)?.trim();
-                if (next) a.run(async () => { await cloud.rename(c.id, next); await load(); });
-              }}>{t("account.consoles.rename")}</button>
-              <button className="button button--ghost" onClick={() => {
-                if (window.confirm(t("account.consoles.removeConfirm", { name: c.name }))) a.run(async () => { await cloud.remove(c.id); await load(); });
-              }}>{t("account.consoles.remove")}</button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="account__link">
-        <h3><MonitorSmartphone size={16} aria-hidden /> {t("account.link.title")}</h3>
-        <p className="muted small">{t("account.link.lead")}</p>
-        {!connected ? <p className="field__hint">{t("account.link.offline")}</p>
-          : list && list.length > 0 && !agent?.installed ? <p className="field__hint">{t("account.link.limit", { name: list[0]!.name })}</p>
-          : agent && !agent.supported ? <p className="field__hint">{t("account.link.unsupported")}</p> : (
-          <form className="field" onSubmit={(e: FormEvent) => { e.preventDefault();
-            a.run(async () => { await localAgent.link(name.trim()); await load(); return t("account.link.done"); }); }}>
-            <label htmlFor="acc-console-name">{t("account.link.name")}</label>
-            <div className="account__inline">
-            <input id="acc-console-name" value={name} maxLength={40} placeholder={t("account.link.namePh")} onChange={(e) => setName(e.target.value)} />
-            <button className="button button--primary" disabled={a.busy}>
-              {a.busy ? <span className="auth-spin" aria-hidden /> : <Cloud size={16} aria-hidden />} {agent?.installed ? t("account.link.again") : t("account.link.go")}
-            </button>
-            </div>
-          </form>
-        )}
-        {agent?.installed && connected && (
-          <p className="field__hint">{t("account.link.installed")}{" "}
-            <button className="auth__link" onClick={() => a.run(async () => { await localAgent.unlink(); await load(); })}>{t("account.link.unlink")}</button>
-          </p>
-        )}
-      </div>
-      <Result a={a} />
     </Block>
   );
 }
