@@ -26,13 +26,14 @@ export const passwordValid = (p: string) => PASSWORD_RULES.every((r) => r.test(p
 export function PasswordStrength({ password }: { password: string }) {
   const t = useT();
   const level = passwordStrength(password);
-  const filled = { empty: 0, weak: 1, medium: 2, strong: 3 }[level];
+  if (level === "empty") return null;  // rien tant que le champ est vide
+  const filled = { weak: 1, medium: 2, strong: 3 }[level];
   return (
     <div className={`pw-strength pw-strength--${level}`} aria-live="polite">
       <div className="pw-strength__bar" aria-hidden>
         {[0, 1, 2].map((i) => <span key={i} className={i < filled ? "is-on" : ""} />)}
       </div>
-      {level !== "empty" && <p className="pw-strength__label">{t("auth.strength.label")} : <strong>{t(`auth.strength.${level}`)}</strong></p>}
+      <p className="pw-strength__label">{t("auth.strength.label")} : <strong>{t(`auth.strength.${level}`)}</strong></p>
       <ul className="pw-strength__rules">
         {PASSWORD_RULES.map((r) => {
           const ok = r.test(password);
