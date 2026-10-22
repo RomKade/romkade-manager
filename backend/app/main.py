@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import assistant, bluetooth, catalog, cheats, controls, descriptions, gamepad, knowledge, llm, play, players, playtime, saves, screenshots, system, transfers, videos, volume
+from app.api import cloud, assistant, bluetooth, catalog, cheats, controls, descriptions, gamepad, knowledge, llm, play, players, playtime, saves, screenshots, system, transfers, videos, volume
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
 from app.credentials import CredentialStore, default_store
@@ -154,6 +154,7 @@ def create_app(
     app.include_router(assistant.router)
     app.include_router(playtime.router)
     app.include_router(system.router)
+    app.include_router(cloud.router)
     _mount_frontend(app, frontend_dist)
     return app
 

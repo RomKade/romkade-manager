@@ -14,12 +14,16 @@ RUN VITE_POSTHOG_KEY="$VITE_POSTHOG_KEY" npm run build
 # 2. Serveur (FastAPI)
 FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    ROMKADE_DATA_DIR=/data ROMKADE_SECRETS=file AGM_FRONTEND_DIST=/app/frontend/dist
+    ROMKADE_DATA_DIR=/data ROMKADE_SECRETS=file AGM_FRONTEND_DIST=/app/frontend/dist \
+    ROMKADE_AGENT_DIR=/app/cloud/agent
 WORKDIR /app
 COPY backend/pyproject.toml ./backend/
 COPY backend/app ./backend/app
 RUN pip install ./backend
 COPY --from=frontend /src/frontend/dist ./frontend/dist
+# Agent ROMKADE (liaison de la console à ROMKADE Cloud depuis le Manager, services/cloud_agent.py) et licence.
+COPY cloud/agent ./cloud/agent
+COPY LICENSE NOTICE ./
 RUN useradd --uid 1000 --create-home romkade && mkdir -p /data && chown romkade:romkade /data
 USER romkade
 VOLUME ["/data"]

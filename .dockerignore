@@ -11,3 +11,10 @@ docs
 .git
 .claude
 *.code-workspace
+
+# ROMKADE Cloud : seul cloud/agent entre dans l image du Manager ; jamais de secrets
+**/.env
+**/.env.*
+cloud/server
+cloud/deploy
+cloud/agent/dist
