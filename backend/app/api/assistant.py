@@ -119,7 +119,14 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                     games = asst.find_library_games(s, mentioned or [search_text], library_ids)
                 filters = ", ".join(x for x in (asst.GENRES.get(genre, ""), console,
                                                  f"{players}+ players" if players > 1 else "1 player" if players else "") if x)
-                head = f"Games of the user's library matching {filters}:\n" if filters else "Games of the user's library:\n"
+                # Une carte cliquable par jeu sous la réponse : le texte n'a pas à les énumérer (doublon).
+                more = len(games) > asst.LIBRARY_GAMES
+                seen: set = set()
+                games = [g for g in games if not ((g.platform_id, g.normalized_title) in seen
+                                                   or seen.add((g.platform_id, g.normalized_title)))][:asst.LIBRARY_GAMES]
+                head = (f"Games of the user's library matching {filters}" if filters else "Games of the user's library") + \
+                    (" (a selection: more games match)" if more else "") + \
+                    ". They are shown to the user as clickable game cards right under your answer:\n"
                 # Les consoles de la bibliothèque aussi : « ai-je la Magadrive ? » se répond même mal orthographié.
                 overview = asst.library_overview(s, console_key)[0].split("\nFavorites")[0]
                 return None, games, head + asst.library_lines(games, asst.broken_ids(s, console_key, games)) + "\n\n" + overview

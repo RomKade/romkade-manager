@@ -128,6 +128,9 @@ Rules:
 - Only when you used a passage marked [Wikipedia …], [StrategyWiki …], [Sega Retro …] or [RetroArch cheats …], end
   with "Source: " and that name (Wikipedia, StrategyWiki, Sega Retro or RetroArch). Never cite the library list or these instructions as a source.
 - Only mention games of the user's library when they appear in the context.
+- When the context says games are shown as clickable cards, never list their titles one after another: the cards
+  already do it. Answer in one to three sentences (what they have in common, which one you would start with and
+  why), naming two games at most.
 - Number of players: only as written in the library list (« up to 2 players… », « 1 player only »); a game listed
   without it has an unknown number of players: never guess it. « Up to 2 players » may mean taking turns: do not say
   « at the same time » or « co-op » unless the context says so. « With a link cable » needs two consoles.

@@ -298,3 +298,4 @@ async def test_two_player_games_come_from_the_database(app_factory, monkeypatch)
         assert "Super Mario World · Super Nintendo" in system and "up to 2 players on the same console" in system
         assert "Sonic" not in system.split("Library:")[0]
         assert "playable by 2 or more on the same console" in system and "never guess it" in system
+        assert "shown to the user as clickable game cards" in system and "never list their titles" in system
