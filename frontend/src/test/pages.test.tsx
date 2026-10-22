@@ -269,7 +269,7 @@ function mockFetch() {
       status: "no_key", query: "Super Mario World SNES gameplay", videos: [],
       search_url: "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay",
     });
-    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), ...sheetImages, favorite: favoriteIds.includes(1), broken: brokenIds.includes(1), release_year: 1990, release_date: "1990-11-21",
+    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), ...sheetImages, favorite: favoriteIds.includes(1), broken: brokenIds.includes(1), players: 2, players_link: false, release_year: 1990, release_date: "1990-11-21",
       publisher: "Nintendo", developer: "Nintendo EAD", franchise: "Mario", description: "Mario's quest to save the princess.",
       descriptions: { fr: { text: "Mario part sauver la princesse.", origin: "translated" } },
       info_url: "http://www.gamefaqs.com/snes/519824-super-mario-world", remote_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc", image_relpath: null, possible_duplicates: [], history: [{ scan_run_id: 1, change: "added", old_size: null, new_size: 1, old_mtime: null, new_mtime: null, run_started_at: "2026-10-16T10:00:00Z" }] });
@@ -384,6 +384,7 @@ describe("Bibliothèque", () => {
       await userEvent.click(await screen.findByText("Super Mario World"));
       const dialog = await screen.findByRole("dialog");
       const title = await within(dialog).findByRole("heading", { name: "Super Mario World" });
+      expect(within(dialog).getByText("1 à 2 joueurs")).toBeInTheDocument();  // sous le titre, à côté de la console
       const gallery = within(dialog).getByRole("region", { name: "Images du jeu" });
       expect(title.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(within(gallery).getByRole("group", { name: "Jaquette, 1 sur 2" })).toBeInTheDocument();
@@ -635,6 +636,17 @@ describe("Assistant de jeu", () => {
     expect(within(panel).getByText(/modèle local : rien ne quitte cet ordinateur/)).toBeInTheDocument();
     expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr", name: "Duke",
       messages: [{ role: "user", content: "Je bloque au château" }] });
+  });
+
+  it("se replie et se déplie d'un chevron, sans perdre la conversation", async () => {
+    renderAt("/");
+    await userEvent.click(await screen.findByRole("button", { name: /^Duke$/ }));
+    const panel = screen.getByRole("region", { name: "Duke" });
+    expect(within(panel).getByRole("textbox", { name: "Ta question" })).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Replier" }));
+    expect(within(panel).queryByRole("textbox", { name: "Ta question" })).not.toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Déplier" }));
+    expect(within(panel).getByRole("textbox", { name: "Ta question" })).toBeInTheDocument();
   });
 
   it("propose une action sur la console et ne l'exécute qu'au clic", async () => {

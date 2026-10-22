@@ -1547,3 +1547,12 @@ kbd {
 .share-btn--bluesky { --brand: #1185fe; }
 .share-btn--x { --brand: currentColor; }
 .share-btn--reddit { --brand: #ff4500; }
+
+/* Fiche du jeu : nombre de joueurs, sous le titre à côté de la console */
+.tag--players { display: inline-flex; align-items: center; gap: 6px; align-self: center; font-weight: 600;
+  background: color-mix(in srgb, var(--ink-3) 14%, transparent); color: var(--ink-2); }
+.tag--players.is-multi { background: color-mix(in srgb, var(--accent-2) 16%, transparent); color: var(--accent-2); }
+
+/* Bulle de Duke repliée : seulement sa barre de titre */
+.assistant__panel.is-collapsed { height: auto; }
+.assistant__panel.is-collapsed .assistant__head { border-bottom: 0; cursor: pointer; }

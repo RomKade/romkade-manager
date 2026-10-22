@@ -3,6 +3,8 @@ import type { Messages } from "../core";
 /** Assistant de jeu (bulle en bas à droite). */
 const messages: Messages = {
   fr: {
+    "expand": "Déplier",
+    "collapse": "Replier",
     "ask.shots": "Montre-moi mes captures",
     "shots.all": "Toutes les captures",
     "shots.downloaded": "Image enregistrée dans tes téléchargements.",
@@ -80,6 +82,8 @@ const messages: Messages = {
     "refusal.unclear": "Je n'ai pas compris la question. Peux-tu la reformuler ?",
   },
   en: {
+    "expand": "Expand",
+    "collapse": "Collapse",
     "ask.shots": "Show me my screenshots",
     "shots.all": "All screenshots",
     "shots.downloaded": "Image saved to your downloads.",
@@ -157,6 +161,8 @@ const messages: Messages = {
     "refusal.unclear": "I didn't understand the question. Could you rephrase it?",
   },
   es: {
+    "expand": "Desplegar",
+    "collapse": "Plegar",
     "ask.shots": "Enséñame mis capturas",
     "shots.all": "Todas las capturas",
     "shots.downloaded": "Imagen guardada en tus descargas.",

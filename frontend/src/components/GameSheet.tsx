@@ -1,6 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { Ban, Copy, Download, Gamepad2, Loader2, Save, Square, Star, X } from "lucide-react";
+import { Ban, Copy, Download, Gamepad2, Loader2, Save, Square, Star, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -93,7 +93,8 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
       <div className="sheet__head">
         <Dialog.Title className="sheet__title">{game.title}</Dialog.Title>
         <p className="sheet__platform"><ConsoleBadge code={game.platform.code} label={game.platform.label} />
-          {game.platform.label && <span>{game.platform.label}</span>}</p>
+          {game.platform.label && <span>{game.platform.label}</span>}
+          <PlayersTag players={game.players ?? null} link={game.players_link} /></p>
         {!game.present && <p className="tag tag--warn">{t("sheet.absent")}</p>}
         {game.broken && <p className="tag tag--broken"><Ban size={14} aria-hidden /> {t("sheet.broken.tag")}</p>}
       </div>
@@ -177,6 +178,19 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
  * de l'ordinateur) : « Qui joue ? » donne une manette à chaque joueur (jusqu'à 4) ; « Jouer » écrit ce choix (en
  * relayant d'abord les manettes de l'ordinateur), puis lance le jeu, qui le prend en compte au démarrage de RetroArch.
  */
+/** Sous le titre, à côté de la console : 1 joueur, jusqu'à N joueurs, ou à plusieurs avec câble link. Inconnu : rien. */
+function PlayersTag({ players, link }: { players: number | null; link: boolean }) {
+  const t = useT();
+  if (!players) return null;
+  const label = players === 1 ? t("sheet.tag.players.one") : t(link ? "sheet.tag.players.link" : "sheet.tag.players.many", { count: players });
+  return (
+    <span className={`tag tag--players ${players > 1 ? "is-multi" : ""}`}
+      title={players > 1 ? t(link ? "sheet.info.players.link" : "sheet.tag.players.hint", { count: players }) : undefined}>
+      <Users size={13} aria-hidden /> {label}
+    </span>
+  );
+}
+
 function LaunchButton({ id }: { id: number }) {
   const t = useT();
   const launch = useLaunchGame();

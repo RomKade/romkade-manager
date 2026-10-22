@@ -1,4 +1,4 @@
-import { Bot, ExternalLink, Gamepad2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, ExternalLink, Gamepad2, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
@@ -124,8 +124,8 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   const offerSolution = gameScope && !busy && last?.role === "assistant" && last.intent === "game_help" && last.content;
 
   return (
-    <section className="assistant__panel" aria-label={st.name}>
-      <header className="assistant__head">
+    <section className={`assistant__panel ${st.collapsed ? "is-collapsed" : ""}`} aria-label={st.name}>
+      <header className="assistant__head" onClick={st.collapsed ? () => assistant.setCollapsed(false) : undefined}>
         <span className="assistant__title">
           <Bot size={16} aria-hidden /> {st.name}
           <small className="assistant__subtitle">{t("assistant.subtitle")}</small>
@@ -145,10 +145,17 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           disabled={busy || messages.length === 0} onClick={() => assistant.setMessages(scope, [])}>
           <Trash2 size={15} aria-hidden />
         </button>
-        <button type="button" className="icon-button" aria-label={t("assistant.close", { name: st.name })} onClick={() => assistant.setOpen(false)}>
+        <button type="button" className="icon-button" aria-expanded={!st.collapsed}
+          aria-label={t(st.collapsed ? "assistant.expand" : "assistant.collapse")} title={t(st.collapsed ? "assistant.expand" : "assistant.collapse")}
+          onClick={(e) => { e.stopPropagation(); assistant.setCollapsed(!st.collapsed); }}>
+          {st.collapsed ? <ChevronUp size={16} aria-hidden /> : <ChevronDown size={16} aria-hidden />}
+        </button>
+        <button type="button" className="icon-button" aria-label={t("assistant.close", { name: st.name })}
+          onClick={(e) => { e.stopPropagation(); assistant.setOpen(false); }}>
           <X size={16} aria-hidden />
         </button>
       </header>
+      {!st.collapsed && <>
 
       {offer && (
         <div className="assistant__offer">
@@ -209,6 +216,7 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           {t("assistant.disclaimer")} · {local ? t("assistant.local") : provider ? t("assistant.online", { provider: t(`settings.ai.provider.${provider}`) }) : ""}
         </p>
       </footer>
+      </>}
     </section>
   );
 }
@@ -240,7 +248,7 @@ function Message({ m, game, onOpenGame, onSettle }: {
       {(m.games ?? []).length > 0 && !game && !m.action && (
         <span className="assistant__games">
           {m.games!.map((g) => (
-            <button key={g.id} type="button" className="assistant__game" onClick={() => onOpenGame?.(g.id)} disabled={!onOpenGame}>
+            <button key={g.id} type="button" className="assistant__game" onClick={() => { assistant.setCollapsed(true); onOpenGame?.(g.id); }} disabled={!onOpenGame}>
               <Gamepad2 size={12} aria-hidden /> {g.title} <em>{g.platform}</em>
             </button>
           ))}

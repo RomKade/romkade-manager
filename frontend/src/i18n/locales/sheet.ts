@@ -3,6 +3,10 @@ import type { Messages } from "../core";
 /** Fiche d'un jeu et fenêtre de la bande-annonce. */
 const messages: Messages = {
   fr: {
+    "tag.players.hint": "Jusqu'à {count} joueurs : en même temps ou chacun son tour, la base ne le précise pas",
+    "tag.players.link": "{count} joueurs · câble link",
+    "tag.players.many": "1 à {count} joueurs",
+    "tag.players.one": "1 joueur",
     "info.players.note": "Selon la base libretro : peut se jouer chacun son tour.",
     "info.players.link": "Jusqu'à {count} joueurs avec câble link (une console chacun)",
     "info.players.many": "Jusqu'à {count} joueurs",
@@ -146,6 +150,10 @@ const messages: Messages = {
     "video.open": "Ouvrir sur YouTube",
   },
   en: {
+    "tag.players.hint": "Up to {count} players: at the same time or taking turns, the database doesn't say",
+    "tag.players.link": "{count} players · link cable",
+    "tag.players.many": "1–{count} players",
+    "tag.players.one": "1 player",
     "info.players.note": "From the libretro database: may be played taking turns.",
     "info.players.link": "Up to {count} players with a link cable (one console each)",
     "info.players.many": "Up to {count} players",
@@ -289,6 +297,10 @@ const messages: Messages = {
     "video.open": "Open on YouTube",
   },
   es: {
+    "tag.players.hint": "Hasta {count} jugadores: a la vez o por turnos, la base no lo indica",
+    "tag.players.link": "{count} jugadores · cable link",
+    "tag.players.many": "1 a {count} jugadores",
+    "tag.players.one": "1 jugador",
     "info.players.note": "Según la base libretro: puede jugarse por turnos.",
     "info.players.link": "Hasta {count} jugadores con cable link (una consola cada uno)",
     "info.players.many": "Hasta {count} jugadores",
