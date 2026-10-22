@@ -37,7 +37,7 @@ def agent_source() -> Path:
     """Dossier de l'agent : ROMKADE_AGENT_DIR (image Docker), sinon cloud/agent du dépôt."""
     path = Path(os.environ.get("ROMKADE_AGENT_DIR") or REPO / "cloud" / "agent")
     if not (path / "romkade_agent.py").is_file():
-        raise errors.AppError("agent_missing", "Agent ROMKADE introuvable dans cette installation du Manager.", 500)
+        raise errors.AppError("agent_missing", "App ROMKADE pour console introuvable dans cette installation du Manager.", 500)
     return path
 
 
@@ -121,7 +121,7 @@ async def install(run, client, sftp, roms_root: str, server: str, secret: str) -
     )
     code, out = await run(client, command, timeout=40)
     if "started" not in out:
-        raise errors.AppError("agent_start_failed", "L'agent ROMKADE n'a pas démarré sur la console.", 502,
+        raise errors.AppError("agent_start_failed", "L'app ROMKADE n'a pas démarré sur la console.", 502,
                               {"exit": code, "output": out[-300:]})
 
 

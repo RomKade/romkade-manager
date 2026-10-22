@@ -115,7 +115,8 @@ export function DashboardPage() {
 
       <NowPlayingCard online={online === true} onOpen={setOpenId} />
 
-      <section className="block" aria-labelledby="played-h">
+      {/* Bibliothèque jamais lue : l'historique de la console n'aurait ni jaquette ni fiche, on ne le montre pas. */}
+      {s.synced && <section className="block" aria-labelledby="played-h">
         <div className="block__head">
           <h2 id="played-h"><Gamepad2 size={22} aria-hidden />{t("dashboard.played")}</h2>
           <Link to="/temps-de-jeu" className="link link--arrow">{t("dashboard.playedAll")} <ArrowRight size={15} aria-hidden /></Link>
@@ -139,7 +140,7 @@ export function DashboardPage() {
             ))}
           </Shelf>
         )}
-      </section>
+      </section>}
 
       <section className="block" aria-labelledby="fav-h">
         <div className="block__head">
