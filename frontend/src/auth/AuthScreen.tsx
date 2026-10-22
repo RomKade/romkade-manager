@@ -1,7 +1,6 @@
 import { Bot, Eye, EyeOff, Gamepad2, LibraryBig, MessagesSquare, Play, Save } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
-import dukeShot from "../assets/auth/assistant-duke.webp";
 import libraryShot from "../assets/auth/bibliotheque-consoles.webp";
 import logo240 from "../assets/brand/romkade-manager-logo-240.webp";
 import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
@@ -393,6 +392,48 @@ function RotatingWords({ words }: { words: string[] }) {
   );
 }
 
+/** Duke en action : une petite conversation qui se joue en boucle (question, « Duke écrit… », réponse). */
+function DukeChat() {
+  const t = useT();
+  const lines = t("auth.duke.chat").split("|");
+  const pairs = Math.floor(lines.length / 2);
+  const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const [pair, setPair] = useState(0);
+  const [phase, setPhase] = useState<"ask" | "typing" | "answer">(reduced ? "answer" : "ask");
+  const [typed, setTyped] = useState(reduced ? (lines[1] ?? "").length : 0);
+  const answer = lines[pair * 2 + 1] ?? "";
+  useEffect(() => {
+    let id: ReturnType<typeof setTimeout>;
+    if (reduced) {
+      id = setTimeout(() => { setPair((pair + 1) % pairs); setTyped((lines[((pair + 1) % pairs) * 2 + 1] ?? "").length); }, 6000);
+    } else if (phase === "ask") {
+      id = setTimeout(() => setPhase("typing"), 900);
+    } else if (phase === "typing") {
+      id = setTimeout(() => { setPhase("answer"); setTyped(0); }, 1400);
+    } else if (typed < answer.length) {
+      id = setTimeout(() => setTyped(Math.min(answer.length, typed + 2)), 22);
+    } else {
+      id = setTimeout(() => { setPair((pair + 1) % pairs); setPhase("ask"); setTyped(0); }, 3600);
+    }
+    return () => clearTimeout(id);
+  }, [phase, typed, pair, answer.length, pairs, reduced]);  // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <figure className="duke-chat" aria-label={t("auth.duke.title")}>
+      <figcaption className="duke-chat__head">
+        <span className="duke-chat__avatar"><Bot size={18} aria-hidden /></span>
+        <span><strong>{t("auth.duke.title")}</strong><small><span className="duke-chat__dot" aria-hidden />{t("auth.duke.status")}</small></span>
+      </figcaption>
+      <div className="duke-chat__body" aria-live="off">
+        <p className="duke-chat__msg duke-chat__msg--me" key={`q${pair}`}>{lines[pair * 2]}</p>
+        {phase === "typing" && (
+          <p className="duke-chat__msg duke-chat__msg--duke duke-chat__typing" aria-label={t("auth.duke.typing")}><i /><i /><i /></p>
+        )}
+        {phase === "answer" && <p className="duke-chat__msg duke-chat__msg--duke">{answer.slice(0, typed)}</p>}
+      </div>
+    </figure>
+  );
+}
+
 function Pitch() {
   const t = useT();
   const words = t("auth.pitch.rotate").split("|");
@@ -406,9 +447,9 @@ function Pitch() {
           <RotatingWords words={words} />
         </h2>
         <p className="auth-pitch__lead">{t("auth.pitch.lead")}</p>
-        <div className="auth-pitch__shots" aria-hidden>
-          <img className="auth-pitch__shot auth-pitch__shot--library" src={libraryShot} alt="" width={1156} height={843} />
-          <img className="auth-pitch__shot auth-pitch__shot--duke" src={dukeShot} alt="" width={782} height={1226} />
+        <div className="auth-pitch__shots">
+          <img className="auth-pitch__shot auth-pitch__shot--library" src={libraryShot} alt="" aria-hidden width={1156} height={843} />
+          <DukeChat />
         </div>
         <ul className="auth-pitch__features">
           {FEATURES.map(({ key, icon: Icon }, i) => (
