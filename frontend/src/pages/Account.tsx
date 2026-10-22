@@ -11,6 +11,7 @@ import { ACCOUNT_TABS, accountPath } from "../auth/accountTabs";
 import { CLOUD_URL, cloud, localAgent, type CloudConsole } from "../auth/cloud";
 import { PasswordStrength, passwordValid } from "../auth/password";
 import { supabase } from "../auth/supabase";
+import { SubNav } from "../components/SubNav";
 import { PageHeader } from "../components/ui";
 import { locale, useT } from "../i18n";
 
@@ -30,7 +31,7 @@ export function AccountPage() {
   return (
     <div className="page account">
       <PageHeader title={t("account.title")} lead={t("account.lead")} />
-      <nav className="subnav" aria-label={t("account.tab.label")}>
+      <SubNav label={t("account.tab.label")} active={current}>
         {ACCOUNT_TABS.map(({ slug, label, icon: Icon }) => (
           <NavLink key={slug} to={accountPath(slug)} end
             className={() => `subnav__item ${current === slug ? "is-active" : ""} ${slug === "zone-dangereuse" ? "subnav__item--danger" : ""}`}
@@ -38,7 +39,7 @@ export function AccountPage() {
             <Icon size={16} aria-hidden /> {t(label)}
           </NavLink>
         ))}
-      </nav>
+      </SubNav>
       <div className="account__tab">
         {current === "" && <><Profile /><EmailChange /></>}
         {current === "securite" && <><PasswordChange /><TwoFactor /><Sessions /></>}

@@ -13,6 +13,7 @@ import { RemoteControl } from "./Account";
 import { AnalyticsPanel } from "../components/AnalyticsNotice";
 import { GamePicker, type PickedGame } from "../components/GamePicker";
 import { StepCards } from "../components/StepCards";
+import { SubNav } from "../components/SubNav";
 import { CheatsPanel, KnowledgePanel } from "../components/KnowledgePanel";
 import { LlmPanel } from "../components/LlmPanel";
 import { SecretInput } from "../components/SecretInput";
@@ -53,7 +54,7 @@ export function SettingsPage() {
   return (
     <div className="page settings">
       <PageHeader title={t("common.nav.settings")} lead={t("settings.lead")} />
-      <nav className="subnav" aria-label={t("settings.tab.label")}>
+      <SubNav label={t("settings.tab.label")} active={current}>
         {TABS.map(({ slug, label, icon: Icon }) => (
           <NavLink key={slug} to={slug ? `/parametres/${slug}` : "/parametres"} end
             className={() => `subnav__item ${current === slug ? "is-active" : ""}`}
@@ -75,7 +76,7 @@ export function SettingsPage() {
             )}
           </NavLink>
         ))}
-      </nav>
+      </SubNav>
       {current === "" && (
         <>
           <ConnectionSteps settings={settings.data} />

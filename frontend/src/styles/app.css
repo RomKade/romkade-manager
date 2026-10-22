@@ -1114,6 +1114,20 @@ kbd {
 .subnav__item.is-active { color: var(--ink); border-bottom-color: var(--accent); box-shadow: 0 6px 10px -8px var(--accent); }
 .subnav__item.is-active svg { color: var(--accent); }
 .subnav__item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 6px; }
+/* Onglets plus larges que la page : flèches et fondu du côté où il en reste, glisser à la souris (SubNav). */
+.subnav-wrap { position: relative; margin-bottom: 4px; }
+.subnav-wrap .subnav { margin-bottom: 0; cursor: grab; user-select: none; }
+.subnav-wrap .subnav:active { cursor: grabbing; }
+.subnav-wrap.has-prev .subnav { mask-image: linear-gradient(to right, transparent 0, #000 56px); }
+.subnav-wrap.has-next .subnav { mask-image: linear-gradient(to left, transparent 0, #000 56px); }
+.subnav-wrap.has-prev.has-next .subnav { mask-image: linear-gradient(to right, transparent 0, #000 56px, #000 calc(100% - 56px), transparent 100%); }
+.subnav__arrow { position: absolute; top: 50%; z-index: 1; transform: translateY(-50%); display: grid; place-items: center; width: 30px; height: 30px;
+  border-radius: 50%; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer;
+  box-shadow: 0 2px 10px rgb(0 0 0 / .35); }
+.subnav__arrow:hover { border-color: var(--accent); color: var(--accent); }
+.subnav__arrow:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.subnav__arrow--prev { left: 0; }
+.subnav__arrow--next { right: 0; }
 
 /* ---------- Informations sur le jeu (fiche) ---------- */
 .game-info__genre { display: flex; align-items: center; gap: 8px; }
