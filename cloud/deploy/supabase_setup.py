@@ -2,7 +2,11 @@
 """Configuration de Supabase Auth pour ROMKADE (comptes, OAuth pour ChatGPT/Claude, e-mails). © 2026 ROMKADE.
 
 Rejouable : applique toute la configuration par l'API de gestion de Supabase. Lit cloud/deploy/.env
-(SUPABASE_ACCESS_TOKEN, MAILJET_API_KEY, MAILJET_SECRET_KEY) ; n'affiche jamais un secret.
+(SUPABASE_ACCESS_TOKEN, et selon EMAIL_PROVIDER : MAILJET_API_KEY / MAILJET_SECRET_KEY, ou OVH_SMTP_USER /
+OVH_SMTP_PASSWORD) ; n'affiche jamais un secret.
+
+Envoi des e-mails : EMAIL_PROVIDER=mailjet (noreply@romkade.com) ou ovh (boîte Zimbra OVH, l'expéditeur est la boîte
+elle-même : contact@romkade.com), le temps que le compte Mailjet soit activé.
 
     python3 cloud/deploy/supabase_setup.py            # applique
     python3 cloud/deploy/supabase_setup.py --dry-run  # montre ce qui serait envoyé (sans les secrets)
@@ -117,6 +121,14 @@ EMAILS = {
 }
 
 
+def smtp(e: dict) -> dict:
+    if e.get("EMAIL_PROVIDER", "mailjet") == "ovh":
+        return {"smtp_host": "smtp.mail.ovh.net", "smtp_port": "465", "smtp_user": e["OVH_SMTP_USER"],
+                "smtp_pass": e["OVH_SMTP_PASSWORD"], "smtp_admin_email": e["OVH_SMTP_USER"]}
+    return {"smtp_host": "in-v3.mailjet.com", "smtp_port": "587", "smtp_user": e["MAILJET_API_KEY"],
+            "smtp_pass": e["MAILJET_SECRET_KEY"], "smtp_admin_email": "noreply@romkade.com"}
+
+
 def config(e: dict) -> dict:
     cfg = {
         "site_url": SITE,
@@ -124,9 +136,7 @@ def config(e: dict) -> dict:
         "oauth_server_enabled": True,
         "oauth_server_allow_dynamic_registration": True,
         "oauth_server_authorization_path": "/authentification/",
-        "smtp_host": "in-v3.mailjet.com", "smtp_port": "587",
-        "smtp_user": e["MAILJET_API_KEY"], "smtp_pass": e["MAILJET_SECRET_KEY"],
-        "smtp_admin_email": "noreply@romkade.com", "smtp_sender_name": "ROMKADE",
+        **smtp(e), "smtp_sender_name": "ROMKADE",
         "smtp_max_frequency": 30, "rate_limit_email_sent": 30,
         "mailer_otp_length": 6, "mailer_otp_exp": 600,
         "password_min_length": 10,
