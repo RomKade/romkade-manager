@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+
 import { t } from "../i18n/core";
 import { supabase } from "./supabase";
 
@@ -56,3 +58,7 @@ export const localAgent = {
     if (!r.ok) throw new Error(errorMessage("/api/cloud/agent", r.status, await r.json().catch(() => ({}))));
   },
 };
+
+/** Consoles du compte (ROMKADE Cloud), rafraîchies chaque minute : voyant de l'onglet Pilotage à distance. */
+export const useCloudConsoles = () =>
+  useQuery({ queryKey: ["cloud-consoles"], queryFn: cloud.consoles, refetchInterval: 60_000, retry: false });

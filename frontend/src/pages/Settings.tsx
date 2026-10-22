@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpenText, BookOpen, Bot, Check, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpenText, Radio, BookOpen, Bot, Check, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
@@ -7,7 +7,9 @@ import { api, ApiError, type Capabilities, type DescriptionDraft, type DeviceSet
 import {
   useCaps, useDetectSystem, useDeviceStatus, useGame, useLlmSettings, usePlaySettings, useSavePlaySettings, useSettings, useSystem, useSystems, useYoutubeSettings,
 } from "../api/queries";
+import { useCloudConsoles } from "../auth/cloud";
 import { GitHubStar } from "../components/GitHubStar";
+import { RemoteControl } from "./Account";
 import { AnalyticsPanel } from "../components/AnalyticsNotice";
 import { GamePicker, type PickedGame } from "../components/GamePicker";
 import { StepCards } from "../components/StepCards";
@@ -29,6 +31,7 @@ const TABS = [
   { slug: "systeme", label: "settings.tab.system", icon: Cpu },
   { slug: "temps-de-jeu", label: "settings.tab.playtime", icon: Hourglass },
   { slug: "ia", label: "settings.tab.ai", icon: Bot },
+  { slug: "pilotage", label: "settings.tab.remote", icon: Radio },
   { slug: "connaissances", label: "settings.tab.knowledge", icon: BookOpenText },
   { slug: "videos", label: "settings.tab.videos", icon: Video },
   { slug: "a-propos", label: "legal.about.title", icon: Info },
@@ -38,6 +41,8 @@ export function SettingsPage() {
   const t = useT();
   const caps = useCaps();  // heure de la console : réglable sauf sous Android
   const llm = useLlmSettings().data;  // voyant de l'onglet Assistant IA, visible depuis tous les onglets
+  const device = useDeviceStatus();  // voyant de l'onglet Connexion
+  const remote = useCloudConsoles();  // voyant de l'onglet Pilotage à distance
   const settings = useSettings();
   const { tab: raw = "" } = useParams();
   // Anciennes adresses : Sources et crédits, Contenu IA (devenu Connaissances).
@@ -54,6 +59,16 @@ export function SettingsPage() {
             className={() => `subnav__item ${current === slug ? "is-active" : ""}`}
             aria-current={current === slug ? "page" : undefined}>
             <Icon size={16} aria-hidden /> {t(label)}
+            {slug === "" && (() => {
+              // Même état que la carte de la barre latérale : connectée, recherche en cours, ou injoignable.
+              const state = device.data?.connected ? "online" : device.isFetching || device.isPending ? "checking" : "offline";
+              const dot = state === "online" ? "connected" : state === "checking" ? "untested" : "error";
+              return <span className={`status-dot subnav__dot is-${dot}`} title={t(`common.device.${state}`)} />;
+            })()}
+            {slug === "pilotage" && remote.data && (
+              <span className={`status-dot subnav__dot is-${remote.data.length === 0 ? "none" : remote.data.some((c) => c.online) ? "connected" : "untested"}`}
+                title={t(`account.remote.dot.${remote.data.length === 0 ? "none" : remote.data.some((c) => c.online) ? "online" : "offline"}`)} />
+            )}
             {slug === "ia" && llm && (
               <span className={`status-dot subnav__dot is-${llm.state}`} title={t(`settings.ai.state.${llm.state}`,
                 { provider: llm.provider ? t(`settings.ai.provider.${llm.provider}`) : "", model: llm.model ?? "" })} />
@@ -78,7 +93,14 @@ export function SettingsPage() {
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}
       {current === "videos" && <YouTubePanel />}
-      {current === "ia" && <LlmPanel />}
+      {current === "ia" && (
+        <>
+          <p className="muted settings__intro">{t("settings.ai.intro")}</p>
+          <LlmPanel />
+          <p className="field__hint settings__intro">{t("settings.ai.notRemote")} <Link to="/parametres/pilotage">{t("settings.tab.remote")}</Link></p>
+        </>
+      )}
+      {current === "pilotage" && <RemoteControl />}
       {current === "connaissances" && <><KnowledgePanel /><CheatsPanel /><DescriptionsPanel /></>}
       {current === "a-propos" && <><AboutPanel /><AnalyticsPanel /><CreditsPanel /></>}
     </div>

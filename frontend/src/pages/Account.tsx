@@ -1,13 +1,14 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
-import { AppWindow, Cloud, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldCheck, UserRound } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { AppWindow, ArrowRight, Bot, Check, Cloud, Copy, Gamepad2, KeyRound, LogOut, Mail, MonitorSmartphone, PlugZap, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { Navigate, NavLink, useParams } from "react-router-dom";
 
 import { useDeviceStatus } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { CodeInput, PasswordInput } from "../auth/AuthScreen";
 import { ACCOUNT_TABS, accountPath } from "../auth/accountTabs";
-import { cloud, localAgent, type CloudConsole } from "../auth/cloud";
+import { CLOUD_URL, cloud, localAgent, type CloudConsole } from "../auth/cloud";
 import { PasswordStrength, passwordValid } from "../auth/password";
 import { supabase } from "../auth/supabase";
 import { PageHeader } from "../components/ui";
@@ -23,6 +24,8 @@ export function AccountPage() {
   const t = useT();
   translate = t as typeof translate;
   const { tab = "" } = useParams();
+  // Console et assistants autorisés vivent désormais dans Paramètres > Pilotage à distance.
+  if (["console", "consoles", "applications"].includes(tab)) return <Navigate to="/parametres/pilotage" replace />;
   const current = ACCOUNT_TABS.some((x) => x.slug === tab) ? tab : "";
   return (
     <div className="page account">
@@ -39,8 +42,6 @@ export function AccountPage() {
       <div className="account__tab">
         {current === "" && <><Profile /><EmailChange /></>}
         {current === "securite" && <><PasswordChange /><TwoFactor /><Sessions /></>}
-        {current === "console" && <Consoles />}
-        {current === "applications" && <ConnectedApps />}
         {current === "zone-dangereuse" && <DeleteAccount />}
       </div>
     </div>
@@ -48,6 +49,54 @@ export function AccountPage() {
 }
 
 /* ---------- briques ---------- */
+
+/**
+ * Paramètres > Pilotage à distance : ChatGPT, Claude… pilotent la console par ROMKADE Cloud (serveur MCP). Trois
+ * étapes : relier la console (app ROMKADE + clé), ajouter ROMKADE dans l'assistant (côté ChatGPT / Claude), et les
+ * assistants autorisés. Rien à voir avec l'Assistant IA du Manager (Duke), réglé dans son propre onglet.
+ */
+export function RemoteControl() {
+  const t = useT();
+  translate = t as typeof translate;
+  return (
+    <div className="account__tab remote">
+      <div className="remote__flow" aria-label={t("account.remote.flowLabel")}>
+        <span className="remote__node"><Bot size={16} aria-hidden /> ChatGPT · Claude</span>
+        <ArrowRight size={16} aria-hidden className="remote__arrow" />
+        <span className="remote__node"><Cloud size={16} aria-hidden /> ROMKADE Cloud</span>
+        <ArrowRight size={16} aria-hidden className="remote__arrow" />
+        <span className="remote__node"><Gamepad2 size={16} aria-hidden /> {t("account.remote.yourConsole")}</span>
+        <p className="muted small remote__example">{t("account.remote.example")}</p>
+      </div>
+      <Consoles />
+      <AddToAssistant />
+      <ConnectedApps />
+    </div>
+  );
+}
+
+function AddToAssistant() {
+  const t = useT();
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(CLOUD_URL); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* sélection manuelle */ }
+  };
+  return (
+    <Block icon={<PlugZap size={18} aria-hidden />} title={t("account.remote.add.title")} lead={t("account.remote.add.lead")}>
+      <div className="account__inline">
+        <input readOnly value={CLOUD_URL} aria-label={t("account.remote.add.url")} onFocus={(e) => e.currentTarget.select()} />
+        <button type="button" className="button" onClick={copy}>
+          {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />} {copied ? t("account.remote.add.copied") : t("account.remote.add.copy")}
+        </button>
+      </div>
+      <div className="remote__howto">
+        <div><strong>ChatGPT</strong><p className="muted small">{t("account.remote.add.chatgpt")}</p></div>
+        <div><strong>Claude</strong><p className="muted small">{t("account.remote.add.claude")}</p></div>
+      </div>
+      <p className="field__hint">{t("account.remote.add.then")}</p>
+    </Block>
+  );
+}
 
 function Block({ icon, title, lead, children, danger }: { icon?: ReactNode; title: string; lead?: string; children: ReactNode; danger?: boolean }) {
   return (
@@ -249,10 +298,12 @@ function Consoles() {
   const [agent, setAgent] = useState<{ supported: boolean; installed: boolean } | null>(null);
   const [name, setName] = useState("");
   const a = useAction();
+  const qc = useQueryClient();
   const load = useCallback(async () => {
     try { setList(await cloud.consoles()); } catch { setList([]); }
     try { setAgent(await localAgent.status()); } catch { setAgent(null); }
-  }, []);
+    qc.invalidateQueries({ queryKey: ["cloud-consoles"] });  // voyant de l'onglet
+  }, [qc]);
   useEffect(() => { load(); }, [load, connected]);
   return (
     <Block icon={<Cloud size={18} aria-hidden />} title={t("account.consoles.title")} lead={t("account.consoles.lead")}>

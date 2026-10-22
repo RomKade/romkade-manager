@@ -243,3 +243,16 @@
 .account__cloud-head { color: var(--ink); }
 .account__badge { display: inline-block; padding: 1px 8px; margin-right: 4px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 800;
   color: var(--accent-ink); background: var(--live); vertical-align: 1px; }
+
+/* Paramètres > Pilotage à distance : sens ChatGPT / Claude -> ROMKADE Cloud -> console, puis trois étapes. */
+.remote__flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px 18px; border-radius: var(--r-card, 14px);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+.remote__node { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: var(--r-pill); font-weight: 700;
+  font-size: var(--fs-sm); background: var(--panel-2); border: 1px solid var(--line); }
+.remote__node svg { color: var(--accent); }
+.remote__arrow { color: var(--ink-3); }
+.remote__example { flex-basis: 100%; margin: 4px 0 0; }
+.remote__howto { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 14px; }
+.remote__howto > div { padding: 12px 14px; border-radius: var(--r-control); background: var(--panel-2); border: 1px solid var(--line); }
+.remote__howto p { margin: 4px 0 0; }
+.settings__intro { margin: 0 0 14px; }
