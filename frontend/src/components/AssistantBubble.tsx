@@ -156,10 +156,6 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           onClick={(e) => { e.stopPropagation(); assistant.setCollapsed(!st.collapsed); }}>
           {st.collapsed ? <ChevronUp size={16} aria-hidden /> : <ChevronDown size={16} aria-hidden />}
         </button>
-        <button type="button" className="icon-button" aria-label={t("assistant.close", { name: st.name })}
-          onClick={(e) => { e.stopPropagation(); assistant.setOpen(false); }}>
-          <X size={16} aria-hidden />
-        </button>
       </header>
       {!st.collapsed && <>
 
