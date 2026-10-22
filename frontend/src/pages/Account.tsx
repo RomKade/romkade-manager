@@ -338,12 +338,13 @@ function Consoles() {
           {connected && agent?.supported && !agent.installed && (
             // Console branchée sans l'app ROMKADE (autre console, ou app retirée) : une seule console par compte,
             // la relier remplace celle du compte (son catalogue est renvoyé par l'app au démarrage).
-            <p className="field__hint">{t("account.link.limit", { name: linked.name })}{" "}
-              <button className="auth__link" disabled={a.busy} onClick={() => a.run(async () => {
+            <div className="account__replace">
+              <p className="field__hint">{t("account.link.limit", { name: linked.name })}</p>
+              <button className="button button--primary" disabled={a.busy} onClick={() => a.run(async () => {
                 await cloud.remove(linked.id); await localAgent.link(); await load(); return t("account.link.done"); })}>
-                {a.busy ? <span className="auth-spin" aria-hidden /> : null}{t("account.link.replace")}
+                {a.busy ? <span className="auth-spin" aria-hidden /> : <Cloud size={16} aria-hidden />} {t("account.link.replace")}
               </button>
-            </p>
+            </div>
           )}
           {here && (
             <p className="field__hint">{t("account.linked.update")}{" "}
