@@ -116,6 +116,7 @@ export const api = {
   game: (id: number) => request<GameDetail>("GET", `/games/${id}`),
   favorites: (limit?: number) => request<Game[]>("GET", `/favorites${qs({ limit })}`),
   setFavorite: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/favorite`),
+  setBroken: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/broken`),
   facets: (platform: string[]) => request<Facets>("GET", `/catalog/facets${qs({ platform })}`),
   startSync: () => request<ScanRun>("POST", "/catalog/sync"),
   sync: (id: number) => request<ScanRun>("GET", `/catalog/sync/${id}`),
@@ -206,6 +207,8 @@ export const api = {
   screenshots: () => request<GameShots[]>("GET", "/screenshots"),
   gameScreenshots: (id: number) => request<Shot[]>("GET", `/games/${id}/screenshots`),
   /** Lecture d'une capture par le modèle réglé (texte de l'écran, rôle des touches). */
+  captionScreenshot: (id: number, name: string, body: { lang: string; tone: string; previous: string[] }) =>
+    request<{ text: string; model: string; saw_image: boolean }>("POST", `/games/${id}/screenshots/${encodeURIComponent(name)}/caption`, body),
   analyzeScreenshot: (id: number, name: string, lang: string) =>
     request<{ text: string; model: string }>("POST", `/games/${id}/screenshots/${encodeURIComponent(name)}/analyze`, { lang }),
   deleteScreenshot: (url: string) => request<void>("DELETE", url.replace(/^\/api/, "")),

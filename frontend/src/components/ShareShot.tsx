@@ -1,9 +1,10 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { Share2, X as Close } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Loader2, RefreshCw, Share2, Sparkles, X as Close } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Shot } from "../api/client";
-import { useT } from "../i18n";
+import { api, type Shot } from "../api/client";
+import { useLlmSettings } from "../api/queries";
+import { getLang, useT } from "../i18n";
 import { errorMessage } from "./ui";
 
 /**
@@ -11,26 +12,25 @@ import { errorMessage } from "./ui";
  * donc tout ce qui peut l'être et la personne publie elle-même.
  * - X et Bluesky : image copiée, éditeur du réseau ouvert avec le texte ; il reste à coller l'image.
  * - Reddit : image téléchargée, formulaire du subreddit ouvert avec le titre ; il reste à y ajouter l'image.
- * - Instagram (pas de lien d'écriture) : feuille de partage du téléphone ; sur ordinateur, image téléchargée,
- *   légende copiée, Instagram ouvert.
+ * - Instagram (pas de lien d'écriture) : sur ordinateur, image téléchargée, légende copiée, Instagram ouvert.
+ * - Téléphone (feuille de partage avec fichiers) : chaque réseau passe par la feuille de partage, qui envoie l'image
+ *   et le texte à l'application choisie (texte aussi copié : Instagram ne le reprend pas).
+ * Texte : vide au départ ; « Générer avec l'IA » le fait écrire par l'IA réglée (faits du jeu, passages de référence,
+ * capture), dans le ton choisi, puis « Régénérer ».
  * L'image est agrandie trois fois sans lissage : les réseaux floutent une petite image de pixel art.
  */
 export type Network = "instagram" | "bluesky" | "x" | "reddit";
 export const NETWORKS: Network[] = ["instagram", "bluesky", "x", "reddit"];
 export const SUBREDDITS = ["SBCGaming", "retrogaming", "ANBERNIC", "RG35XX"];
+export const TONES = ["nostalgic", "fun", "challenge", "story"] as const;
+type Tone = (typeof TONES)[number];
+
+/** Jeu et nom de la capture, lus dans son adresse (/api/screenshots/<jeu>/<nom>). */
+export function shotRef(url: string): { gameId: number; name: string } | null {
+  const m = url.match(/\/screenshots\/(\d+)\/([^/?#]+)/);
+  return m ? { gameId: Number(m[1]), name: decodeURIComponent(m[2]!) } : null;
+}
 const SCALE = 3;
-
-/** Mot-dièse de la console : « Mega Drive / Genesis » → « MegaDrive ». */
-export function consoleTag(label: string | null | undefined): string | null {
-  const first = (label ?? "").split("/")[0]!.normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const tag = first.split(/[^A-Za-z0-9]+/).filter(Boolean).map((w) => w[0]!.toUpperCase() + w.slice(1)).join("");
-  return tag || null;
-}
-
-export function defaultText(title: string, platform: string | null | undefined): string {
-  const tag = consoleTag(platform);
-  return `${title}${platform ? ` · ${platform}` : ""}\n#retrogaming${tag ? ` #${tag}` : ""}`;
-}
 
 /** Titre Reddit : le texte sans mots-dièse, sur une ligne. */
 export const redditTitle = (text: string) => text.replace(/#\S+/g, "").replace(/\s+/g, " ").trim();
@@ -89,7 +89,7 @@ async function copyText(text: string): Promise<boolean> {
 const isPhone = () => typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 
 /** Bouton « Partager » d'une capture et sa fenêtre de partage. */
-export function ShareShotButton({ shot, title, platform }: { shot: Shot; title: string; platform?: string | null }) {
+export function ShareShotButton({ shot, title }: { shot: Shot; title: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
@@ -99,14 +99,15 @@ export function ShareShotButton({ shot, title, platform }: { shot: Shot; title: 
           <Share2 size={14} aria-hidden />
         </button>
       </Dialog.Trigger>
-      {open && <ShareDialog shot={shot} title={title} platform={platform} />}
+      {open && <ShareDialog shot={shot} title={title} />}
     </Dialog.Root>
   );
 }
 
-function ShareDialog({ shot, title, platform }: { shot: Shot; title: string; platform?: string | null }) {
+function ShareDialog({ shot, title }: { shot: Shot; title: string }) {
   const t = useT();
-  const [text, setText] = useState(() => defaultText(title, platform));
+  const [text, setText] = useState("");  // vide : la personne écrit, ou « Générer avec l'IA »
+  const ai = useCaption(shot, setText);
   const [subreddit, setSubreddit] = useState(SUBREDDITS[0]!);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -131,10 +132,12 @@ function ShareDialog({ shot, title, platform }: { shot: Shot; title: string; pla
     if (!blob || !file) return;
     setError(null);
     try {
-      if (network === "system" || (network === "instagram" && isPhone() && canShareFile)) {
-        if (network === "instagram") await copyText(text);  // Instagram ne reçoit pas le texte : légende à coller
-        await navigator.share({ files: [file], text: network === "system" ? text : undefined });
-        setDone({ network, how: network === "instagram" ? "instagramPhone" : "system" });
+      if (network === "system" || (isPhone() && canShareFile)) {
+        // Téléphone : la feuille de partage envoie l'image (et le texte) à l'application choisie. Texte copié aussi :
+        // Instagram ne le reprend pas.
+        if (network !== "system") await copyText(text);
+        await navigator.share({ files: [file], text: network === "instagram" ? undefined : text });
+        setDone({ network, how: network === "system" ? "system" : network === "instagram" ? "instagramPhone" : "phone" });
       } else if (network === "instagram") {
         download(blob, name);
         await copyText(text);
@@ -164,10 +167,31 @@ function ShareDialog({ shot, title, platform }: { shot: Shot; title: string; pla
         </Dialog.Close>
         <Dialog.Title className="share-dialog__title">{t("screenshots.share.title")}</Dialog.Title>
         <img className="share-dialog__img" src={shot.url} alt={title} />
-        <label className="field">
-          <span className="field__label">{t("screenshots.share.text")}</span>
-          <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} />
-        </label>
+        <div className="field">
+          <div className="share-dialog__text-head">
+            <label htmlFor="share-text" className="field__label">{t("screenshots.share.text")}</label>
+            {ai.ready && (
+              <div className="share-dialog__ai">
+                <select aria-label={t("screenshots.share.tone")} value={ai.tone} disabled={ai.busy}
+                  onChange={(e) => (ai.drafts ? ai.generate(e.target.value as Tone) : ai.setTone(e.target.value as Tone))}>
+                  {TONES.map((x) => <option key={x} value={x}>{t(`screenshots.share.tone.${x}`)}</option>)}
+                </select>
+                <button type="button" className="button button--small" onClick={() => ai.generate()} disabled={ai.busy}>
+                  {ai.busy ? <Loader2 size={14} className="spin" aria-hidden />
+                    : ai.drafts ? <RefreshCw size={14} aria-hidden /> : <Sparkles size={14} aria-hidden />}
+                  {" "}{t(ai.drafts ? "screenshots.share.regenerate" : "screenshots.share.write")}
+                </button>
+              </div>
+            )}
+          </div>
+          <textarea id="share-text" rows={5} value={text} onChange={(e) => setText(e.target.value)} aria-busy={ai.busy}
+            placeholder={t(ai.ready ? "screenshots.share.placeholderAi" : "screenshots.share.placeholder")} />
+          <p className="muted small share-dialog__ai-note" role="status">
+            {ai.busy ? t("screenshots.share.writing")
+              : ai.error ? <span className="text-error">{errorMessage(ai.error)}</span>
+              : !ai.ready ? t("screenshots.share.noAi") : null}
+          </p>
+        </div>
         <div className="share-dialog__networks">
           {NETWORKS.map((n) => (
             <button key={n} type="button" className={`button share-btn share-btn--${n}`} disabled={!blob} onClick={() => share(n)}>
@@ -197,4 +221,37 @@ function ShareDialog({ shot, title, platform }: { shot: Shot; title: string; pla
       </Dialog.Content>
     </Dialog.Portal>
   );
+}
+
+/**
+ * Texte du post écrit par l'IA réglée (POST …/caption), à la demande : « Générer avec l'IA », puis « Régénérer » ou
+ * changement de ton, en lui donnant les brouillons déjà proposés pour qu'il change d'idée.
+ */
+function useCaption(shot: Shot, setText: (text: string) => void) {
+  const llm = useLlmSettings();
+  const ready = llm.data?.ready === true;
+  const ref = shotRef(shot.url);
+  const [tone, setTone] = useState<Tone>("nostalgic");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [drafts, setDrafts] = useState(0);
+  const previous = useRef<string[]>([]);
+  const generate = useCallback(async (next?: Tone) => {
+    if (!ref) return;
+    const chosen = next ?? tone;
+    setTone(chosen);
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.captionScreenshot(ref.gameId, ref.name, { lang: getLang(), tone: chosen, previous: previous.current });
+      previous.current = [...previous.current, r.text].slice(-5);
+      setText(r.text);
+      setDrafts((n) => n + 1);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  }, [ref?.gameId, ref?.name, tone, setText]);  // eslint-disable-line react-hooks/exhaustive-deps
+  return { ready: ready && !!ref, tone, setTone, busy, error, generate, drafts: drafts > 0 };
 }

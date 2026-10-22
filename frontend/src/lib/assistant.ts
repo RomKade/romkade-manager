@@ -24,6 +24,8 @@ export type ChatMessage =
 
 type State = {
   open: boolean;
+  /** Bulle ouverte mais repliée sur sa barre de titre (chevron, ou jeu ouvert depuis la bulle). */
+  collapsed: boolean;
   /** Bulle masquée (Paramètres > Assistant IA), mémorisé dans ce navigateur. */
   hidden: boolean;
   /** Prénom de l'assistant (« Duke » par défaut), mémorisé dans ce navigateur et transmis à l'IA. */
@@ -44,7 +46,7 @@ const loadName = () => {
   try { const n = localStorage.getItem(NAME); return n && isValidName(n) ? n : DEFAULT_ASSISTANT_NAME; } catch { return DEFAULT_ASSISTANT_NAME; }
 };
 const loadHidden = () => { try { return localStorage.getItem(HIDDEN) === "1"; } catch { return false; } };
-let state: State = { open: false, hidden: loadHidden(), name: loadName(), scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
+let state: State = { open: false, collapsed: false, hidden: loadHidden(), name: loadName(), scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
   dismissedOffer: null, conversations: load() };
 const listeners = new Set<() => void>();
 
@@ -71,7 +73,8 @@ export const scopeKey = (scope: Scope) => (scope.kind === "game" ? `game:${scope
 export const assistant = {
   get: () => state,
   subscribe: (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; },
-  setOpen: (open: boolean) => set({ open }),
+  setOpen: (open: boolean) => set({ open, collapsed: false }),
+  setCollapsed: (collapsed: boolean) => set({ collapsed }),
   setName: (name: string) => {
     const n = isValidName(name) ? name.trim() : DEFAULT_ASSISTANT_NAME;
     try { if (n === DEFAULT_ASSISTANT_NAME) localStorage.removeItem(NAME); else localStorage.setItem(NAME, n); } catch { /* stockage indisponible */ }
@@ -89,7 +92,7 @@ export const assistant = {
   setMessages: (scope: Scope, messages: ChatMessage[]) =>
     set({ conversations: { ...state.conversations, [scopeKey(scope)]: messages } }),
   /** Tests : état de départ. */
-  reset: () => set({ open: false, hidden: false, name: DEFAULT_ASSISTANT_NAME, scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
+  reset: () => set({ open: false, collapsed: false, hidden: false, name: DEFAULT_ASSISTANT_NAME, scope: { kind: "library" }, sheetGame: null, sheetOpen: false,
     dismissedOffer: null, conversations: {} }),
 };
 

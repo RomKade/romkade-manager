@@ -21,7 +21,14 @@ export type LibraryState = {
   removed: boolean;
   /** Seulement les jeux favoris. */
   fav: boolean;
+  /** Seulement les jeux signalés comme ne fonctionnant pas. */
+  broken: boolean;
+  /** Joueurs : seul, 2 ou plus / 4 ou plus sur la même console, ou à plusieurs avec câble link ; "" : tous. */
+  players: Players;
 };
+
+export type Players = "" | "solo" | "2" | "4" | "link";
+export const PLAYERS: Players[] = ["solo", "2", "4", "link"];
 
 const SORTS: Sort[] = ["name", "size", "date", "added", "year"];
 
@@ -45,6 +52,8 @@ export function parseLibrary(sp: URLSearchParams): LibraryState {
     art: sp.get("art") === "card" ? "card" : "box",
     removed: sp.get("removed") === "1",
     fav: sp.get("fav") === "1",
+    broken: sp.get("broken") === "1",
+    players: (PLAYERS as string[]).includes(sp.get("players") ?? "") ? (sp.get("players") as Players) : "",
   };
 }
 
@@ -63,6 +72,8 @@ export function serializeLibrary(s: LibraryState): URLSearchParams {
   if (s.art !== "box") sp.set("art", s.art);
   if (s.removed) sp.set("removed", "1");
   if (s.fav) sp.set("fav", "1");
+  if (s.broken) sp.set("broken", "1");
+  if (s.players) sp.set("players", s.players);
   return sp;
 }
 
@@ -79,23 +90,25 @@ export function toApiQuery(s: LibraryState) {
     order: s.order,
     include_removed: s.removed || undefined,
     favorite: s.fav || undefined,
+    broken: s.broken || undefined,
+    players: s.players || undefined,
   };
 }
 
 /** La console choisie sur l'accueil n'est pas un filtre : elle délimite la page. */
 export function activeFilterCount(s: LibraryState): number {
   const platforms = s.platform.length === 1 ? 0 : s.platform.length;
-  return platforms + s.extension.length + s.region.length + s.genre.length + s.sub.length + (s.q ? 1 : 0) + (s.removed ? 1 : 0) + (s.fav ? 1 : 0);
+  return platforms + s.extension.length + s.region.length + s.genre.length + s.sub.length + (s.q ? 1 : 0) + (s.removed ? 1 : 0) + (s.fav ? 1 : 0) + (s.broken ? 1 : 0) + (s.players ? 1 : 0);
 }
 
 /** Sans console, sans recherche ni filtre : l'accueil propose de choisir une console. */
 export function showsConsolePicker(s: LibraryState): boolean {
-  return !s.all && !s.q && s.platform.length + s.extension.length + s.region.length + s.genre.length === 0 && !s.removed && !s.fav;
+  return !s.all && !s.q && s.platform.length + s.extension.length + s.region.length + s.genre.length === 0 && !s.removed && !s.fav && !s.broken && !s.players;
 }
 
 /** Une console ouverte, sans genre choisi, ni recherche ni filtre : on propose de choisir un genre. */
 export function showsGenrePicker(s: LibraryState): boolean {
-  return s.platform.length === 1 && !s.all && !s.q && s.genre.length + s.extension.length + s.region.length === 0 && !s.removed && !s.fav;
+  return s.platform.length === 1 && !s.all && !s.q && s.genre.length + s.extension.length + s.region.length === 0 && !s.removed && !s.fav && !s.broken && !s.players;
 }
 
 /** Ce que garde « Effacer les filtres » : la console ouverte et l'affichage ; on reste sur la liste des jeux. */

@@ -3,6 +3,7 @@ import type { Messages } from "../core";
 /** Paramètres : connexion, mot de passe, clé de la console, test, YouTube. */
 const messages: Messages = {
   fr: {
+    "as.faceHint": "Le visage de {name} : en pixel art, comme les héros des jeux des années 90.",
     "kn.refreshHint": "Refait la recherche pour tous les jeux, déjà trouvés compris : ajoute les nouvelles sources (Sega Retro) et les pages mises à jour. Tu peux l'arrêter à tout moment.",
     "kn.refresh": "Tout récupérer à nouveau ({count} jeux, ≈ {minutes} min)",
     "ch.downloading": "Téléchargement…",
@@ -353,6 +354,7 @@ const messages: Messages = {
     "yt.remove": "Retirer la clé",
   },
   en: {
+    "as.faceHint": "{name}'s face: pixel art, like the heroes of 90s games.",
     "kn.refreshHint": "Searches again for every game, including those already found: adds new sources (Sega Retro) and updated pages. You can stop it at any time.",
     "kn.refresh": "Fetch everything again ({count} games, ≈ {minutes} min)",
     "ch.downloading": "Downloading…",
@@ -703,6 +705,7 @@ const messages: Messages = {
     "yt.remove": "Remove the key",
   },
   es: {
+    "as.faceHint": "La cara de {name}: en pixel art, como los héroes de los juegos de los 90.",
     "kn.refreshHint": "Vuelve a buscar todos los juegos, incluidos los ya encontrados: añade las fuentes nuevas (Sega Retro) y las páginas actualizadas. Puedes detenerlo cuando quieras.",
     "kn.refresh": "Obtener todo de nuevo ({count} juegos, ≈ {minutes} min)",
     "ch.downloading": "Descargando…",

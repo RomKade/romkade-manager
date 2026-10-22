@@ -145,7 +145,14 @@ function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirect
               <div className="field">
                 <label htmlFor={`player-${n}`} className="field__label">{t("players.player", { n: n + 1 })}</label>
                 <select id={`player-${n}`} value={String(index)} disabled={busy} onChange={(e) => pick(n, e.target.value)}>
-                  {options.map((i) => <option key={i} value={String(i)}>{label(i)}</option>)}
+                  {/* Manette branchée d'un autre joueur : grisée, avec son joueur (une manette ne sert qu'à un joueur).
+                      Un numéro sans manette branchée reste libre : le choisir libère la manette du joueur. */}
+                  {options.map((i) => {
+                    const other = players.indexOf(i);
+                    const taken = other >= 0 && other !== n && byIndex.has(i);
+                    return <option key={i} value={String(i)} disabled={taken}>
+                      {taken ? t("players.takenBy", { name: label(i), n: other + 1 }) : label(i)}</option>;
+                  })}
                   {pads.map((g) => (
                     <option key={`pc:${g.index}`} value={`pc:${g.index}`}>{t("players.computerPad", { name: padName(g) })}</option>
                   ))}

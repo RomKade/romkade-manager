@@ -82,6 +82,7 @@ class RemoteFile(Base):
         Index("ix_remote_file_title", "platform_id", "normalized_title"),
         Index("ix_remote_file_genre", "platform_id", "genre"),
         Index("ix_remote_file_release_year", "release_year"),
+        Index("ix_remote_file_players", "players"),
         Index("ix_remote_file_subgenre", "platform_id", "subgenre"),
     )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -112,6 +113,8 @@ class RemoteFile(Base):
     franchise: Mapped[str | None] = mapped_column(String(200))
     description: Mapped[str | None] = mapped_column(Text)  # en anglais (OpenVGDB)
     info_url: Mapped[str | None] = mapped_column(String(500))  # fiche de référence (GameFAQs)
+    # Nombre maximum de joueurs (libretro-database « maxusers ») ; consoles portables : avec câble link.
+    players: Mapped[int | None] = mapped_column(Integer)
     first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
@@ -258,6 +261,18 @@ class Favorite(Base):
     NULL : favori d'avant cette distinction, montré sur toute console où le jeu est présent."""
 
     __tablename__ = "favorite"
+    __table_args__ = (UniqueConstraint("console", "file_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("remote_file.id", ondelete="CASCADE"), index=True)
+    console: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class BrokenGame(Base):
+    """Jeu signalé depuis sa fiche comme ne fonctionnant pas (l'édition choisie), sur une console : un jeu peut
+    marcher sur un firmware et pas sur un autre. `console` comme pour Favorite (empreinte de la clé SSH)."""
+
+    __tablename__ = "broken_game"
     __table_args__ = (UniqueConstraint("console", "file_id"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     file_id: Mapped[int] = mapped_column(ForeignKey("remote_file.id", ondelete="CASCADE"), index=True)

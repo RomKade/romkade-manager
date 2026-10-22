@@ -42,7 +42,7 @@ export function ScreenshotButton({ variant, label }: { variant?: "small" | "chip
 }
 
 /** Vignettes des captures : ouvrir en grand, partager sur les réseaux, télécharger, supprimer. */
-export function ShotGrid({ shots, title, platform }: { shots: Shot[]; title: string; platform?: string | null }) {
+export function ShotGrid({ shots, title }: { shots: Shot[]; title: string }) {
   const t = useT();
   const del = useDeleteScreenshot();
   return (
@@ -54,7 +54,7 @@ export function ShotGrid({ shots, title, platform }: { shots: Shot[]; title: str
           </a>
           <div className="shot__bar">
             <span className="muted num">{dateTime(s.taken_at)}</span>
-            <ShareShotButton shot={s} title={title} platform={platform} />
+            <ShareShotButton shot={s} title={title} />
             <a className="icon-button" href={s.url} download={`${title} ${s.name}`} aria-label={t("screenshots.download")} title={t("screenshots.download")}>
               <Download size={14} aria-hidden />
             </a>
@@ -70,14 +70,14 @@ export function ShotGrid({ shots, title, platform }: { shots: Shot[]; title: str
 }
 
 /** Fiche d'un jeu : ses captures d'écran, s'il en a. */
-export function GameScreenshots({ id, title, platform }: { id: number; title: string; platform?: string | null }) {
+export function GameScreenshots({ id, title }: { id: number; title: string }) {
   const t = useT();
   const q = useGameScreenshots(id);
   if (!q.data?.length) return null;
   return (
     <section className="sheet__section" aria-labelledby="shots-h">
       <h2 id="shots-h">{t("screenshots.mine")}</h2>
-      <ShotGrid shots={q.data} title={title} platform={platform} />
+      <ShotGrid shots={q.data} title={title} />
       <Link to={`/captures?game=${id}`} className="link">{t("screenshots.all")}</Link>
     </section>
   );
