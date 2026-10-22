@@ -1603,3 +1603,10 @@ kbd {
 @keyframes duke-nod { 50% { transform: translateY(-1px) rotate(-4deg); } }
 .llm__persona { display: flex; align-items: center; gap: 14px; }
 .llm__persona .assistant__face { width: 64px; height: 64px; margin: 0; }
+
+/* Manette de l'ordinateur : invite à appuyer sur un bouton, puis manette détectée */
+.players__pc { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px; border-radius: var(--r-control);
+  background: var(--panel-2); color: var(--ink-2); font-size: var(--fs-sm); }
+.players__pc svg { flex: none; color: var(--ink-3); }
+.players__pc.is-seen { color: var(--ink); }
+.players__pc.is-seen svg { color: var(--accent); }
