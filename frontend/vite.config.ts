@@ -15,7 +15,8 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 5173,
-    proxy: { "/api": { target: "http://127.0.0.1:8765", ws: true } },  // ws : manette à distance
+    // ROMKADE_API_PORT : moteur sur un autre port (instance de test à côté du Manager habituel).
+    proxy: { "/api": { target: `http://127.0.0.1:${process.env.ROMKADE_API_PORT ?? 8765}`, ws: true } },  // ws : manette à distance
   },
   build: { outDir: "dist", sourcemap: false, chunkSizeWarningLimit: 700 },
   test: {

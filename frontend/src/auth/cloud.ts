@@ -1,0 +1,50 @@
+import { supabase } from "./supabase";
+
+/**
+ * API du compte ROMKADE : consoles reliées et suppression du compte (ROMKADE Cloud, mcp.romkade.com), liaison de la
+ * console branchée au Manager (moteur local, /api/cloud). Toujours avec le jeton de la session en cours.
+ */
+export const CLOUD_URL = import.meta.env.VITE_ROMKADE_CLOUD_URL || "https://mcp.romkade.com";
+
+export type CloudConsole = {
+  id: string; name: string; model: string | null; firmware: string | null; online: boolean; games: number;
+  last_seen: number | null;
+};
+
+async function token(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) throw new Error("session");
+  return data.session.access_token;
+}
+
+async function call<T>(url: string, init: RequestInit = {}, header = "Authorization"): Promise<T> {
+  const t = await token();
+  const r = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init.headers ?? {}),
+    [header]: header === "Authorization" ? `Bearer ${t}` : t } });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body?.error?.message ?? body?.error ?? `HTTP ${r.status}`);
+  return body as T;
+}
+
+export const cloud = {
+  consoles: () => call<{ consoles: CloudConsole[] }>(`${CLOUD_URL}/api/me/consoles`).then((r) => r.consoles),
+  rename: (id: string, name: string) => call(`${CLOUD_URL}/api/me/consoles/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  remove: (id: string) => call(`${CLOUD_URL}/api/me/consoles/${id}`, { method: "DELETE" }),
+  deleteAccount: () => call(`${CLOUD_URL}/api/me`, { method: "DELETE" }),
+};
+
+/** Moteur local du Manager : agent ROMKADE de la console branchée. */
+export const localAgent = {
+  status: async () => {
+    const r = await fetch("/api/cloud/agent");
+    const body = await r.json();
+    if (!r.ok) throw new Error(body?.error?.message ?? `HTTP ${r.status}`);
+    return body as { supported: boolean; installed: boolean; server: string | null; cloud: string };
+  },
+  link: (name?: string) => call<{ console: CloudConsole; reused: boolean }>("/api/cloud/link",
+    { method: "POST", body: JSON.stringify({ name: name || null }) }, "X-Romkade-Token"),
+  unlink: async () => {
+    const r = await fetch("/api/cloud/agent", { method: "DELETE" });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error?.message ?? `HTTP ${r.status}`);
+  },
+};

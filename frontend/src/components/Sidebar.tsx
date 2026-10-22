@@ -142,10 +142,10 @@ function AccountChip() {
   return (
     <div className="account-chip" title={email}>
       <span className="account-chip__avatar" aria-hidden>{(meta?.name || email || "?").slice(0, 1).toUpperCase()}</span>
-      <span className="account-chip__who">
+      <Link to="/compte" className="account-chip__who" title={t("account.open")}>
         <span className="account-chip__name">{meta?.name || email}</span>
         {meta?.name && <span className="account-chip__email">{email}</span>}
-      </span>
+      </Link>
       <button type="button" className="account-chip__out" onClick={() => signOut()} aria-label={t("auth.signout")} title={t("auth.signout")}>
         <LogOut size={16} aria-hidden />
       </button>

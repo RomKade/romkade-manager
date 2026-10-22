@@ -98,7 +98,7 @@ function Field({ id, label, children, hint }: { id: string; label: string; child
   );
 }
 
-function PasswordInput({ id, value, onChange, autoComplete }: { id: string; value: string; onChange: (v: string) => void; autoComplete: string }) {
+export function PasswordInput({ id, value, onChange, autoComplete }: { id: string; value: string; onChange: (v: string) => void; autoComplete: string }) {
   const t = useT();
   const [shown, setShown] = useState(false);
   return (
@@ -113,7 +113,7 @@ function PasswordInput({ id, value, onChange, autoComplete }: { id: string; valu
 }
 
 /** Code à 6 chiffres en 6 cases : avance seul, retour arrière, collage du code entier, remplissage automatique. */
-function CodeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function CodeInput({ value, onChange, id = "auth-code" }: { value: string; onChange: (v: string) => void; id?: string }) {
   const t = useT();
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
@@ -127,10 +127,10 @@ function CodeInput({ value, onChange }: { value: string; onChange: (v: string) =
   };
   return (
     <div className="field auth__field">
-      <label htmlFor="auth-code-0">{t("auth.code")}</label>
+      <label htmlFor={`${id}-0`}>{t("auth.code")}</label>
       <div className="auth__digits" role="group" aria-label={t("auth.code")}>
         {digits.map((d, i) => (
-          <input key={i} id={`auth-code-${i}`} ref={(el) => { refs.current[i] = el; }} className="auth__digit"
+          <input key={i} id={`${id}-${i}`} ref={(el) => { refs.current[i] = el; }} className="auth__digit"
             type="text" inputMode="numeric" pattern="[0-9]" maxLength={i === 0 ? 6 : 1} value={d} autoFocus={i === 0}
             autoComplete={i === 0 ? "one-time-code" : "off"} aria-label={`${t("auth.code")} ${i + 1}/6`}
             onFocus={(e) => e.target.select()}
@@ -152,7 +152,7 @@ function CodeInput({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-function ResendButton({ send, captcha }: { send: (token: string) => Promise<string | void>; captcha: Captcha }) {
+export function ResendButton({ send, captcha }: { send: (token: string) => Promise<string | void>; captcha: Captcha }) {
   const t = useT();
   const [left, setLeft] = useState(RESEND_SECONDS);
   const [msg, setMsg] = useState("");

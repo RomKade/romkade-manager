@@ -14,6 +14,7 @@ import { TermsNotice } from "./components/TermsNotice";
 import { TopBar } from "./components/TopBar";
 import { t, useLang } from "./i18n";
 import { Empty } from "./components/ui";
+import { AccountPage } from "./pages/Account";
 import { DashboardPage } from "./pages/Dashboard";
 import { LibraryPage } from "./pages/Library";
 import { BluetoothPage } from "./pages/Bluetooth";
@@ -103,6 +104,7 @@ export function AppRoutes() {
         <Route path="parametres" element={<SettingsPage />} />
         <Route path="parametres/:tab" element={<SettingsPage />} />
         <Route path="conditions" element={<TermsPage />} />
+        <Route path="compte" element={<AccountPage />} />
         <Route path="*" element={<div className="page"><Empty title={t("common.nav.notFound")} /></div>} />
       </Route>
     </Routes>
