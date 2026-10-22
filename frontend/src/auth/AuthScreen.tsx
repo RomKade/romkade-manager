@@ -6,6 +6,7 @@ import logo240 from "../assets/brand/romkade-manager-logo-240.webp";
 import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
 import { LanguageSwitcher } from "../components/TopBar";
 import { getLang, useT } from "../i18n";
+import { CaptchaBox, useCaptcha, type Captcha } from "./captcha";
 import { PRIVACY_URL, supabase, TERMS_URL } from "./supabase";
 
 /**
@@ -61,7 +62,7 @@ function errorText(e: { code?: string; message?: string } | null | undefined, t:
   return e?.message ?? String(e);
 }
 
-function useSubmit() {
+function useSubmit(captcha?: Captcha) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -74,6 +75,7 @@ function useSubmit() {
       setError(String(e));
     } finally {
       setBusy(false);
+      captcha?.reset();  // jeton Turnstile à usage unique
     }
   }
   return { busy, error, info, setInfo, setError, run };
@@ -119,7 +121,7 @@ function CodeInput({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-function ResendButton({ send }: { send: () => Promise<string | void> }) {
+function ResendButton({ send, captcha }: { send: (token: string) => Promise<string | void>; captcha: Captcha }) {
   const t = useT();
   const [left, setLeft] = useState(RESEND_SECONDS);
   const [msg, setMsg] = useState("");
@@ -130,8 +132,8 @@ function ResendButton({ send }: { send: () => Promise<string | void> }) {
   }, [left]);
   return (
     <>
-      <button type="button" className="auth__link" disabled={left > 0}
-        onClick={async () => { const err = await send(); setMsg(err || t("auth.resent")); setLeft(RESEND_SECONDS); }}>
+      <button type="button" className="auth__link" disabled={left > 0 || !captcha.token}
+        onClick={async () => { const err = await send(captcha.token); captcha.reset(); setMsg(err || t("auth.resent")); setLeft(RESEND_SECONDS); }}>
         {left > 0 ? t("auth.resendIn", { s: left }) : t("auth.resend")}
       </button>
       {msg && <span className="auth__muted" role="status">{msg}</span>}
@@ -142,15 +144,13 @@ function ResendButton({ send }: { send: () => Promise<string | void> }) {
 function SignIn({ email, setEmail, go, onDone }: EmailProps & StepProps & { onDone: () => void }) {
   const t = useT();
   const [password, setPassword] = useState("");
-  const s = useSubmit();
+  const captcha = useCaptcha();
+  const s = useSubmit(captcha);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     s.run(async () => {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (error?.code === "email_not_confirmed") {
-        await supabase.auth.resend({ type: "signup", email: email.trim() });
-        return go("verify");
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password, options: { captchaToken: captcha.token } });
+      if (error?.code === "email_not_confirmed") return go("verify");  // l'écran du code propose le renvoi
       if (error) return errorText(error, t);
       onDone();
     });
@@ -165,8 +165,9 @@ function SignIn({ email, setEmail, go, onDone }: EmailProps & StepProps & { onDo
       <Field id="auth-password" label={t("auth.password")}>
         <PasswordInput id="auth-password" value={password} onChange={setPassword} autoComplete="current-password" />
       </Field>
+      <CaptchaBox captcha={captcha} offline={t("auth.captchaFail")} />
       <Notice error={s.error} />
-      <button type="submit" className="button button--primary auth__submit" disabled={s.busy}>
+      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || !captcha.token}>
         {s.busy ? <span className="auth-spin" aria-hidden /> : t("auth.signin.submit")}
       </button>
       <div className="auth__links">
@@ -182,13 +183,14 @@ function SignUp({ email, setEmail, go, onDone }: EmailProps & StepProps & { onDo
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [terms, setTerms] = useState(false);
-  const s = useSubmit();
+  const captcha = useCaptcha();
+  const s = useSubmit(captcha);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!terms) { s.setError(t("auth.err.terms")); return; }
     s.run(async () => {
       const { data, error } = await supabase.auth.signUp({ email: email.trim(), password,
-        options: { data: { name: name.trim(), locale: getLang(), terms_accepted_at: new Date().toISOString() } } });
+        options: { captchaToken: captcha.token, data: { name: name.trim(), locale: getLang(), terms_accepted_at: new Date().toISOString() } } });
       if (error) return errorText(error, t);
       if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return t("auth.err.user_already_exists");
       if (data.session) return onDone();
@@ -215,8 +217,9 @@ function SignUp({ email, setEmail, go, onDone }: EmailProps & StepProps & { onDo
         <span>{before}<a href={TERMS_URL} target="_blank" rel="noreferrer noopener">{t("auth.signup.termsLink")}</a>{middle}
           <a href={PRIVACY_URL} target="_blank" rel="noreferrer noopener">{t("auth.signup.privacyLink")}</a>{end}</span>
       </label>
+      <CaptchaBox captcha={captcha} offline={t("auth.captchaFail")} />
       <Notice error={s.error} />
-      <button type="submit" className="button button--primary auth__submit" disabled={s.busy}>
+      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || !captcha.token}>
         {s.busy ? <span className="auth-spin" aria-hidden /> : t("auth.signup.submit")}
       </button>
       <div className="auth__links">
@@ -229,11 +232,12 @@ function SignUp({ email, setEmail, go, onDone }: EmailProps & StepProps & { onDo
 function Verify({ email, go, onDone }: { email: string; onDone: () => void } & StepProps) {
   const t = useT();
   const [code, setCode] = useState("");
-  const s = useSubmit();
+  const captcha = useCaptcha();
+  const s = useSubmit(captcha);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     s.run(async () => {
-      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "signup" });
+      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "signup", options: { captchaToken: captcha.token } });
       if (error) return errorText(error, t);
       onDone();
     });
@@ -243,12 +247,13 @@ function Verify({ email, go, onDone }: { email: string; onDone: () => void } & S
       <h1 id="auth-title" className="auth__title">{t("auth.verify.title")}</h1>
       <p className="auth__muted">{t("auth.verify.sub", { email })}</p>
       <CodeInput value={code} onChange={setCode} />
+      <CaptchaBox captcha={captcha} offline={t("auth.captchaFail")} />
       <Notice error={s.error} />
-      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || code.length !== 6}>
+      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || code.length !== 6 || !captcha.token}>
         {s.busy ? <span className="auth-spin" aria-hidden /> : t("auth.verify.submit")}
       </button>
       <div className="auth__links">
-        <ResendButton send={async () => { const { error } = await supabase.auth.resend({ type: "signup", email: email.trim() }); return error ? errorText(error, t) : undefined; }} />
+        <ResendButton captcha={captcha} send={async (captchaToken) => { const { error } = await supabase.auth.resend({ type: "signup", email: email.trim(), options: { captchaToken } }); return error ? errorText(error, t) : undefined; }} />
         <button type="button" className="auth__link" onClick={() => go("signin")}>{t("auth.back")}</button>
       </div>
     </form>
@@ -257,11 +262,12 @@ function Verify({ email, go, onDone }: { email: string; onDone: () => void } & S
 
 function Forgot({ email, setEmail, go }: EmailProps & StepProps) {
   const t = useT();
-  const s = useSubmit();
+  const captcha = useCaptcha();
+  const s = useSubmit(captcha);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     s.run(async () => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { captchaToken: captcha.token });
       if (error) return errorText(error, t);
       go("reset");
     });
@@ -273,8 +279,9 @@ function Forgot({ email, setEmail, go }: EmailProps & StepProps) {
       <Field id="auth-email" label={t("auth.email")}>
         <input id="auth-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
       </Field>
+      <CaptchaBox captcha={captcha} offline={t("auth.captchaFail")} />
       <Notice error={s.error} />
-      <button type="submit" className="button button--primary auth__submit" disabled={s.busy}>
+      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || !captcha.token}>
         {s.busy ? <span className="auth-spin" aria-hidden /> : t("auth.forgot.submit")}
       </button>
       <div className="auth__links"><button type="button" className="auth__link" onClick={() => go("signin")}>{t("auth.back")}</button></div>
@@ -286,11 +293,12 @@ function Reset({ email, go, onDone }: { email: string; onDone: () => void } & St
   const t = useT();
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
-  const s = useSubmit();
+  const captcha = useCaptcha();
+  const s = useSubmit(captcha);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     s.run(async () => {
-      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "recovery" });
+      const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "recovery", options: { captchaToken: captcha.token } });
       if (error) return errorText(error, t);
       const upd = await supabase.auth.updateUser({ password });
       if (upd.error) return errorText(upd.error, t);
@@ -305,12 +313,13 @@ function Reset({ email, go, onDone }: { email: string; onDone: () => void } & St
       <Field id="auth-password" label={t("auth.newPassword")} hint={t("auth.rules")}>
         <PasswordInput id="auth-password" value={password} onChange={setPassword} autoComplete="new-password" />
       </Field>
+      <CaptchaBox captcha={captcha} offline={t("auth.captchaFail")} />
       <Notice error={s.error} />
-      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || code.length !== 6}>
+      <button type="submit" className="button button--primary auth__submit" disabled={s.busy || code.length !== 6 || !captcha.token}>
         {s.busy ? <span className="auth-spin" aria-hidden /> : t("auth.reset.submit")}
       </button>
       <div className="auth__links">
-        <ResendButton send={async () => { const { error } = await supabase.auth.resetPasswordForEmail(email.trim()); return error ? errorText(error, t) : undefined; }} />
+        <ResendButton captcha={captcha} send={async (captchaToken) => { const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { captchaToken }); return error ? errorText(error, t) : undefined; }} />
         <button type="button" className="auth__link" onClick={() => go("signin")}>{t("auth.back")}</button>
       </div>
     </form>

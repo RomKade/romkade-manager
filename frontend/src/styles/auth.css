@@ -149,3 +149,7 @@
 .auth-pitch__brands li:nth-child(even) { border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); box-shadow: 0 0 14px rgb(255 67 181 / 0.08); }
 .auth-pitch__brands .auth-pitch__brands-more { border-style: dashed; border-color: rgb(255 255 255 / 0.18); color: var(--screen-ink-2); font-weight: 600; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .auth-pitch__brands li { animation: none !important; } }
+
+/* Vérification anti-robot (Cloudflare Turnstile) */
+.auth__captcha { margin-top: 16px; min-height: 0; }
+.auth__captcha > div:empty { display: none; }
