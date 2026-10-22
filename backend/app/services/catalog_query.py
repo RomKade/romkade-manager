@@ -12,10 +12,12 @@ from app.catalog_schemas import (
     FacetsOut, FacetValue,
     GameDetailOut, GameOut, GamesPageOut, PlatformRef, ScanRunOut, UnmatchedImagesOut,
 )
-from app.db.models import Device, Favorite, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
+from app.db.models import BrokenGame, Device, Favorite, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
 from app.device.paths import safe_join
 from app.schemas import Page
+from app.platforms import canonical
 from app.services.classify import display_title, search_key
+from app.services.gameinfo import LINK_DIRS
 from app.services.boxart import has_source as has_boxart_source
 from app.services import videos
 from app.services.genres import GENRES, UNCLASSIFIED
@@ -37,6 +39,7 @@ def to_game(f: RemoteFile) -> GameOut:
         metadata_status=f.metadata_status, genre=f.genre, genre_label=GENRES.get(f.genre) if f.genre else None,
         genre_detail=f.genre_detail, subgenre=f.subgenre, subgenre_label=SUB_LABELS.get(f.subgenre or ""),
         release_year=f.release_year, developer=f.developer, publisher=f.publisher,
+        players=f.players, players_link=bool(f.players and f.players > 1 and canonical(f.platform.directory) in LINK_DIRS),
         first_seen_at=f.first_seen_at, last_seen_at=f.last_seen_at,
         present=f.deleted_at is None,
         youtube_url=videos.youtube_search_url(videos.build_query(f)),
@@ -73,11 +76,29 @@ def list_platforms(s: Session, include_absent: bool = False) -> list[CatalogPlat
 
 
 SortKey = Literal["name", "size", "date", "added", "year"]
+# Filtre « Joueurs » : seul, à 2 ou plus / 4 ou plus sur la même console (deux manettes), ou à plusieurs avec un câble
+# link (consoles portables : une console chacun).
+PlayersFilter = Literal["solo", "2", "4", "link"]
+
+
+def link_platform_ids(s: Session) -> list[int]:
+    """Plateformes portables (dossiers aux noms libres compris : « gba », « Game Boy (GB) »… via canonical)."""
+    return [p.id for p in s.scalars(select(Platform)) if canonical(p.directory) in LINK_DIRS]
+
+
+def players_condition(s: Session, players: str):
+    link = RemoteFile.platform_id.in_(link_platform_ids(s))
+    if players == "solo":
+        return RemoteFile.players == 1
+    if players == "link":
+        return and_(RemoteFile.players >= 2, link)
+    return and_(RemoteFile.players >= int(players), ~link)
 
 
 def search_games(s: Session, *, q: str | None, platforms: list[str] | None, extensions: list[str] | None,
                  regions: list[str] | None, role: str, genres: list[str] | None = None, subgenres: list[str] | None = None,
-                 has_image: bool | None, include_removed: bool, favorite: bool = False, console: str | None = None,
+                 has_image: bool | None, include_removed: bool, favorite: bool = False, broken: bool = False,
+                 console: str | None = None, players: str | None = None,
                  sort: SortKey, order: Literal["asc", "desc"], offset: int, limit: int) -> GamesPageOut:
     conds = []
     if role != "all":
@@ -104,6 +125,10 @@ def search_games(s: Session, *, q: str | None, platforms: list[str] | None, exte
         conds.append(RemoteFile.image_relpath.is_not(None) if has_image else RemoteFile.image_relpath.is_(None))
     if favorite:
         conds.append(RemoteFile.id.in_(select(Favorite.file_id).where(_console_scope(console))))
+    if broken:
+        conds.append(RemoteFile.id.in_(select(BrokenGame.file_id).where(BrokenGame.console == console)))
+    if players:
+        conds.append(players_condition(s, players))
     if q:
         for word in search_key(q).split():
             conds.append(RemoteFile.search_key.like(f"%{word}%", escape="\\"))
@@ -155,6 +180,21 @@ def set_favorite(s: Session, console: str | None, file_id: int, on: bool) -> Non
             s.delete(row)
 
 
+def is_broken(s: Session, console: str | None, file_id: int) -> bool:
+    return s.scalar(select(BrokenGame.id).where(BrokenGame.file_id == file_id, BrokenGame.console == console)
+                    .limit(1)) is not None
+
+
+def set_broken(s: Session, console: str | None, file_id: int, on: bool) -> None:
+    """Signale (ou non) le jeu comme ne fonctionnant pas sur cette console."""
+    get_file(s, file_id)
+    row = s.scalar(select(BrokenGame).where(BrokenGame.file_id == file_id, BrokenGame.console == console))
+    if on and row is None:
+        s.add(BrokenGame(file_id=file_id, console=console))
+    elif not on and row is not None:
+        s.delete(row)
+
+
 def get_file(s: Session, file_id: int) -> RemoteFile:
     f = s.get(RemoteFile, file_id, options=[joinedload(RemoteFile.platform)])
     if f is None:
@@ -175,6 +215,7 @@ def game_detail(s: Session, file_id: int, roms_root: str, console: str | None = 
         descriptions={t.lang: {"text": t.text, "origin": t.origin} for t in s.scalars(select(GameText).where(
             GameText.platform_id == f.platform_id, GameText.normalized_title == f.normalized_title))},
         favorite=is_favorite(s, console, f.id),
+        broken=is_broken(s, console, f.id),
         remote_path=safe_join(roms_root, f.platform.directory, f.relative_path),
         image_relpath=f.image_relpath,
         possible_duplicates=[to_game(d) for d in dups] if f.role == "candidate" else [],

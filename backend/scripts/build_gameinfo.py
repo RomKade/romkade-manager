@@ -5,12 +5,13 @@ Usage (depuis backend/) :
 
 À lancer seulement pour rafraîchir les sources : l'application lit le fichier produit, sans réseau.
 Sources publiques :
-- libretro-database (metadat/developer, publisher, releaseyear, releasemonth, franchise) : consoles, par nom
-  No-Intro ;
+- libretro-database (metadat/developer, publisher, releaseyear, releasemonth, franchise, maxusers) : consoles, par
+  nom No-Intro ;
 - OpenVGDB (base d'OpenEmu) : résumé (en anglais), date de sortie, développeur, éditeur, fiche GameFAQs ;
-- listes arcade libretro (MAME, FBNeo, HBMAME) : année et fabricant, par nom court du zip.
+- listes arcade libretro (MAME, FBNeo, HBMAME) : année et fabricant, par nom court du zip ;
+- liste XML de MAME (mameXXXXlx.zip, dernière version) : nombre de joueurs des jeux d'arcade, par nom court.
 Chaque enregistrement : [année, date « AAAA-MM-JJ » ou « AAAA-MM », développeur, éditeur, franchise,
-index du résumé dans « texts », lien de référence]. Les résumés identiques (éditions d'un même jeu) sont partagés.
+index du résumé dans « texts », lien de référence, nombre maximum de joueurs]. Les résumés identiques (éditions d'un même jeu) sont partagés.
 """
 
 import gzip
@@ -32,7 +33,8 @@ from app.services.gameinfo import DATA_FILE, FIELDS, dump  # noqa: E402
 from app.services.genres import ARCADE_DIRS, CONSOLE_SOURCES, OVGDB_SYSTEMS  # noqa: E402
 
 METADAT = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/{}/{}.dat"
-LIBRETRO_FIELDS = ("developer", "publisher", "releaseyear", "releasemonth", "franchise")
+LIBRETRO_FIELDS = ("developer", "publisher", "releaseyear", "releasemonth", "franchise", "users")
+FOLDERS = {"users": "maxusers"}  # dossier de metadat quand il diffère du nom du champ
 ARCADE = [  # (url, champ année, champ fabricant)
     ("https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/mame/MAME.dat", "year", "developer"),
     ("https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/fbneo-split/FBNeo%20-%20Arcade%20Games.dat",
@@ -40,6 +42,8 @@ ARCADE = [  # (url, champ année, champ fabricant)
     ("https://raw.githubusercontent.com/libretro/libretro-database/master/dat/HBMAME.dat", "year", "developer"),
 ]
 OPENVGDB = "https://github.com/OpenVGDB/OpenVGDB/releases/download/v29.0/openvgdb.zip"
+# Liste XML officielle de MAME (licences libres GPL/BSD) : nombre de joueurs de chaque jeu d'arcade (<input players>).
+MAME_RELEASES = "https://api.github.com/repos/mamedev/mame/releases/latest"
 
 BLOCK_RE = re.compile(r"^game \((.*?)^\)", re.S | re.M)
 TITLE_RE = re.compile(r'^\s*(?:comment|name) "((?:[^"\\]|\\.)*)"', re.M)
@@ -110,14 +114,21 @@ class Builder:
             for src in sources:
                 found = 0
                 for kind in LIBRETRO_FIELDS:
-                    for block in BLOCK_RE.findall(fetch(METADAT.format(kind, urllib.parse.quote(src)))):
-                        title, value = TITLE_RE.search(block), field(block, kind)
+                    for block in BLOCK_RE.findall(fetch(METADAT.format(FOLDERS.get(kind, kind), urllib.parse.quote(src)))):
+                        title = TITLE_RE.search(block)
+                        if kind == "users":  # valeur sans guillemets : « users 2 »
+                            m = re.search(r"^\s*users (\d+)", block, re.M)
+                            value = m.group(1) if m else None
+                        else:
+                            value = field(block, kind)
                         if not (title and value):
                             continue
                         found += 1
                         row = [None] * len(FIELDS)
                         if kind == "releaseyear":
                             row[0] = year_of(value)
+                        elif kind == "users":
+                            row[FIELDS.index("players")] = int(value) if 0 < int(value) <= 16 else None
                         elif kind == "releasemonth":
                             row[1] = value  # mois seul : complété avec l'année plus bas
                         else:
@@ -147,7 +158,7 @@ class Builder:
             if not dirs or not name:
                 continue
             year, full_date = ovgdb_date(date)
-            values = [year, full_date, dev, pub, None, self.text(desc), url]
+            values = [year, full_date, dev, pub, None, self.text(desc), url, None]
             for d in dirs:
                 self.merge(self.consoles.setdefault(d, {}), name, values)
             count += 1
@@ -163,8 +174,38 @@ class Builder:
                 maker = field(block, maker_field) or field(block, "manufacturer")
                 self.merge(self.arcade, z.group(1).lower(),
                            # Arcade : le fabricant est à la fois développeur et éditeur.
-                           [year_of(field(block, year_field)), None, maker, maker, None, None, None])
+                           [year_of(field(block, year_field)), None, maker, maker, None, None, None, None])
             print(f"arcade {url.rsplit('/', 1)[1]:<40} {len(self.arcade) - before:>6} nouveaux")
+
+
+def mame_players(b: "Builder") -> str:
+    """Nombre de joueurs de l'arcade d'après la liste XML de MAME ; renvoie la version utilisée."""
+    import xml.etree.ElementTree as ET
+
+    release = httpx.get(MAME_RELEASES, timeout=60, follow_redirects=True).json()
+    asset = next(a for a in release["assets"] if a["name"].endswith("lx.zip"))
+    r = httpx.get(asset["browser_download_url"], timeout=300, follow_redirects=True)
+    r.raise_for_status()
+    found = 0
+    players_at = FIELDS.index("players")
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z, z.open(z.namelist()[0]) as fh:
+        for _, el in ET.iterparse(fh, events=("end",)):
+            if el.tag != "machine":
+                continue
+            name = (el.get("name") or "").lower()
+            inp = el.find("input")
+            n = int(inp.get("players") or 0) if inp is not None else 0
+            if name and 0 < n <= 8 and el.get("isdevice") != "yes" and el.get("isbios") != "yes":
+                row = b.arcade.get(name)
+                if row is not None:
+                    while len(row) < len(FIELDS):
+                        row.append(None)
+                    if row[players_at] is None:
+                        row[players_at] = n
+                        found += 1
+            el.clear()
+    print(f"MAME {release['tag_name']} : nombre de joueurs pour {found} jeux d'arcade")
+    return release["tag_name"]
 
 
 def main() -> int:
@@ -172,9 +213,10 @@ def main() -> int:
     b.libretro()
     b.openvgdb()
     b.arcade_lists()
+    mame = mame_players(b)
     data = {
         "version": {"built_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                    "sources": "libretro-database master, OpenVGDB v29.0", "arcade_dirs": sorted(ARCADE_DIRS)},
+                    "sources": f"libretro-database master, OpenVGDB v29.0, MAME {mame} (joueurs)", "arcade_dirs": sorted(ARCADE_DIRS)},
         "fields": list(FIELDS),
         "consoles": b.consoles,
         "arcade": b.arcade,

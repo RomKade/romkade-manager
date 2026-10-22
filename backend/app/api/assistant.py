@@ -8,6 +8,7 @@ message. Les erreurs de réglage de l'IA (aucune IA, clé manquante…) sont ren
 import asyncio
 import json
 import logging
+import random
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -75,6 +76,7 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
     wants_solution = bool(route.get("wants_solution"))
     genre = route.get("genre") if route.get("genre") in asst.GENRES else ""
     console = str(route.get("console") or "")[:60]
+    players = route.get("players") if isinstance(route.get("players"), int) and 1 <= route.get("players") <= 8 else 0
 
     def dirs_for_console():
         with st.sessions() as s:
@@ -109,15 +111,18 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                 overview, favs = asst.library_overview(s, console_key)
                 return None, (favs if asst.FAVORITES_RE.search(question) else []), overview
             if intent == "find_games":
-                if library_ids is None and not mentioned and (genre or dirs):
+                if players and not mentioned:  # nombre de joueurs : seulement en base, jamais deviné
+                    games = asst.find_by_filters(s, genre, dirs, players)
+                elif library_ids is None and not mentioned and (genre or dirs):
                     games = asst.find_by_filters(s, genre, dirs)
                 else:
                     games = asst.find_library_games(s, mentioned or [search_text], library_ids)
-                filters = ", ".join(x for x in (asst.GENRES.get(genre, ""), console) if x)
+                filters = ", ".join(x for x in (asst.GENRES.get(genre, ""), console,
+                                                 f"{players}+ players" if players > 1 else "1 player" if players else "") if x)
                 head = f"Games of the user's library matching {filters}:\n" if filters else "Games of the user's library:\n"
                 # Les consoles de la bibliothèque aussi : « ai-je la Magadrive ? » se répond même mal orthographié.
                 overview = asst.library_overview(s, console_key)[0].split("\nFavorites")[0]
-                return None, games, head + asst.library_lines(games) + "\n\n" + overview
+                return None, games, head + asst.library_lines(games, asst.broken_ids(s, console_key, games)) + "\n\n" + overview
             if intent == "game_help":  # jeu cité absent de la bibliothèque
                 return None, [], "The game asked about is not in the user's library; answer from general knowledge " \
                                  "only if you are sure, and say it is not in the library."
@@ -141,7 +146,7 @@ async def _prepare(request: Request, body: AssistantIn, llm) -> asst.Prepared:
                 if extra := kn.version_chunk(s, f.platform_id, f.normalized_title, f.platform.directory, chunks):
                     chunks = [*chunks, extra]
                 passages, srcs = asst.passages_text(chunks)
-                text = asst.game_card(s, f, body.lang)
+                text = asst.game_card(s, f, body.lang, console_key)
                 if passages:
                     text += "\n\nPassages:\n" + passages
                 else:
@@ -302,3 +307,49 @@ async def analyze_screenshot(game_id: int, name: str, body: ShotAnalysisIn, requ
         raise errors.AppError("screenshot_analysis_empty", f"{llm.label} n'a rien rendu pour cette capture.", 502)
     return {"text": text[:2000],
             "model": llm.label}
+
+
+class CaptionIn(BaseModel):
+    lang: Literal["fr", "en", "es"] = "fr"
+    tone: Literal["nostalgic", "fun", "challenge", "story"] = "nostalgic"
+    previous: list[str] = Field(default_factory=list, max_length=10)  # brouillons déjà proposés, à ne pas répéter
+
+
+class CaptionOut(BaseModel):
+    text: str
+    model: str
+    saw_image: bool  # le modèle a lu la capture (sinon : seulement les faits du jeu)
+
+
+@router.post("/games/{game_id}/screenshots/{name}/caption", response_model=CaptionOut)
+async def caption_screenshot(game_id: int, name: str, body: CaptionIn, request: Request) -> dict:
+    """Post pour les réseaux sur une capture, rédigé par le modèle réglé : faits du jeu et passages de référence
+    (petit RAG), plus la capture si le modèle lit les images. Rien n'est publié ni enregistré."""
+    st = request.app.state
+    llm = llm_mod.resolve(st)
+    path = st.screenshots.path(game_id, name)  # 404 si la capture n'existe pas
+
+    def read():
+        with st.sessions() as s:
+            f = cq.get_file(s, game_id)
+            return asst._game_title(f), f.platform.label or f.platform.directory, asst.caption_context(s, f, body.lang)
+
+    title, console, context = await asyncio.to_thread(read)
+    angle = random.choice(asst.CAPTION_ANGLES)
+    system = asst.caption_system(title, console, body.lang, body.tone, angle, context, body.previous)
+    prompt = {"fr": "Écris le post.", "es": "Escribe la publicación."}.get(body.lang, "Write the post.")
+    image = await asyncio.to_thread(path.read_bytes)
+    saw_image = True
+    try:
+        text = await asyncio.to_thread(llm.describe_image, system, prompt, image, max_tokens=400)
+    except errors.AppError as exc:
+        if exc.code != "llm_no_vision":
+            raise
+        saw_image = False  # modèle sans vision : le post s'appuie seulement sur les faits du jeu
+        system = system.replace("Describe the screenshot only if you can see it", "You cannot see the screenshot: do not describe it")
+        out = await asyncio.to_thread(llm.complete_json, system, prompt, asst.CAPTION_SCHEMA, max_tokens=400, name="post")
+        text = (out or {}).get("post", "")
+    text = asst.clean_caption(text)
+    if not text:
+        raise errors.AppError("caption_empty", f"{llm.label} n'a rien rédigé pour cette capture : réessaie.", 502)
+    return {"text": text[:1000], "model": llm.label, "saw_image": saw_image}

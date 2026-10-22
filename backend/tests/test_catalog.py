@@ -239,6 +239,24 @@ async def test_favorites(app_factory):
         assert (await c.put("/api/games/999999/favorite")).status_code == 404
 
 
+async def test_broken_games(app_factory):
+    """Jeu signalé depuis sa fiche comme ne fonctionnant pas : sur la fiche, filtrable dans la bibliothèque."""
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        a = (await c.get("/api/games", params={"limit": 1})).json()["items"][0]["id"]
+        assert (await c.get(f"/api/games/{a}")).json()["broken"] is False
+        assert (await c.put(f"/api/games/{a}/broken")).status_code == 204
+        assert (await c.put(f"/api/games/{a}/broken")).status_code == 204  # déjà signalé : sans effet
+        assert (await c.get(f"/api/games/{a}")).json()["broken"] is True
+        page = (await c.get("/api/games", params={"broken": True})).json()
+        assert page["page"]["total"] == 1 and page["items"][0]["id"] == a
+        assert (await c.delete(f"/api/games/{a}/broken")).status_code == 204
+        assert (await c.get(f"/api/games/{a}")).json()["broken"] is False
+        assert (await c.get("/api/games", params={"broken": True})).json()["page"]["total"] == 0
+        assert (await c.put("/api/games/999999/broken")).status_code == 404
+
+
 async def test_favorites_per_console(app_factory, monkeypatch):
     """Favoris rattachés à la console : ceux d'une autre console ne s'affichent pas, et reviennent avec elle."""
     from app.api import catalog

@@ -327,4 +327,4 @@ def test_migration_from_phase2_database(tmp_path):
     with sqlite3.connect(db) as c:
         assert c.execute("select added, trigger from scan_run").fetchone() == (5, "manual")
         assert c.execute("select count(*) from transfer").fetchone() == (0,)
-        assert c.execute("select version_num from alembic_version").fetchone() == ("0014",)
+        assert c.execute("select version_num from alembic_version").fetchone() == ("0016",)

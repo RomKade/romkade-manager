@@ -109,14 +109,18 @@ async def games(
     has_image: bool | None = None,
     include_removed: bool = Query(False, description="Inclure les fichiers disparus de la carte"),
     favorite: bool = Query(False, description="Seulement les jeux favoris"),
+    broken: bool = Query(False, description="Seulement les jeux signalés comme ne fonctionnant pas"),
+    players: Literal["solo", "2", "4", "link"] | None = Query(None, description="Joueurs : seul, 2 ou plus / 4 ou plus "
+                                                              "sur la même console, ou à plusieurs avec câble link (portables)"),
     sort: Literal["name", "size", "date", "added", "year"] = "name",
     order: Literal["asc", "desc"] = "asc",
     offset: int = Query(0, ge=0),
     limit: int = Query(60, ge=1, le=500),
 ) -> GamesPageOut:
     search = request.app.state.search
-    # Favoris : peu de jeux, filtrés par SQLite (l'index Typesense ne les connaît pas).
-    if q and q.strip() and search.ready and role == "candidate" and has_image is None and not favorite:
+    # Favoris, jeux qui ne marchent pas : peu de jeux, filtrés par SQLite (l'index Typesense ne les connaît pas).
+    if (q and q.strip() and search.ready and role == "candidate" and has_image is None and not favorite and not broken
+            and not players):
         try:
             ids, total = await search.search(q.strip(), platforms=platform, extensions=extension, regions=region,
                                              genres=genre, subgenres=subgenre, include_removed=include_removed,
@@ -127,7 +131,8 @@ async def games(
             search.ready = False
     return await asyncio.to_thread(_with_session, request, lambda s: cq.search_games(
         s, q=q, platforms=platform, extensions=extension, regions=region, role=role, genres=genre, subgenres=subgenre,
-        has_image=has_image, favorite=favorite, console=console_id(request) if favorite else None,
+        has_image=has_image, favorite=favorite, broken=broken, players=players,
+        console=console_id(request) if favorite or broken else None,
         include_removed=include_removed, sort=sort, order=order, offset=offset, limit=limit))
 
 
@@ -136,7 +141,8 @@ async def quick_search(request: Request, q: str = Query(..., min_length=1, max_l
                        limit: int = Query(8, ge=1, le=30)) -> SearchOut:
     """Recherche rapide (tableau de bord) : les jeux les plus pertinents et le nombre total de résultats."""
     page = await games(request, q=q, platform=None, extension=None, region=None, genre=None, subgenre=None, role="candidate",
-                       has_image=None, include_removed=False, favorite=False, sort="name", order="asc", offset=0,
+                       has_image=None, include_removed=False, favorite=False, broken=False, players=None, sort="name",
+                       order="asc", offset=0,
                        limit=limit)
     return SearchOut(items=page.items, total=page.page.total, engine="typesense" if request.app.state.search.ready else "sqlite")
 
@@ -161,6 +167,17 @@ async def add_favorite(game_id: int, request: Request) -> None:
 @router.delete("/games/{game_id}/favorite", status_code=204, tags=["catalog"])
 async def remove_favorite(game_id: int, request: Request) -> None:
     await asyncio.to_thread(_with_write, request, cq.set_favorite, console_id(request), game_id, False)
+
+
+@router.put("/games/{game_id}/broken", status_code=204, tags=["catalog"])
+async def mark_broken(game_id: int, request: Request) -> None:
+    """Signale le jeu comme ne fonctionnant pas sur la console branchée."""
+    await asyncio.to_thread(_with_write, request, cq.set_broken, console_id(request), game_id, True)
+
+
+@router.delete("/games/{game_id}/broken", status_code=204, tags=["catalog"])
+async def unmark_broken(game_id: int, request: Request) -> None:
+    await asyncio.to_thread(_with_write, request, cq.set_broken, console_id(request), game_id, False)
 
 
 @router.get("/games/{game_id}", response_model=GameDetailOut, tags=["catalog"])

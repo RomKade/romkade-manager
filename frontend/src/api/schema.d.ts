@@ -454,6 +454,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/broken": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark Broken
+         * @description Signale le jeu comme ne fonctionnant pas sur la console branchée.
+         */
+        put: operations["mark_broken_api_games__game_id__broken_put"];
+        post?: never;
+        /** Unmark Broken */
+        delete: operations["unmark_broken_api_games__game_id__broken_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/games/{game_id}": {
         parameters: {
             query?: never;
@@ -1625,6 +1646,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/screenshots/{name}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze Screenshot
+         * @description Lecture d'une capture d'écran par le modèle réglé (qui doit lire les images) : quel écran, texte lisible,
+         *     et rôle des touches si c'est un écran de commandes. Rien n'est enregistré.
+         */
+        post: operations["analyze_screenshot_api_games__game_id__screenshots__name__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/play/settings": {
         parameters: {
             query?: never;
@@ -2596,6 +2638,13 @@ export interface components {
             developer?: string | null;
             /** Publisher */
             publisher?: string | null;
+            /** Players */
+            players?: number | null;
+            /**
+             * Players Link
+             * @default false
+             */
+            players_link: boolean;
             /**
              * First Seen At
              * Format: date-time
@@ -2630,6 +2679,11 @@ export interface components {
              * @default false
              */
             favorite: boolean;
+            /**
+             * Broken
+             * @default false
+             */
+            broken: boolean;
             /** Info Url */
             info_url?: string | null;
             /** Remote Path */
@@ -2711,6 +2765,13 @@ export interface components {
             developer?: string | null;
             /** Publisher */
             publisher?: string | null;
+            /** Players */
+            players?: number | null;
+            /**
+             * Players Link
+             * @default false
+             */
+            players_link: boolean;
             /**
              * First Seen At
              * Format: date-time
@@ -3465,6 +3526,22 @@ export interface components {
             has_password: boolean;
             /** Host Key Trusted */
             host_key_trusted: boolean;
+        };
+        /** ShotAnalysisIn */
+        ShotAnalysisIn: {
+            /**
+             * Lang
+             * @default fr
+             * @enum {string}
+             */
+            lang: "fr" | "en" | "es";
+        };
+        /** ShotAnalysisOut */
+        ShotAnalysisOut: {
+            /** Text */
+            text: string;
+            /** Model */
+            model: string;
         };
         /** ShotOut */
         ShotOut: {
@@ -4341,6 +4418,10 @@ export interface operations {
                 include_removed?: boolean;
                 /** @description Seulement les jeux favoris */
                 favorite?: boolean;
+                /** @description Seulement les jeux signalés comme ne fonctionnant pas */
+                broken?: boolean;
+                /** @description Joueurs : seul, 2 ou plus / 4 ou plus sur la même console, ou à plusieurs avec câble link (portables) */
+                players?: ("solo" | "2" | "4" | "link") | null;
                 sort?: "name" | "size" | "date" | "added" | "year";
                 order?: "asc" | "desc";
                 offset?: number;
@@ -4487,6 +4568,64 @@ export interface operations {
         };
     };
     remove_favorite_api_games__game_id__favorite_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_broken_api_games__game_id__broken_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmark_broken_api_games__game_id__broken_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6572,6 +6711,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_screenshot_api_games__game_id__screenshots__name__analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShotAnalysisIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShotAnalysisOut"];
                 };
             };
             /** @description Validation Error */

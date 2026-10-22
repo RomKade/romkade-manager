@@ -61,6 +61,8 @@ class GameOut(ORM):
     release_year: int | None = None
     developer: str | None = None
     publisher: str | None = None
+    players: int | None = None  # nombre maximum de joueurs (libretro-database), inconnu : None
+    players_link: bool = False  # console portable : à plusieurs avec un câble link (une console chacun)
     first_seen_at: datetime
     last_seen_at: datetime
     present: bool
@@ -83,6 +85,7 @@ class GameDetailOut(GameOut):
     description: str | None = None  # résumé, en anglais (OpenVGDB)
     descriptions: dict[str, dict] = {}  # {fr|en|es: {text, origin}} : par Claude (services/descriptions.py)
     favorite: bool = False
+    broken: bool = False  # signalé comme ne fonctionnant pas sur cette console
     info_url: str | None = None  # fiche de référence (GameFAQs)
     remote_path: str
     image_relpath: str | None

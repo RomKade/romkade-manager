@@ -1,6 +1,6 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, LayoutGrid, LibraryBig, Plus, Rows3, Star, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Ban, ChevronRight, LayoutGrid, LibraryBig, Plus, Rows3, Star, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -22,8 +22,7 @@ import { genreIcon } from "../lib/genreIcons";
 import {
   activeFilterCount, clearedFilters, DEFAULT_ORDER, parseLibrary, serializeLibrary, showsConsolePicker, showsGenrePicker,
   toApiQuery,
-  type Art, type LibraryState, type Sort,
-} from "../lib/libraryParams";
+  type Art, type LibraryState, type Sort, PLAYERS, type Players } from "../lib/libraryParams";
 
 const SORT_OPTIONS = [
   { value: "name", label: "library.sort.name" },
@@ -92,7 +91,7 @@ export function LibraryPage() {
                 )}
               </nav>
               {single && <ConsoleIcon code={singleCode} className="library__icon" />}
-              <h1>{singleLabel ?? (state.fav ? t("library.favorites") : t("library.allGames"))}</h1>
+              <h1>{singleLabel ?? (state.fav ? t("library.favorites") : state.broken ? t("library.broken") : t("library.allGames"))}</h1>
               {step === "games" && oneGenre && <GenrePill genre={state.genre[0]!} />}
             </>
           )}
@@ -134,6 +133,9 @@ export function LibraryPage() {
           <MultiFilter label={t("library.filter.genre")} options={genreOptions} selected={state.genre} onChange={(genre) => update({ genre, sub: [] })} />
           <MultiFilter label={t("library.filter.format")} options={extOptions} selected={state.extension} onChange={(extension) => update({ extension })} />
           <MultiFilter label={t("library.filter.region")} options={regionOptions} selected={state.region} onChange={(region) => update({ region })} />
+          <SelectField label={t("library.filter.players")} value={state.players || "any"}
+            options={[{ value: "any", label: t("library.players.any") }, ...PLAYERS.map((v) => ({ value: v, label: t(`library.players.${v}`) }))]}
+            onChange={(v) => update({ players: v === "any" ? "" : (v as Players) })} />
           <span className="library__sep" aria-hidden />
           <SelectField label={t("library.sortBy")} value={state.sort} options={SORT_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))}
             onChange={(v) => update({ sort: v as Sort, order: DEFAULT_ORDER[v as Sort] })} />
@@ -150,6 +152,10 @@ export function LibraryPage() {
           <button type="button" className={`chip ${state.fav ? "is-on" : ""}`} aria-pressed={state.fav}
             onClick={() => update({ fav: !state.fav })}>
             <Star size={14} fill={state.fav ? "currentColor" : "none"} aria-hidden /> {t("library.favoritesOnly")}
+          </button>
+          <button type="button" className={`chip chip--broken ${state.broken ? "is-on" : ""}`} aria-pressed={state.broken}
+            onClick={() => update({ broken: !state.broken })}>
+            <Ban size={14} aria-hidden /> {t("library.brokenOnly")}
           </button>
           <label className="toggle-inline">
             <input type="checkbox" checked={state.removed} onChange={(e) => update({ removed: e.target.checked })} />

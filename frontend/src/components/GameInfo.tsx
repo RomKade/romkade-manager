@@ -56,6 +56,14 @@ export function GameInfo({ game }: { game: GameDetail }) {
         {game.franchise && <div><dt>{t("sheet.info.franchise")}</dt><dd><WikiLinks names={game.franchise} /></dd></div>}
         <div><dt>{t("sheet.info.publisher")}</dt><dd>{game.publisher ? <WikiLinks names={game.publisher} /> : t("sheet.info.unknown")}</dd></div>
         <div><dt>{t("sheet.info.developer")}</dt><dd>{game.developer ? <WikiLinks names={game.developer} /> : t("sheet.info.unknown")}</dd></div>
+        <div>
+          <dt>{t("sheet.info.players")}</dt>
+          <dd>
+            {!game.players ? t("sheet.info.unknown") : game.players === 1 ? t("sheet.info.players.one")
+              : t(game.players_link ? "sheet.info.players.link" : "sheet.info.players.many", { count: game.players })}
+            {(game.players ?? 0) > 1 && <span className="facts__note">{t("sheet.info.players.note")}</span>}
+          </dd>
+        </div>
       </dl>
       {summary && (
         <div className="game-info__summary">

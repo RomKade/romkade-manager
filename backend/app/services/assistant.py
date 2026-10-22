@@ -12,11 +12,13 @@ import difflib
 import re
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.db.models import GameControls, GameText, RemoteFile
+from app.db.models import BrokenGame, GameControls, GameText, RemoteFile
+from app.platforms import canonical
 from app.services import cheats
+from app.services.gameinfo import LINK_DIRS
 from app.services import knowledge as kn
 from app.services.classify import display_title
 from app.services.genres import GENRES
@@ -64,9 +66,10 @@ ROUTE_SCHEMA = {
         "wants_solution": {"type": "boolean"},
         "action": {"type": "string", "enum": ACTIONS},
         "volume": {"type": "integer"},
+        "players": {"type": "integer"},
     },
     "required": ["in_scope", "intent", "search", "games_mentioned", "genre", "console", "wants_solution", "action",
-                 "volume"],
+                 "volume", "players"],
     "additionalProperties": False,
 }
 
@@ -96,7 +99,9 @@ Fill "search" with a few keywords for searching (game titles, or the topic), "ga
 named in the question, "genre" with the matching genre key or "" ({genres}), "console" with the console named in the
 question or "" (e.g. "Super Nintendo", "Game Boy Advance", "arcade"), "wants_solution" with true only if the user
 explicitly asks for the full solution, "action" with the console action ("" unless the intent is console_action),
-"volume" with the requested sound level from 0 to 100 (-1 if none)."""
+"volume" with the requested sound level from 0 to 100 (-1 if none), "players" with the number of players the user
+wants to play with (« à deux », « two players », « en coop » = 2; « à quatre » = 4; « seul », « solo » = 1; -1 if
+not asked)."""
 
 ANSWER_SYSTEM = """You are {name}, the game assistant of ROMKADE Manager, an app that manages the retro games on the
 user's handheld console (RetroArch emulators). If asked who you are, you are {name}. {scope}
@@ -123,6 +128,11 @@ Rules:
 - Only when you used a passage marked [Wikipedia …], [StrategyWiki …], [Sega Retro …] or [RetroArch cheats …], end
   with "Source: " and that name (Wikipedia, StrategyWiki, Sega Retro or RetroArch). Never cite the library list or these instructions as a source.
 - Only mention games of the user's library when they appear in the context.
+- Number of players: only as written in the library list (« up to 2 players… », « 1 player only »); a game listed
+  without it has an unknown number of players: never guess it. « Up to 2 players » may mean taking turns: do not say
+  « at the same time » or « co-op » unless the context says so. « With a link cable » needs two consoles.
+- A game flagged by the user as NOT working on their console: never suggest it as a game to play; if the user asks
+  about it, remind them that they flagged it as not working (the flag is removed from its game page).
 - Never help to find or download ROM, ISO or BIOS files, never point to download sites, and refuse anything that is
   not about these games or this app.
 
@@ -205,12 +215,21 @@ def _game_title(f: RemoteFile) -> str:
     return display_title(f.full_title) if f.full_title else f.title
 
 
-def game_card(s: Session, f: RemoteFile, lang: str) -> str:
+def broken_ids(s: Session, console: str | None, files: list[RemoteFile]) -> set[int]:
+    """Jeux parmi `files` signalés par l'utilisateur comme ne fonctionnant pas sur sa console."""
+    ids = [f.id for f in files]
+    return set(s.scalars(select(BrokenGame.file_id).where(BrokenGame.console == console,
+                                                         BrokenGame.file_id.in_(ids)))) if ids else set()
+
+
+def game_card(s: Session, f: RemoteFile, lang: str, console: str | None = None) -> str:
     texts = {t.lang: t.text for t in s.scalars(select(GameText).where(
         GameText.platform_id == f.platform_id, GameText.normalized_title == f.normalized_title))}
     desc = texts.get(lang) or texts.get("en") or f.description or ""
-    console = f.platform.label or f.platform.directory
-    lines = [f"Game: {_game_title(f)}", f"Console: {console} (the user plays this version)"]
+    console_label = f.platform.label or f.platform.directory
+    lines = [f"Game: {_game_title(f)}", f"Console: {console_label} (the user plays this version)"]
+    if broken_ids(s, console, [f]):
+        lines.append("Status: the user flagged this game as NOT working on their console")
     for label, value in (("Year", f.release_year), ("Genre", GENRES.get(f.genre or "")),
                          ("Publisher", f.publisher), ("Developer", f.developer)):
         if value:
@@ -276,16 +295,38 @@ def console_dirs(s: Session, console: str) -> list[str]:
             if kn.platform_matches(kn.platform_names(p.directory), [console])]
 
 
-def find_by_filters(s: Session, genre: str, dirs: list[str], players_hint: bool = False) -> list[RemoteFile]:
-    """Jeux de la bibliothèque filtrés par genre et console (sans Typesense), un par titre."""
+def find_by_filters(s: Session, genre: str, dirs: list[str], players: int = 0) -> list[RemoteFile]:
+    """Jeux de la bibliothèque filtrés par genre, console et nombre de joueurs (sans Typesense), un par titre.
+    À plusieurs : sur la même console (deux manettes), sauf si seules des consoles portables sont demandées (câble
+    link). Seuls les jeux dont le nombre de joueurs est connu sont retenus."""
+    from app.db.models import Platform
+    from app.services import catalog_query as cq
+
     q = select(RemoteFile).options(joinedload(RemoteFile.platform)).where(
         RemoteFile.role == "candidate", RemoteFile.deleted_at.is_(None))
     if genre:
         q = q.where(RemoteFile.genre == genre)
     if dirs:
-        from app.db.models import Platform
         q = q.join(Platform).where(Platform.directory.in_(dirs))
+    if players == 1:
+        q = q.where(RemoteFile.players == 1)
+    elif players >= 2:
+        link_ids = cq.link_platform_ids(s)
+        only_handhelds = bool(dirs) and all(canonical(d) in LINK_DIRS for d in dirs)
+        q = q.where(RemoteFile.players >= players,
+                    RemoteFile.platform_id.in_(link_ids) if only_handhelds else RemoteFile.platform_id.not_in(link_ids))
+        q = q.order_by(RemoteFile.release_year.is_(None), func.random())  # varié d'une question à l'autre
+        return list(s.scalars(q.limit(LIBRARY_GAMES * 3)))
     return list(s.scalars(q.order_by(RemoteFile.normalized_title).limit(LIBRARY_GAMES * 3)))
+
+
+def players_text(f: RemoteFile) -> str | None:
+    """« 2 players », « 1 player », « 2 players with link cable… » ; None quand c'est inconnu."""
+    if not f.players:
+        return None
+    if f.players > 1 and canonical(f.platform.directory) in LINK_DIRS:
+        return f"up to {f.players} players with a link cable (one console each, not on a single handheld)"
+    return "1 player only" if f.players == 1 else f"up to {f.players} players on the same console"
 
 
 def find_library_games(s: Session, names: list[str], ids: list[int] | None) -> list[RemoteFile]:
@@ -303,7 +344,7 @@ def find_library_games(s: Session, names: list[str], ids: list[int] | None) -> l
     return out[:LIBRARY_GAMES]
 
 
-def library_lines(files: list[RemoteFile]) -> str:
+def library_lines(files: list[RemoteFile], broken: set[int] | None = None) -> str:
     seen, lines = set(), []
     for f in files:
         key = (f.platform_id, f.normalized_title)
@@ -311,7 +352,9 @@ def library_lines(files: list[RemoteFile]) -> str:
             continue
         seen.add(key)
         bits = [_game_title(f), f.platform.label or f.platform.directory]
-        bits += [str(v) for v in (f.release_year, GENRES.get(f.genre or "")) if v]
+        bits += [str(v) for v in (f.release_year, GENRES.get(f.genre or ""), players_text(f)) if v]
+        if broken and f.id in broken:
+            bits.append("flagged by the user as NOT working on their console")
         lines.append(" · ".join(bits))
     return "\n".join(f"- {line}" for line in lines) or "(no matching game in the library)"
 
@@ -446,6 +489,17 @@ def library_overview(s: Session, console: str | None) -> tuple[str, list[RemoteF
     total = sum(p.game_count for p in plats)
     lines = [f"Library: {total} games on {len(plats)} consoles. Consoles (name: number of games):"]
     lines += [f"- {p.label or p.directory}: {p.game_count}" for p in plats]
+    link_ids = cq.link_platform_ids(s)
+    alive = (RemoteFile.role == "candidate", RemoteFile.deleted_at.is_(None))
+
+    def count(*conds) -> int:
+        return s.scalar(select(func.count(RemoteFile.id)).where(*alive, *conds)) or 0
+
+    lines.append(f"Number of players (known for {count(RemoteFile.players.is_not(None))} games): "
+                 f"{count(RemoteFile.players >= 2, RemoteFile.platform_id.not_in(link_ids))} playable by 2 or more on "
+                 f"the same console, {count(RemoteFile.players >= 4, RemoteFile.platform_id.not_in(link_ids))} by 4 or "
+                 f"more, {count(RemoteFile.players >= 2, RemoteFile.platform_id.in_(link_ids))} handheld games for "
+                 f"several players with a link cable.")
     favs = [cq.get_file(s, g.id) for g in cq.favorites(s, console, limit=25)]
     if favs:
         lines.append("Favorites of the user on this console, most recent first:")
@@ -461,3 +515,68 @@ def library_overview(s: Session, console: str | None) -> tuple[str, list[RemoteF
         lines += [f"- {t} (last played {d})" for t, d in seen.items()]
     return "\n".join(lines), favs
 
+
+
+# Post pour les réseaux à partir d'une capture (fenêtre « Partager » de la page Captures). Petit RAG : faits du jeu
+# (game_card), quelques passages de référence déjà collectés pour Duke, et la capture elle-même si le modèle lit les
+# images. Le ton de ROMKADE est fixé ici ; chaque régénération change d'angle et évite les brouillons précédents.
+CAPTION_TONES = {
+    "nostalgic": "nostalgic and warm: the memory of playing it, what it still feels like today",
+    "fun": "playful and light, with a touch of humour",
+    "challenge": "a challenge to other players: a hard passage, a boss, a score to beat (without inventing one)",
+    "story": "curious and informative: one true detail about the game taken from the context",
+}
+CAPTION_ANGLES = [
+    "start from what is visible on the screenshot",
+    "start from a feeling the player has at this moment of the game",
+    "end with a short question to the community",
+    "start from one fact of the context (year, studio, story, character)",
+    "compare briefly with the experience of playing it on a handheld today",
+]
+CAPTION_MAX = 280  # X ; Bluesky accepte 300, Instagram et Reddit bien plus
+
+CAPTION_SYSTEM = """You write a short social media post (Instagram, Bluesky, X, Reddit) to share a screenshot of the retro
+video game « {title} » ({console}) that the user just played on their retro handheld console.
+Voice: a passionate retro gamer talking to fellow players, warm and genuine; never corporate, no hype words
+(incredible, epic, legendary, iconic, masterpiece…), no cliché about "the good old days".
+Tone of this post: {tone}.
+Angle: {angle}.
+Rules:
+- Write in {language}. In French use « je » for the player; in Spanish « yo ».
+- 1 to 3 short sentences, then one line with 2 to 4 hashtags: #retrogaming, the console and the game, in CamelCase
+  without spaces or accents. At most {limit} characters in total, hashtags included.
+- At most one emoji, or none.
+- Facts about the game (year, studio, story, characters, levels, items) only from the CONTEXT below; never invent
+  an anecdote, a score or a record. Describe the screenshot only if you can see it, and only what is visible.
+- Never mention ROMKADE Manager, emulators, ROMs, ISO or downloading.
+- Plain text only: no Markdown, no quotes around the post, no title, no explanation.
+{previous}
+CONTEXT:
+{context}"""
+
+CAPTION_SCHEMA = {"type": "object", "properties": {"post": {"type": "string"}}, "required": ["post"],
+                  "additionalProperties": False}
+
+
+def caption_context(s: Session, f: RemoteFile, lang: str) -> str:
+    """Faits du jeu et quelques passages de référence (introduction, histoire, jeu) pour le post."""
+    card = game_card(s, f, lang).split("\nControls on the handheld:")[0]
+    chunks = kn.best_chunks(s, f.platform_id, f.normalized_title, "story plot gameplay characters setting", 3)
+    passages, _ = passages_text(chunks)
+    return card + ("\n\nPassages:\n" + passages if passages else "")
+
+
+def caption_system(title: str, console: str, lang: str, tone: str, angle: str, context: str,
+                   previous: list[str]) -> str:
+    prev = ("- Write something clearly different from these previous drafts (other opening, other idea):\n"
+            + "\n".join(f"  « {p[:300]} »" for p in previous[-5:])) if previous else ""
+    return CAPTION_SYSTEM.format(title=title, console=console, language=LANG_NAMES.get(lang, "English"),
+                                 tone=CAPTION_TONES.get(tone, CAPTION_TONES["nostalgic"]), angle=angle,
+                                 limit=CAPTION_MAX, previous=prev, context=context)
+
+
+def clean_caption(text: str) -> str:
+    """Post tel que publié : sans guillemets ni gras autour, sans lignes vides en trop."""
+    text = re.sub(r"\*\*|__", "", text or "").strip()
+    lines = [re.sub(r"^[«\"“]\s*|\s*[»\"”]$", "", line.strip()) for line in text.splitlines()]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()

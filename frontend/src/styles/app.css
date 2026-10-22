@@ -689,10 +689,15 @@ button, input, select { font: inherit; color: inherit; }
 .sheet__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
 .sheet__launch-error { flex-basis: 100%; }
 .favorite-button.is-on { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
-.launch-who { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 12px;
-  margin: 0; padding: 0; border: 0; min-width: 0; }
-.launch-who legend { padding: 0; margin-bottom: 8px; font-weight: 700; }
-.launch-who__player { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* Jeu signalé comme ne fonctionnant pas : rouge (--err), sur la fiche et dans le filtre de la bibliothèque */
+.broken-button.is-on, .chip--broken.is-on { color: var(--err); border-color: color-mix(in srgb, var(--err) 55%, var(--line)); background: color-mix(in srgb, var(--err) 12%, var(--panel-2)); }
+.tag--broken { display: inline-flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--err) 16%, transparent); color: var(--err); font-weight: 600; }
+/* « Qui joue ? » : les 4 joueurs en deux colonnes, aérés, séparés des boutons Jouer / Favoris en dessous */
+.launch-who { flex-basis: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px;
+  margin: 0 0 14px; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.launch-who legend { padding: 0; margin-bottom: 14px; font-weight: 700; }
+.launch-who__player { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+@media (max-width: 480px) { .launch-who { grid-template-columns: minmax(0, 1fr); } }
 .launch-who__player span { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); }
 .launch-who select {
   height: 40px; padding: 0 12px; border-radius: var(--r-control); border: 1px solid var(--line-strong);
@@ -799,8 +804,9 @@ button, input, select { font: inherit; color: inherit; }
 .now-card__title { font-size: clamp(1.4rem, 1rem + 1.2vw, 2rem); font-stretch: 115%; overflow-wrap: anywhere; }
 .now-card__open { padding: 0; border: none; background: none; cursor: pointer; border-radius: var(--r-cover); flex: none; }
 .now-card__open:hover .cover, .now-card__open:focus-visible .cover { box-shadow: 0 0 0 2px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 40%, transparent); }
-.now-card__title-link { font: inherit; color: inherit; text-align: left; padding: 0; }
-.now-card__title-link:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.now-card__title-link { font: inherit; color: inherit; text-align: left; padding: 0; transition: color var(--dur) var(--ease); }
+/* Survol : le titre prend la couleur d'accent, sans soulignement */
+.now-card__title-link:hover, .now-card__title-link:focus-visible { color: var(--accent); text-decoration: none; }
 .now-card__platform { color: var(--ink-2); }
 .now-card__platform .console-badge { font-size: var(--fs-sm); padding: 3px 10px 3px 4px; border-radius: 8px; color: var(--ink); background: color-mix(in srgb, var(--panel-2) 90%, transparent); box-shadow: inset 0 0 0 1px var(--line); }
 .volume { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 2px; }
@@ -1529,6 +1535,10 @@ kbd {
 .share-dialog__title { margin: 0; font-size: 1.15rem; padding-right: 32px; }
 .share-dialog__img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #000; border-radius: var(--r-panel); image-rendering: pixelated; }
 .share-dialog textarea { width: 100%; resize: vertical; font: inherit; }
+.share-dialog__text-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.share-dialog__ai { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.share-dialog__ai select { height: 34px; padding: 0 10px; border-radius: var(--r-control); border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink); }
+.share-dialog__ai-note { margin: 4px 0 0; display: flex; align-items: center; gap: 6px; min-height: 1.2em; }
 .share-dialog__networks { display: flex; flex-wrap: wrap; gap: 8px; }
 .share-dialog__sub select { width: auto; }
 .share-dialog__done { margin: 0; padding: 10px 12px; border-radius: var(--r-panel); background: color-mix(in srgb, var(--ok) 15%, transparent); }

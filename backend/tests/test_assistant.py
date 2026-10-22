@@ -59,6 +59,7 @@ async def test_game_scope_answer_uses_card_and_passages(app_factory, monkeypatch
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
         await sync(c)
         game_id = add_mario_knowledge(app)
+        assert (await c.put(f"/api/games/{game_id}/broken")).status_code == 204  # signalé depuis sa fiche
         r = await c.post("/api/assistant", json={"scope": "game", "game_id": game_id, "lang": "fr", "name": "Luna",
                                                  "messages": [{"role": "user", "content": "Je bloque au château de Lemmy"}]})
         assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
@@ -73,6 +74,7 @@ async def test_game_scope_answer_uses_card_and_passages(app_factory, monkeypatch
         assert "only about the game « Super Mario World »" in system and "Vanilla Dome" in system
         assert system.startswith("You are Luna, the game assistant")
         assert "short hint first" in system and "French" in system
+        assert "the user flagged this game as NOT working on their console" in system  # Duke le sait
 
 
 async def test_refusals_never_show_model_text(app_factory, monkeypatch):
@@ -236,3 +238,63 @@ async def test_screenshots_shown_then_analysed(app_factory, monkeypatch):
         assert "Super Mario World" in sent[0]["messages"][0]["content"]
         assert (await c.post(f"/api/games/{mario['id']}/screenshots/20990101-000000.png/analyze",
                              json={"lang": "fr"})).status_code == 404
+
+
+async def test_screenshot_caption_uses_game_facts_tone_and_previous_drafts(app_factory, monkeypatch):
+    """Post pour les réseaux : capture + faits du jeu + passages (petit RAG), ton choisi, brouillons à ne pas répéter ;
+    modèle sans vision : post rédigé avec les seuls faits du jeu."""
+    import json as _json
+
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        game_id = add_mario_knowledge(app)
+        shot = app.state.screenshots.add(game_id, b"\x89PNG\r\n\x1a\n" + b"\0" * 64, {"title": "Super Mario World"})
+        sent, vision = [], [True]
+
+        def handler(request):
+            body = _json.loads(request.content)
+            sent.append(body)
+            has_image = any(isinstance(m["content"], list) for m in body["messages"])
+            if has_image and not vision[0]:
+                return httpx.Response(400, json={"error": "this model does not support image input"})
+            text = "« **Le château de Lemmy m'attend encore.** »\n#retrogaming #SNES #SuperMarioWorld"
+            return httpx.Response(200, json={"choices": [{"message": {"content": text if has_image else
+                                                                       _json.dumps({"post": "Cape au vent. #retrogaming"})}}]})
+
+        monkeypatch.setattr(llm, "resolve", lambda state: llm.LLM(llm.PROVIDERS["local"], "gemma-test",
+                                                                  "http://localhost:1234/v1", None,
+                                                                  transport=httpx.MockTransport(handler)))
+        url = f"/api/games/{game_id}/screenshots/{shot['name']}/caption"
+        r = await c.post(url, json={"lang": "fr", "tone": "challenge", "previous": ["Ancien brouillon"]})
+        assert r.status_code == 200, r.text
+        assert r.json() == {"text": "Le château de Lemmy m'attend encore.\n#retrogaming #SNES #SuperMarioWorld",
+                            "model": r.json()["model"], "saw_image": True}
+        system = sent[0]["messages"][0]["content"]
+        assert "Super Mario World" in system and "Vanilla Dome" in system  # faits et passages du jeu
+        assert "a challenge to other players" in system and "« Ancien brouillon »" in system and "French" in system
+        assert "never invent" in system and "ROMKADE Manager" in system  # règles : pas d'invention, pas de pub
+
+        vision[0] = False
+        r = await c.post(url, json={"lang": "fr"})
+        assert r.status_code == 200 and r.json()["text"] == "Cape au vent. #retrogaming" and not r.json()["saw_image"]
+        assert "You cannot see the screenshot" in sent[-1]["messages"][0]["content"]
+        assert (await c.post(f"/api/games/{game_id}/screenshots/20990101-000000.png/caption", json={})).status_code == 404
+
+
+async def test_two_player_games_come_from_the_database(app_factory, monkeypatch):
+    """« Un jeu à deux ? » : seulement les jeux dont la base dit 2 joueurs ou plus, avec le nombre écrit."""
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        model, seen = fake_llm({"in_scope": True, "intent": "find_games", "search": "", "games_mentioned": [],
+                                "genre": "", "console": "", "wants_solution": False, "action": "", "volume": -1,
+                                "players": 2}, ["Super Mario World, jusqu'à 2 joueurs."])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Un jeu à deux ?"}]})
+        meta = events(r.text)[0][1]
+        assert [g["title"] for g in meta["games"]] == ["Super Mario World"]
+        system = seen["answers"][0]["messages"][0]["content"]
+        assert "Super Mario World · Super Nintendo" in system and "up to 2 players on the same console" in system
+        assert "Sonic" not in system.split("Library:")[0]
+        assert "playable by 2 or more on the same console" in system and "never guess it" in system

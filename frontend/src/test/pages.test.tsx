@@ -35,6 +35,7 @@ let bodies: Record<string, unknown>[] = [];
 let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
+let brokenIds: number[] = [];
 let hostKeyTrusted = true;
 let relayToken = "";
 let assistantBodies: Record<string, unknown>[] = [];
@@ -240,6 +241,15 @@ function mockFetch() {
       favoriteIds = init?.method === "PUT" ? [id, ...favoriteIds.filter((f) => f !== id)] : favoriteIds.filter((f) => f !== id);
       return new Response(null, { status: 204 });
     }
+    if (/^\/api\/games\/\d+\/screenshots\/[^/]+\/caption/.test(url)) {
+      const n = bodies.filter((b) => String(b.url).endsWith("/caption")).length;
+      return json({ text: `Brouillon ${n} de l'IA\n#retrogaming`, model: "Gemma", saw_image: true });
+    }
+    if (/^\/api\/games\/\d+\/broken/.test(url)) {
+      const id = Number(url.split("/")[3]);
+      brokenIds = init?.method === "PUT" ? [...brokenIds, id] : brokenIds.filter((f) => f !== id);
+      return new Response(null, { status: 204 });
+    }
     if (url.startsWith("/api/favorites")) return json(favoriteIds.map((id) => game(id, id === 1 ? "Super Mario World" : "Zelda")));
     if (/^\/api\/games\/\d+\/controls/.test(url)) {
       if (init?.method === "POST") return json({ status: "found", origin: controlsSourced ? "sourced" : "written",
@@ -259,7 +269,7 @@ function mockFetch() {
       status: "no_key", query: "Super Mario World SNES gameplay", videos: [],
       search_url: "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay",
     });
-    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), ...sheetImages, favorite: favoriteIds.includes(1), release_year: 1990, release_date: "1990-11-21",
+    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), ...sheetImages, favorite: favoriteIds.includes(1), broken: brokenIds.includes(1), release_year: 1990, release_date: "1990-11-21",
       publisher: "Nintendo", developer: "Nintendo EAD", franchise: "Mario", description: "Mario's quest to save the princess.",
       descriptions: { fr: { text: "Mario part sauver la princesse.", origin: "translated" } },
       info_url: "http://www.gamefaqs.com/snes/519824-super-mario-world", remote_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc", image_relpath: null, possible_duplicates: [], history: [{ scan_run_id: 1, change: "added", old_size: null, new_size: 1, old_mtime: null, new_mtime: null, run_started_at: "2026-10-16T10:00:00Z" }] });
@@ -303,6 +313,7 @@ beforeEach(() => {
   playingId = null;
   shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
   favoriteIds = [];
+  brokenIds = [];
   hostKeyTrusted = true;
   relayToken = "";
   assistantBodies = [];
@@ -460,20 +471,23 @@ describe("Jeu en cours", () => {
 });
 
 describe("Jouer avec une manette branchée", () => {
-  it("« Qui joue ? » : une manette par joueur, échangées entre joueurs, enregistrées puis le jeu lancé", async () => {
+  it("« Qui joue ? » : une manette par joueur (celle d'un autre joueur est grisée), enregistrées puis le jeu lancé", async () => {
     renderAt("/bibliotheque?all=1");
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
     const who = await within(dialog).findByRole("group", { name: "Qui joue ?" });
-    // Deux manettes : deux joueurs. Le joueur 1 prend la 8BitDo, le joueur 2 reçoit les boutons de la console.
-    expect(within(who).getByLabelText("Joueur 1")).toHaveDisplayValue("Boutons de la console");
-    expect(within(who).queryByLabelText("Joueur 3")).not.toBeInTheDocument();
+    // Les 4 joueurs, comme sur la page Manettes, avec la config enregistrée : joueur 2 sur la 8BitDo, joueur 3 sur
+    // les boutons de la console. La 8BitDo est grisée pour le joueur 1 : le joueur 2 la libère, le joueur 1 la prend.
+    expect(within(who).getByLabelText("Joueur 1")).toHaveDisplayValue("Aucune manette");
+    expect(within(who).getByLabelText("Joueur 3")).toHaveDisplayValue("Boutons de la console");
+    expect(within(who).getByLabelText("Joueur 4")).toHaveDisplayValue("Aucune manette");
+    expect(within(within(who).getByLabelText("Joueur 1")).getByRole("option", { name: "8BitDo Pro 2 · manette n°1 — joueur 2" })).toBeDisabled();
+    await userEvent.selectOptions(within(who).getByLabelText("Joueur 2"), "Aucune manette");
     await userEvent.selectOptions(within(who).getByLabelText("Joueur 1"), "8BitDo Pro 2 · manette n°1");
-    expect(within(who).getByLabelText("Joueur 2")).toHaveDisplayValue("Boutons de la console");
     await userEvent.click(within(dialog).getByRole("button", { name: /Jouer sur la console/ }));
     await waitFor(() => expect(bodies.some((b) => b.url === "/api/games/1/launch")).toBe(true));
     const put = bodies.findIndex((b) => b.url === "/api/players");
-    expect(bodies[put]).toEqual({ url: "/api/players", players: [1, 0, 2, 3] });
+    expect(bodies[put]).toEqual({ url: "/api/players", players: [1, 2, 0, 3] });
     expect(put).toBeLessThan(bodies.findIndex((b) => b.url === "/api/games/1/launch"));
   });
 });
@@ -711,6 +725,25 @@ describe("Favoris", () => {
     await waitFor(() => expect(calls.some((c) => c.startsWith("/api/games?") && c.includes("favorite=true"))).toBe(true));
     expect(await screen.findByText("Super Mario World")).toBeInTheDocument();
     expect(screen.queryByText("Zelda")).not.toBeInTheDocument();
+  });
+});
+
+describe("Jeux qui ne fonctionnent pas", () => {
+  it("signale un jeu depuis sa fiche, puis retire le signalement ; la bibliothèque les filtre", async () => {
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Ne fonctionne pas/ }));
+    expect(await within(dialog).findByRole("button", { name: /Signalé : ne fonctionne pas/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(dialog).getByText("Ne fonctionne pas sur cette console")).toBeInTheDocument();
+    expect(calls).toContain("/api/games/1/broken");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Signalé : ne fonctionne pas/ }));
+    expect(await within(dialog).findByRole("button", { name: /^Ne fonctionne pas$/ })).toHaveAttribute("aria-pressed", "false");
+    expect(within(dialog).queryByText("Ne fonctionne pas sur cette console")).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByRole("button", { name: /Ne fonctionnent pas/ }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Jeux qui ne fonctionnent pas" })).toBeInTheDocument();
+    await waitFor(() => expect(calls.some((c) => c.startsWith("/api/games?") && c.includes("broken=true"))).toBe(true));
   });
 });
 
@@ -984,7 +1017,11 @@ describe("Manettes", () => {
 
   it("joueur 1 sur une manette branchée, sans jeu en cours : propose de choisir un jeu", async () => {
     renderAt("/manettes");
-    await userEvent.selectOptions(await screen.findByLabelText("Joueur 1"), "1");
+    // La 8BitDo du joueur 2 est grisée pour le joueur 1 ; le joueur 2 prend le numéro libre du joueur 1, qui
+    // reçoit la 8BitDo.
+    const p1 = await screen.findByLabelText("Joueur 1");
+    expect(within(p1).getByRole("option", { name: "8BitDo Pro 2 · manette n°1 — joueur 2" })).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText("Joueur 2"), "2");
     await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [1, 2, 0, 3] }));
     expect(screen.queryByRole("button", { name: /boutons de la console/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Choisir un jeu/ }));
@@ -1018,10 +1055,8 @@ describe("Manettes", () => {
     await waitFor(() => expect(JSON.parse(sent[0]!)).toEqual({ b: [1], a: [0, 0, 0, 0] }));
     expect(screen.getByLabelText("Joueur 1")).toHaveDisplayValue("Manette de l'ordinateur · Xbox Wireless Controller");
 
-    // Le joueur 1 reprend les boutons de la console : échange, la manette de l'ordinateur passe au joueur 3.
-    await userEvent.selectOptions(screen.getByLabelText("Joueur 1"), "Boutons de la console");
-    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/players", players: [0, 1, 4, 3] }));
-    expect(screen.getByLabelText("Joueur 3")).toHaveDisplayValue("Manette de l'ordinateur · Xbox Wireless Controller");
+    // Les boutons de la console sont au joueur 3 : grisés pour le joueur 1.
+    expect(within(screen.getByLabelText("Joueur 1")).getByRole("option", { name: "Boutons de la console — joueur 3" })).toBeDisabled();
   });
 
   it("choisit ce qui dirige le joueur 1 : la croix seule, ou la croix et un stick", async () => {
@@ -1040,7 +1075,7 @@ describe("Manettes", () => {
     await waitFor(() => expect(bodies.at(-1)).toMatchObject({ url: "/api/games/1/launch" }));
     expect(bodies.at(-2)).toEqual({ url: "/api/players", players: [0, 1, 2, 3] });
 
-    await userEvent.selectOptions(screen.getByLabelText("Joueur 1"), "1");
+    await userEvent.selectOptions(screen.getByLabelText("Joueur 2"), "2");
     expect(await screen.findByText(/relance-le pour appliquer le changement/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Relancer le jeu pour appliquer/ }));
     await waitFor(() => expect(bodies.filter((b) => b.url === "/api/games/1/launch")).toHaveLength(2));
@@ -1136,18 +1171,42 @@ describe("Captures d'écran", () => {
     const game = await screen.findByRole("region", { name: /Super Mario World/ });
     await userEvent.click(within(game).getAllByRole("button", { name: "Partager sur les réseaux" })[0]!);
     const dialog = await screen.findByRole("dialog", { name: "Partager la capture" });
-    expect(within(dialog).getByLabelText("Texte du message")).toHaveValue("Super Mario World · Super Nintendo\n#retrogaming #SuperNintendo");
+    const box = within(dialog).getByLabelText("Texte du message");
+    expect(box).toHaveValue("");  // vide : on écrit, ou on fait générer par l'IA
+    await userEvent.type(box, "Mon record #retrogaming");
     await waitFor(() => expect(within(dialog).getByRole("button", { name: "X" })).toBeEnabled());
     await userEvent.click(within(dialog).getByRole("button", { name: "X" }));
     expect(await within(dialog).findByText(/Image copiée : colle-la/)).toBeInTheDocument();
     expect(write).toHaveBeenCalled();
-    expect(opened.at(-1)).toBe("https://x.com/intent/post?text=" + encodeURIComponent("Super Mario World · Super Nintendo\n#retrogaming #SuperNintendo"));
+    expect(opened.at(-1)).toBe("https://x.com/intent/post?text=" + encodeURIComponent("Mon record #retrogaming"));
     await userEvent.selectOptions(within(dialog).getByLabelText("Communauté Reddit"), "retrogaming");
     await userEvent.click(within(dialog).getByRole("button", { name: "Reddit" }));
     expect(await within(dialog).findByText(/Image téléchargée : ajoute-la au post Reddit/)).toBeInTheDocument();
-    expect(opened.at(-1)).toBe("https://www.reddit.com/r/retrogaming/submit?type=IMAGE&title=" + encodeURIComponent("Super Mario World · Super Nintendo"));
+    expect(opened.at(-1)).toBe("https://www.reddit.com/r/retrogaming/submit?type=IMAGE&title=" + encodeURIComponent("Mon record"));
     open.mockRestore();
     vi.unstubAllGlobals();
+  });
+
+  it("l'IA écrit le texte du post à la demande, puis « Régénérer » (et au changement de ton)", async () => {
+    llm = { provider: "local", model: "gemma", base_url: "http://localhost:1234/v1", key: false, tested: true };
+    renderAt("/captures");
+    const game = await screen.findByRole("region", { name: /Super Mario World/ });
+    await userEvent.click(within(game).getAllByRole("button", { name: "Partager sur les réseaux" })[0]!);
+    const dialog = await screen.findByRole("dialog", { name: "Partager la capture" });
+    expect(within(dialog).getByLabelText("Texte du message")).toHaveValue("");
+    expect(bodies.some((b) => String(b.url).endsWith("/caption"))).toBe(false);  // rien n'est écrit sans le demander
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Générer avec l'IA/ }));
+    await waitFor(() => expect(within(dialog).getByLabelText("Texte du message")).toHaveValue("Brouillon 1 de l'IA\n#retrogaming"));
+    expect(within(dialog).queryByText(/Proposé par/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /Générer avec l'IA/ })).not.toBeInTheDocument();
+    const first = bodies.find((b) => String(b.url).endsWith("/caption"));
+    expect(first).toMatchObject({ lang: "fr", tone: "nostalgic", previous: [] });
+    await userEvent.selectOptions(within(dialog).getByLabelText("Ton du post"), "Défi");
+    await waitFor(() => expect(within(dialog).getByLabelText("Texte du message")).toHaveValue("Brouillon 2 de l'IA\n#retrogaming"));
+    expect(bodies.filter((b) => String(b.url).endsWith("/caption")).at(-1)).toMatchObject(
+      { tone: "challenge", previous: ["Brouillon 1 de l'IA\n#retrogaming"] });
+    await userEvent.click(within(dialog).getByRole("button", { name: /Régénérer/ }));
+    await waitFor(() => expect(within(dialog).getByLabelText("Texte du message")).toHaveValue("Brouillon 3 de l'IA\n#retrogaming"));
   });
 
   it("sans capture, explique comment en prendre ; la section est dans le menu", async () => {

@@ -21,8 +21,10 @@ from app.services.classify import stem_of
 from app.services.genres import ARCADE_DIRS, compact_title, loose_title
 
 DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "gameinfo.json.gz"
-FIELDS = ("year", "date", "developer", "publisher", "franchise", "text", "url")
-COLUMNS = ("release_year", "release_date", "developer", "publisher", "franchise", "description", "info_url")
+FIELDS = ("year", "date", "developer", "publisher", "franchise", "text", "url", "players")
+COLUMNS = ("release_year", "release_date", "developer", "publisher", "franchise", "description", "info_url", "players")
+# Consoles portables : leur « 2 joueurs » demande deux consoles reliées (câble link), pas deux manettes.
+LINK_DIRS = {"GB", "GBC", "GBA", "GG", "WS", "NGP", "LYNX", "VB", "NDS", "PSP", "POKEMINI", "GW"}
 
 
 def dump(data: dict, path: Path = DATA_FILE) -> None:
@@ -39,6 +41,20 @@ def _richness(name: str, row: list) -> tuple:
     return (-sum(v is not None for v in row), demo, region, name)
 
 
+def _fill(table: dict[str, list], key: str, row: list) -> None:
+    """Édition la plus renseignée d'abord ; ses champs vides sont complétés par les autres éditions du même titre
+    (le nombre de joueurs n'est souvent connu que pour l'une d'elles)."""
+    have = table.get(key)
+    if have is None:
+        table[key] = list(row)
+        return
+    if len(have) < len(row):
+        have.extend([None] * (len(row) - len(have)))
+    for i, v in enumerate(row):
+        if have[i] is None and v is not None:
+            have[i] = v
+
+
 class InfoIndex:
     def __init__(self, data: dict):
         self.version: dict = data.get("version", {})
@@ -52,9 +68,9 @@ class InfoIndex:
             for name in sorted(table, key=lambda n: _richness(n, table[n])):
                 row = table[name]
                 if t := loose_title(name):
-                    self.loose.setdefault(d, {}).setdefault(t, row)
+                    _fill(self.loose.setdefault(d, {}), t, row)
                 if c := compact_title(name):
-                    self.compact.setdefault(d, {}).setdefault(c, row)
+                    _fill(self.compact.setdefault(d, {}), c, row)
 
     def lookup(self, platform_dir: str, filename: str) -> dict | None:
         """Champs de COLUMNS pour ce fichier, ou None sans correspondance."""
@@ -63,9 +79,12 @@ class InfoIndex:
         if d in ARCADE_DIRS:
             row = self.arcade.get(stem.lower())
         else:
-            row = (self.exact.get(d, {}).get(stem.lower())
-                   or self.loose.get(d, {}).get(loose_title(stem))
-                   or self._compact(d, stem))
+            exact = self.exact.get(d, {}).get(stem.lower())
+            loose = self.loose.get(d, {}).get(loose_title(stem))
+            row = exact or loose or self._compact(d, stem)
+            if exact and loose and None in exact:  # nom exact sans un champ (joueurs…) : complété par le titre
+                row = [v if v is not None else (loose[i] if i < len(loose) else None) for i, v in enumerate(exact)]
+                row += loose[len(exact):]
         if not row:
             return None
         values = dict(zip(COLUMNS, row))

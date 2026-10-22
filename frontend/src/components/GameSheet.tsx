@@ -1,11 +1,11 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, Gamepad2, Loader2, Save, Square, Star, X } from "lucide-react";
+import { Ban, Copy, Download, Gamepad2, Loader2, Save, Square, Star, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { saveFileUrl, type GameDetail } from "../api/client";
-import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetFavorite, useSetPlayers } from "../api/queries";
+import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetBroken, useSetFavorite, useSetPlayers } from "../api/queries";
 import { useT } from "../i18n";
 import { bytes, date, dateTime } from "../lib/format";
 import { controllerLabel, dropUnusedRelays, linkComputerPad, padName, useComputerPads, useRelays } from "../lib/computerPads";
@@ -95,6 +95,7 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
         <p className="sheet__platform"><ConsoleBadge code={game.platform.code} label={game.platform.label} />
           {game.platform.label && <span>{game.platform.label}</span>}</p>
         {!game.present && <p className="tag tag--warn">{t("sheet.absent")}</p>}
+        {game.broken && <p className="tag tag--broken"><Ban size={14} aria-hidden /> {t("sheet.broken.tag")}</p>}
       </div>
       <GameGallery key={game.id} game={game} left={
         <TrailerButton game={game} onVideo={onVideo} className="link-button sheet__trailer">
@@ -106,6 +107,7 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
         <div className="sheet__actions">
           {game.present && <LaunchButton id={game.id} />}
           <FavoriteButton id={game.id} on={game.favorite ?? false} />
+          <BrokenButton id={game.id} on={game.broken ?? false} />
         </div>
       )}
 
@@ -113,7 +115,7 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
 
       {game.role === "candidate" && <GameControlsSection id={game.id} />}
       {game.role === "candidate" && <GameCheatsSection id={game.id} />}
-      <GameScreenshots id={game.id} title={game.title} platform={game.platform.label} />
+      <GameScreenshots id={game.id} title={game.title} />
 
       <dl className="facts">
         {game.full_title && <div className="facts__wide"><dt>{t("sheet.fullTitle")}</dt><dd>{game.full_title}</dd></div>}
@@ -192,16 +194,18 @@ function LaunchButton({ id }: { id: number }) {
   const players = pq.data ? completePlayers(pq.data.players) : [];
   // Manettes de l'ordinateur pas encore relayées : les choisir les relaie vers la console.
   const pads = useComputerPads().filter((g) => !relays.some((r) => r.pad === g.index));
-  // Une liste par joueur, autant que de manettes possibles (4 au plus) : chacune est à un seul joueur.
+  // Une liste par joueur, les 4 joueurs comme sur la page Manettes : chaque manette est à un seul joueur, les
+  // joueurs en trop sont sur « Aucune manette ».
   const options = [...controllers.map((c) => String(c.index)), ...pads.map((g) => `pc:${g.index}`)];
-  const slots = Math.min(PLAYERS, options.length);
+  const slots = PLAYERS;
   const initial = defaultSlots(players, options, slots);
   const [touched, setTouched] = useState<string[] | null>(null);
-  const draft = touched && touched.length === slots && touched.every((v) => options.includes(v)) ? touched : initial;
+  // "" : aucune manette pour ce joueur (libère une manette pour la donner à un autre joueur).
+  const draft = touched && touched.length === slots && touched.every((v) => v === "" || options.includes(v)) ? touched : initial;
   const pick = (n: number, value: string) => {
     const next = [...draft];
-    const other = next.indexOf(value);
-    if (other >= 0) next[other] = next[n]!;  // échange avec le joueur qui l'avait
+    const other = value === "" ? -1 : next.indexOf(value);
+    if (other >= 0) next[other] = next[n]!;  // échange avec le joueur qui l'avait (option grisée, par sécurité)
     next[n] = value;
     setTouched(next);
   };
@@ -221,7 +225,16 @@ function LaunchButton({ id }: { id: number }) {
         index.set(value, linked.index);
       }
       const base = current ? completePlayers(current.players) : players;
-      const final = draft.reduce((acc, v, n) => assignPlayer(acc, n, index.get(v) ?? Number(v)), base);
+      const chosen = draft.reduce((acc, v, n) => (v === "" ? acc : assignPlayer(acc, n, index.get(v) ?? Number(v))), base);
+      // Joueur sans manette : un numéro où rien n'est branché, que personne n'a.
+      const connected = new Set([...controllers.map((c) => c.index), ...index.values()]);
+      const final = chosen.map((v, n) => {
+        if (draft[n] !== "" || !connected.has(v)) return v;
+        let free = 0;
+        while (connected.has(free) || chosen.includes(free)) free++;
+        chosen[n] = free;
+        return free;
+      });
       setTouched(null);
       if (final.every((v, i) => v === base[i])) launch.mutate(id);
       else savePlayers.mutate(final, { onSuccess: (d) => { dropUnusedRelays(d); launch.mutate(id); } });
@@ -254,14 +267,20 @@ function LaunchButton({ id }: { id: number }) {
   const busy = launch.isPending || savePlayers.isPending || starting || linking;
   return (
     <>
-      {slots > 1 && (
+      {options.length > 1 && (
         <fieldset className="launch-who" disabled={busy}>
           <legend>{t("sheet.whoPlays")}</legend>
           {draft.map((value, n) => (
             <label key={n} className="launch-who__player">
               <span>{t("players.player", { n: n + 1 })}</span>
               <select value={value} onChange={(e) => pick(n, e.target.value)}>
-                {options.map((o) => <option key={o} value={o}>{optionLabel(o)}</option>)}
+                <option value="">{t("players.none")}</option>
+                {options.map((o) => {
+                  const other = draft.indexOf(o);
+                  const taken = other >= 0 && other !== n;
+                  return <option key={o} value={o} disabled={taken}>
+                    {taken ? t("players.takenBy", { name: optionLabel(o), n: other + 1 }) : optionLabel(o)}</option>;
+                })}
               </select>
             </label>
           ))}
@@ -287,6 +306,18 @@ function FavoriteButton({ id, on }: { id: number; on: boolean }) {
     <button type="button" className={`button favorite-button ${on ? "is-on" : ""}`} aria-pressed={on}
       disabled={set.isPending} onClick={() => set.mutate(!on)}>
       <Star size={16} fill={on ? "currentColor" : "none"} aria-hidden /> {t(on ? "sheet.favorite.on" : "sheet.favorite.add")}
+    </button>
+  );
+}
+
+/** Signale le jeu comme ne fonctionnant pas sur cette console (ou retire le signalement). */
+function BrokenButton({ id, on }: { id: number; on: boolean }) {
+  const t = useT();
+  const set = useSetBroken(id);
+  return (
+    <button type="button" className={`button broken-button ${on ? "is-on" : ""}`} aria-pressed={on}
+      disabled={set.isPending} onClick={() => set.mutate(!on)} title={t(on ? "sheet.broken.undo" : "sheet.broken.hint")}>
+      <Ban size={16} aria-hidden /> {t(on ? "sheet.broken.on" : "sheet.broken.add")}
     </button>
   );
 }

@@ -52,6 +52,18 @@ export function useSetFavorite(id: number) {
   });
 }
 
+/** Signale le jeu comme ne fonctionnant pas sur la console branchée (ou retire le signalement). */
+export function useSetBroken(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => api.setBroken(id, on),
+    onSuccess: (_, on) => {
+      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, broken: on } : g));
+      qc.invalidateQueries({ queryKey: ["games"] });
+    },
+  });
+}
+
 export const useRecentGames = (limit = 14) =>
   useQuery({ queryKey: ["games", "recent", limit], queryFn: () => api.games({ sort: "added", order: "desc", limit }) });
 
