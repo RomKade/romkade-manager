@@ -1,5 +1,5 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
-import { AppWindow, Cloud, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldAlert, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { AppWindow, Cloud, KeyRound, LogOut, Mail, MonitorSmartphone, ShieldAlert, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { NavLink, useParams } from "react-router-dom";
 
@@ -55,10 +55,10 @@ export function AccountPage() {
 
 /* ---------- briques ---------- */
 
-function Block({ icon, title, lead, children, danger }: { icon: ReactNode; title: string; lead?: string; children: ReactNode; danger?: boolean }) {
+function Block({ icon, title, lead, children, danger }: { icon?: ReactNode; title: string; lead?: string; children: ReactNode; danger?: boolean }) {
   return (
     <section className={`block account__block ${danger ? "account__block--danger" : ""}`}>
-      <div className="block__head"><h2>{icon} {title}</h2></div>
+      <div className="block__head"><h2>{icon}{icon && " "}{title}</h2></div>
       {lead && <p className="muted account__lead">{lead}</p>}
       {children}
     </section>
@@ -370,7 +370,7 @@ function DeleteAccount() {
   const a = useAction();
   const email = session?.user.email ?? "";
   return (
-    <Block icon={<Trash2 size={18} aria-hidden />} title={t("account.danger.title")} lead={t("account.danger.lead")} danger>
+    <Block title={t("account.danger.title")} lead={t("account.danger.lead")} danger>
       <form onSubmit={(e: FormEvent) => { e.preventDefault();
         a.run(async () => { await cloud.deleteAccount(); await supabase.auth.signOut(); }); }}>
         <div className="field">
