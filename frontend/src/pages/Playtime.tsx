@@ -1,9 +1,9 @@
-import { CalendarRange, Clock, Hourglass, Settings as SettingsIcon, Trash2, X } from "lucide-react";
+import { CalendarRange, Clock, Hourglass, RefreshCw, Settings as SettingsIcon, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { PlayStats } from "../api/client";
-import { usePlayState, usePlayStats, useResetPlaytime, useStatus } from "../api/queries";
+import { useDeviceStatus, usePlayState, usePlayStats, useResetPlaytime, useStartSync, useStatus } from "../api/queries";
 import { ConsoleBadge } from "../components/ConsoleBadge";
 import { Cover } from "../components/Cover";
 import { Empty, ErrorNotice, PageHeader, Spinner } from "../components/ui";
@@ -45,6 +45,8 @@ export function PlaytimePage() {
   const st = state.data;
   const limit = st?.settings.alert_enabled ? st.settings.alert_minutes * 60 : null;
   const status = useStatus();
+  const sync = useStartSync(() => undefined);
+  const online = useDeviceStatus().data?.connected;
 
   // Bibliothèque jamais lue : les journaux de la console n'auraient ni jaquette ni fiche, on invite à synchroniser.
   if (status.data && !status.data.synced) return (
@@ -52,8 +54,13 @@ export function PlaytimePage() {
       <PageHeader title={t("playtime.title")} lead={t("playtime.lead")} />
       <Empty title={t("dashboard.notSynced")}>
         <p>{t("playtime.notSynced")}</p>
-        <Link to="/" className="button">{t("playtime.toSync")}</Link>
+        <button type="button" className="button button--neon" style={{ alignSelf: "center" }} onClick={() => sync.mutate()}
+          disabled={status.data.sync_running || sync.isPending || online === false}>
+          <RefreshCw size={16} aria-hidden className={status.data.sync_running ? "spin" : ""} />
+          {status.data.sync_running ? t("dashboard.syncing") : t("dashboard.sync")}
+        </button>
       </Empty>
+      {sync.isError && <ErrorNotice error={sync.error} />}
     </div>
   );
 
