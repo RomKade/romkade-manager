@@ -140,3 +140,12 @@
 @keyframes duke-dot { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
 @media (max-width: 1100px) { .duke-chat { width: 56%; } }
 @media (prefers-reduced-motion: reduce) { .duke-chat, .duke-chat__msg, .duke-chat__typing i { animation: none !important; } }
+
+/* Types de consoles prises en charge */
+.auth-pitch__brands { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; padding: 0; }
+.auth-pitch__brands li { padding: 5px 12px; border-radius: var(--r-pill); font-family: var(--font-display); font-weight: 750; font-size: var(--fs-xs);
+  letter-spacing: 0.04em; color: var(--screen-ink); background: rgb(255 255 255 / 0.04); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 0 14px rgb(17 217 245 / 0.08); animation: auth-up 500ms var(--ease) both; }
+.auth-pitch__brands li:nth-child(even) { border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); box-shadow: 0 0 14px rgb(255 67 181 / 0.08); }
+.auth-pitch__brands .auth-pitch__brands-more { border-style: dashed; border-color: rgb(255 255 255 / 0.18); color: var(--screen-ink-2); font-weight: 600; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .auth-pitch__brands li { animation: none !important; } }

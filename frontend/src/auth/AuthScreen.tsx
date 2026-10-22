@@ -447,6 +447,12 @@ function Pitch() {
           <RotatingWords words={words} />
         </h2>
         <p className="auth-pitch__lead">{t("auth.pitch.lead")}</p>
+        <ul className="auth-pitch__brands">
+          {t("auth.pitch.brands").split("|").map((brand, i) => (
+            <li key={brand} style={{ animationDelay: `${0.35 + i * 0.08}s` }}>{brand}</li>
+          ))}
+          <li className="auth-pitch__brands-more" style={{ animationDelay: "0.8s" }}>{t("auth.pitch.more")}</li>
+        </ul>
         <div className="auth-pitch__shots">
           <img className="auth-pitch__shot auth-pitch__shot--library" src={libraryShot} alt="" aria-hidden width={1156} height={843} />
           <DukeChat />
