@@ -42,32 +42,18 @@ WARN = (245, 184, 74)
 BOARDS = {"RGcubexx": (720, 720, 0), "RG34xx": (720, 480, 0), "RG34xxSP": (720, 480, 0), "RG28xx": (640, 480, 90)}
 KEY_A, KEY_B, KEY_MENU = 304, 305, 312
 EVIOCGRAB = 0x40044590  # accès exclusif aux touches (le menu de la console ne les reçoit plus)
-BASELINE = "Retro Games Played from Anywhere"  # sous le logo, en anglais quelle que soit la langue de la console
+BASELINE = "Retro Games Played from Anywhere"  # sous le logo
 
-TEXT = {
-    "fr": {"code": "CODE D'APPAIRAGE", "where": "Dans ChatGPT ou Claude, avec le connecteur ROMKADE :",
-           "say": "« Connecte ma console, code {code} »", "valid": "Valable encore {min} min",
-           "connected": "Console connectée", "games": "jeux", "available": "disponibles dans ChatGPT et Claude",
-           "try": "Essaie :", "ex1": "« Lance Sonic sur ma console »", "ex2": "« Des codes de triche pour Contra ? »",
-           "connecting": "Connexion au cloud ROMKADE", "offline": "Pas de connexion au cloud",
-           "offline_hint": "Vérifie que le Wi-Fi est activé, puis rouvre l'app.", "back": "Retour",
-           "updated": "App ROMKADE mise à jour", "installed": "App ROMKADE installée", "version": "Version {v}", "linked": "Reliée à ton compte ROMKADE", "ready": "Pilotable depuis ChatGPT et Claude", "close": "Fermer"},
-    "en": {"code": "PAIRING CODE", "where": "In ChatGPT or Claude, with the ROMKADE connector:",
-           "say": "“Connect my console, code {code}”", "valid": "Valid for {min} more min",
-           "connected": "Console connected", "games": "games", "available": "available in ChatGPT and Claude",
-           "try": "Try:", "ex1": "“Launch Sonic on my console”", "ex2": "“Cheat codes for Contra?”",
-           "connecting": "Connecting to ROMKADE cloud", "offline": "No connection to the cloud",
-           "offline_hint": "Check that Wi-Fi is on, then open the app again.", "back": "Back",
-           "updated": "ROMKADE app updated", "installed": "ROMKADE app installed", "version": "Version {v}", "linked": "Linked to your ROMKADE account", "ready": "Ready to drive from ChatGPT and Claude", "close": "Close"},
-    "es": {"code": "CÓDIGO DE EMPAREJAMIENTO", "where": "En ChatGPT o Claude, con el conector ROMKADE:",
-           "say": "«Conecta mi consola, código {code}»", "valid": "Válido {min} min más",
-           "connected": "Consola conectada", "games": "juegos", "available": "disponibles en ChatGPT y Claude",
-           "try": "Prueba:", "ex1": "«Inicia Sonic en mi consola»", "ex2": "«¿Trucos para Contra?»",
-           "connecting": "Conectando con la nube ROMKADE", "offline": "Sin conexión con la nube",
-           "offline_hint": "Comprueba que el Wi-Fi está activado y vuelve a abrir la app.", "back": "Volver",
-           "updated": "App ROMKADE actualizada", "installed": "App ROMKADE instalada", "version": "Versión {v}", "linked": "Conectada a tu cuenta ROMKADE", "ready": "Lista para controlar desde ChatGPT y Claude", "close": "Cerrar"},
+TEXT = {  # en anglais, quelle que soit la langue de la console
+    "code": "PAIRING CODE", "where": "In ChatGPT or Claude, with the ROMKADE connector:",
+    "say": "“Connect my console, code {code}”", "valid": "Valid for {min} more min",
+    "connected": "Console connected", "games": "games", "available": "available in ChatGPT and Claude",
+    "try": "Try:", "ex1": "“Launch Sonic on my console”", "ex2": "“Cheat codes for Contra?”",
+    "connecting": "Connecting to ROMKADE cloud", "offline": "No connection to the cloud",
+    "offline_hint": "Check that Wi-Fi is on, then open the app again.", "back": "Back",
+    "updated": "ROMKADE app updated", "installed": "ROMKADE app installed", "version": "Version {v}",
+    "linked": "Linked to your ROMKADE account", "ready": "Ready to drive from ChatGPT and Claude", "close": "Close",
 }
-LANGS = ["zh", "zh", "en", "ja", "ko", "es", "ru", "de", "fr", "pt"]  # /mnt/vendor/oem/language.ini
 
 
 def app_version() -> str:
@@ -84,14 +70,6 @@ def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         return ImageFont.truetype(str(ASSETS / name), size)
     except OSError:
         return ImageFont.load_default()
-
-
-def system_lang() -> str:
-    try:
-        lang = LANGS[int(Path("/mnt/vendor/oem/language.ini").read_text().split()[0])]
-    except (OSError, ValueError, IndexError):
-        lang = "en"
-    return lang if lang in TEXT else "en"
 
 
 def mix(a, b, t: float):
@@ -144,10 +122,10 @@ def paste_asset(img: Image.Image, name: str, center_x: int, top: int, width: int
     return a.height
 
 
-def render(state: dict, lang: str, size=(640, 480), tick: int = 0) -> Image.Image:
+def render(state: dict, size=(640, 480), tick: int = 0) -> Image.Image:
     w, h = size
     s = w / 640 if w / 640 < h / 480 else h / 480  # échelle : écran de référence 640 x 480
-    T = TEXT.get(lang, TEXT["en"])
+    T = TEXT
     img = background(w, h)
     d = ImageDraw.Draw(img)
     cx = w // 2
@@ -268,7 +246,26 @@ def render(state: dict, lang: str, size=(640, 480), tick: int = 0) -> Image.Imag
     rights = (f"v{ver} · " if ver else "") + "© 2026 ROMKADE · romkade.com"
     fr = font(sc(14))
     d.text((w - sc(24) - d.textlength(rights, font=fr), fy + sc(3)), rights, font=fr, fill=INK_3)
+    site_qr(img, w - sc(18), top)
     return img
+
+
+def site_qr(img: Image.Image, right: int, top: int) -> None:
+    """QR code vers romkade.com, en haut à droite (assets/romkade-qr.png : un pixel par module, agrandi net)."""
+    try:
+        qr = Image.open(ASSETS / "romkade-qr.png").convert("RGB")
+    except OSError:
+        return
+    s = min(img.width / 640, img.height / 480)
+    qr = qr.resize((qr.width * max(2, round(3 * s)),) * 2, Image.NEAREST)
+    x = right - qr.width
+    d = ImageDraw.Draw(img)
+    r = round(6 * s)
+    d.rounded_rectangle((x - 2, top - 2, x + qr.width + 1, top + qr.height + 1), r, fill=(255, 255, 255))
+    img.paste(qr, (x, top))
+    f = font(round(11 * s), True)
+    label = "romkade.com"
+    d.text((x + (qr.width - d.textlength(label, font=f)) / 2, top + qr.height + round(5 * s)), label, font=f, fill=INK_2)
 
 
 # ---------- écran et touches de la console ----------
@@ -348,7 +345,6 @@ def splash(kind: str, seconds: float) -> None:
     """Écran « app installée / mise à jour » lancé par le Manager, par-dessus le menu de la console : l'image du menu
     est gardée puis remise, et les touches sont prises le temps de l'écran (le menu ne les reçoit pas). B, A ou
     MENU le ferment plus tôt."""
-    lang = system_lang()
     screen = Screen()
     before = screen.snapshot()
     keys = grab = None
@@ -369,7 +365,7 @@ def splash(kind: str, seconds: float) -> None:
                 st = {}
             state = {"status": kind if kind in ("updated", "installed") else "updated", "name": st.get("name")}
             if state != last:
-                screen.show(render(state, lang, screen.size))
+                screen.show(render(state, screen.size))
                 last = state
             if keys is not None and any(k in (KEY_A, KEY_B, KEY_MENU) for k in read_keys(keys)):
                 break
@@ -390,16 +386,14 @@ def main() -> None:
     if "--preview" in sys.argv:
         out = sys.argv[sys.argv.index("--preview") + 1]
         state = json.loads(sys.argv[sys.argv.index("--state") + 1]) if "--state" in sys.argv else {}
-        lang = sys.argv[sys.argv.index("--lang") + 1] if "--lang" in sys.argv else "fr"
         size = tuple(int(v) for v in sys.argv[sys.argv.index("--size") + 1].split("x")) if "--size" in sys.argv else (640, 480)
-        render(state, lang, size).save(out)
+        render(state, size).save(out)
         return
     if "--splash" in sys.argv:
         i = sys.argv.index("--splash")
         splash(sys.argv[i + 1], float(sys.argv[i + 2]) if len(sys.argv) > i + 2 else 6)
         return
     started = float(sys.argv[1]) if len(sys.argv) > 1 else time.time()
-    lang = system_lang()
     screen = Screen()
     try:
         keys = os.open("/dev/input/event1", os.O_RDONLY | os.O_NONBLOCK)
@@ -412,7 +406,7 @@ def main() -> None:
             key = (state.get("status"), state.get("code"), state.get("name"), state.get("games"),
                    math.ceil((state.get("code_until") or 0) - time.time()) // 60)
             if key != last or state["status"] == "connecting":
-                screen.show(render(state, lang, screen.size, tick))
+                screen.show(render(state, screen.size, tick))
                 last = key
             if keys is not None and any(k in (KEY_B, KEY_MENU) for k in read_keys(keys)):
                 break

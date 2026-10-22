@@ -25,8 +25,9 @@ cp "$APP/device/__init__.py" "$APP/device/launcher.py" "$APP/device/volume.py" "
    "$OUT/romkade/vendor/app/device/"
 printf '{"server": "%s"}\n' "$1" > "$OUT/romkade/agent.json"
 
-cp "$HERE/RomKade.sh" "$OUT/Roms/APPS/ROMKADE.sh"
-cp "$HERE/assets/apps-icon.png" "$OUT/Roms/APPS/Imgs/ROMKADE.png"
+APP="ROMKADE - Played from Anywhere"  # nom dans le menu APPS (même nom que dans backend/app/services/cloud_agent.py)
+cp "$HERE/RomKade.sh" "$OUT/Roms/APPS/$APP.sh"
+cp "$HERE/assets/apps-icon.png" "$OUT/Roms/APPS/Imgs/$APP.png"
 find "$OUT" -name .DS_Store -delete
-chmod +x "$OUT/romkade/romkade_agent.py" "$OUT/romkade/screen.py" "$OUT/romkade/start.sh" "$OUT/romkade/uninstall.sh" "$OUT/Roms/APPS/ROMKADE.sh"
+chmod +x "$OUT/romkade/romkade_agent.py" "$OUT/romkade/screen.py" "$OUT/romkade/start.sh" "$OUT/romkade/uninstall.sh" "$OUT/Roms/APPS/$APP.sh"
 echo "paquet prêt : $OUT"

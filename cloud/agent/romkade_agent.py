@@ -425,7 +425,7 @@ def already_running() -> bool:
 
 def main() -> None:
     if already_running():
-        print("agent déjà lancé")
+        print("agent already running")
         return
     PIDFILE.write_text(str(os.getpid()))
     if LOG.exists() and LOG.stat().st_size > 1_000_000:

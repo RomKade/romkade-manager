@@ -16,7 +16,8 @@ def test_bundle_contains_agent_screen_app_and_manager_modules():
     assert "/mnt/mmc/romkade/romkade_agent.py" in names and "/mnt/mmc/romkade/screen.py" in names
     assert "/mnt/mmc/romkade/vendor/app/device/launcher.py" in names          # modules du Manager, sur place
     assert "/mnt/mmc/romkade/vendor/asyncssh.py" in names                     # remplaçant de SSH
-    assert "/mnt/mmc/Roms/APPS/ROMKADE.sh" in names and "/mnt/mmc/Roms/APPS/Imgs/ROMKADE.png" in names
+    app = "/mnt/mmc/Roms/APPS/ROMKADE - Played from Anywhere"
+    assert f"{app}.sh" in names and "/mnt/mmc/Roms/APPS/Imgs/ROMKADE - Played from Anywhere.png" in names
     assert not any(n.endswith("agent.json") for n in names)                   # le secret est écrit à part
     assert files["/mnt/mmc/romkade/start.sh"][1] == 0o755
 

@@ -34,6 +34,8 @@ CLOUD_URL = os.environ.get("ROMKADE_CLOUD_URL", "https://mcp.romkade.com").rstri
 SUPPORTED = {"anbernic-stock-mod"}
 AUTOSTART = "/mnt/mod/ctrl/autostart"
 MARK = "# ROMKADE"
+APP_NAME = "ROMKADE - Played from Anywhere"  # nom de l'app dans le menu APPS de la console (nom du fichier)
+OLD_APP_NAMES = ("ROMKADE",)  # anciens noms, effacés à l'installation
 # Modules du Manager exécutés sur la console : tout ce qu'ils importent de app (même dans une fonction) doit y être,
 # sinon l'app ROMKADE échoue au premier appel (test_bundle_covers_every_app_import).
 VENDOR = ("__init__.py", "errors.py", "platforms.py")
@@ -84,8 +86,8 @@ def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
             files[f"{base}/{legal}"] = (path.read_bytes(), 0o644)
     files[f"{base}/VERSION"] = (manager_version().encode() + b"\n", 0o644)
     apps = roms_root.rstrip("/") + "/APPS"
-    files[f"{apps}/ROMKADE.sh"] = ((src / "RomKade.sh").read_bytes(), 0o755)
-    files[f"{apps}/Imgs/ROMKADE.png"] = ((src / "assets" / "apps-icon.png").read_bytes(), 0o644)
+    files[f"{apps}/{APP_NAME}.sh"] = ((src / "RomKade.sh").read_bytes(), 0o755)
+    files[f"{apps}/Imgs/{APP_NAME}.png"] = ((src / "assets" / "apps-icon.png").read_bytes(), 0o644)
     return files
 
 
@@ -187,7 +189,10 @@ async def install(run, client, sftp, roms_root: str, server: str, secret: str, s
     await sftp.chmod(f"{base}/agent.json.tmp", 0o600)
     start = f"{base}/start.sh"
     line = f"[ -x {start} ] && {start}  {MARK}"
+    apps = roms_root.rstrip("/") + "/APPS"
+    old_apps = " ".join(shlex.quote(f"{apps}/{p}") for n in OLD_APP_NAMES for p in (f"{n}.sh", f"Imgs/{n}.png"))
     command = (
+        f"rm -f {old_apps}; "  # app renommée : l'ancienne entrée du menu APPS disparaît
         f"mv {shlex.quote(base + '/agent.json.tmp')} {shlex.quote(base + '/agent.json')} && sync; "
         # Démarrage avec la console : une ligne marquée avant le « exit 0 » final du script du Stock OS Mod.
         f"if [ -f {AUTOSTART} ] && ! grep -qF {shlex.quote(MARK)} {AUTOSTART}; then "
