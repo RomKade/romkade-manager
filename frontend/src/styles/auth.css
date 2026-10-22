@@ -172,3 +172,10 @@
 .pw-strength__rules li.is-ok svg { color: var(--live); }
 .pw-strength__rules .pw-strength__bonus { grid-column: 1 / -1; }
 .pw-strength__plus { width: 14px; text-align: center; font-weight: 800; color: var(--ink-3); }
+
+/* Code à 6 chiffres, une case par chiffre */
+.auth__digits { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.field .auth__digit { width: 100%; min-height: 58px; padding: 0; text-align: center; font-family: var(--font-display); font-weight: 800;
+  font-size: 1.6rem; caret-color: var(--accent-2); }
+.field .auth__digit:not(:placeholder-shown), .field .auth__digit:valid:not([value=""]) { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+@media (max-width: 420px) { .auth__digits { gap: 6px; } .field .auth__digit { min-height: 50px; font-size: 1.35rem; } }

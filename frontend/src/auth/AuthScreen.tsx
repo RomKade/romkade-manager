@@ -1,5 +1,5 @@
 import { Bot, Eye, EyeOff, Gamepad2, LibraryBig, MessagesSquare, Play, Save } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import libraryShot from "../assets/auth/bibliotheque-consoles.webp";
 import logo240 from "../assets/brand/romkade-manager-logo-240.webp";
@@ -112,13 +112,43 @@ function PasswordInput({ id, value, onChange, autoComplete }: { id: string; valu
   );
 }
 
+/** Code à 6 chiffres en 6 cases : avance seul, retour arrière, collage du code entier, remplissage automatique. */
 function CodeInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const t = useT();
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const digits = Array.from({ length: 6 }, (_, i) => value[i] ?? "");
+  const focus = (i: number) => refs.current[Math.max(0, Math.min(5, i))]?.focus();
+  const put = (from: number, text: string) => {
+    const clean = text.replace(/\D/g, "");
+    if (!clean) return;
+    const next = (value.slice(0, from) + clean).slice(0, 6);
+    onChange(next);
+    focus(next.length >= 6 ? 5 : next.length);
+  };
   return (
-    <Field id="auth-code" label={t("auth.code")}>
-      <input id="auth-code" className="auth__code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}"
-        maxLength={6} value={value} onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))} required autoFocus />
-    </Field>
+    <div className="field auth__field">
+      <label htmlFor="auth-code-0">{t("auth.code")}</label>
+      <div className="auth__digits" role="group" aria-label={t("auth.code")}>
+        {digits.map((d, i) => (
+          <input key={i} id={`auth-code-${i}`} ref={(el) => { refs.current[i] = el; }} className="auth__digit"
+            type="text" inputMode="numeric" pattern="[0-9]" maxLength={i === 0 ? 6 : 1} value={d} autoFocus={i === 0}
+            autoComplete={i === 0 ? "one-time-code" : "off"} aria-label={`${t("auth.code")} ${i + 1}/6`}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "");
+              if (v.length > 1) return put(i, v);                     // remplissage automatique du code entier
+              onChange((value.slice(0, i) + v + value.slice(i + 1)).slice(0, 6).replace(/\s/g, ""));
+              if (v) focus(i + 1);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Backspace" && !d) { e.preventDefault(); onChange(value.slice(0, i - 1) + value.slice(i)); focus(i - 1); }
+              else if (e.key === "ArrowLeft") focus(i - 1);
+              else if (e.key === "ArrowRight") focus(i + 1);
+            }}
+            onPaste={(e) => { e.preventDefault(); put(i, e.clipboardData.getData("text")); }} />
+        ))}
+      </div>
+    </div>
   );
 }
 
