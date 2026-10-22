@@ -43,15 +43,20 @@ export const cloud = {
   deleteAccount: () => call(`${CLOUD_URL}/api/me`, { method: "DELETE" }),
 };
 
+/** App ROMKADE de la console branchée : installée, sa version, et celle que ce Manager installerait. */
+export type AgentStatus = {
+  supported: boolean; installed: boolean; server: string | null; cloud: string; version: string | null; latest: string;
+};
+
 /** Moteur local du Manager : agent ROMKADE de la console branchée. */
 export const localAgent = {
   status: async () => {
     const r = await fetch("/api/cloud/agent");
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(errorMessage("/api/cloud/agent", r.status, body));
-    return body as { supported: boolean; installed: boolean; server: string | null; cloud: string };
+    return body as AgentStatus;
   },
-  link: (name?: string) => call<{ console: CloudConsole; reused: boolean }>("/api/cloud/link",
+  link: (name?: string) => call<{ console: CloudConsole; reused: boolean; splash: boolean }>("/api/cloud/link",
     { method: "POST", body: JSON.stringify({ name: name || null }) }, "X-Romkade-Token"),
   unlink: async () => {
     const r = await fetch("/api/cloud/agent", { method: "DELETE" });

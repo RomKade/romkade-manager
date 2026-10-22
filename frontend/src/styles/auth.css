@@ -256,3 +256,15 @@
 .remote__howto > div { padding: 12px 14px; border-radius: var(--r-control); background: var(--panel-2); border: 1px solid var(--line); }
 .remote__howto p { margin: 4px 0 0; }
 .settings__intro { margin: 0 0 14px; }
+
+/* Pilotage à distance : console reliée, son état en une phrase. */
+.account__linked { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: var(--r-control);
+  border: 1px solid var(--line); background: var(--panel-2); }
+.account__linked.is-online { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.account__linked-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.account__linked-head .account__grow { display: flex; flex-direction: column; }
+.account__linked-state { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; }
+.account__linked.is-online .account__linked-state { color: var(--ok); }
+.account__linked .field__hint { margin: 0; }
+.account__replace { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.account__new { color: var(--accent); }

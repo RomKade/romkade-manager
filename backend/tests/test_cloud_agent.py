@@ -79,3 +79,60 @@ async def test_favorites_written_next_to_the_agent(app_factory, ssh_server):
         assert (await c.delete(f"/api/games/{sonic['id']}/favorite")).status_code == 204
         await asyncio.gather(*cloud_agent._pushes)
         assert json.loads((agent / "favorites.json").read_text())["favorites"] == [["SFC", "Super Mario World (USA).smc"]]
+
+
+def test_bundle_covers_every_app_import():
+    """Chaque « from app.x import » des modules envoyés à la console (y compris dans une fonction) a son fichier."""
+    import re
+
+    files = cloud_agent.bundle("/mnt/mmc/Roms")
+    vendor = {p.split("/vendor/", 1)[1] for p in files if "/vendor/" in p}
+    for path in vendor:
+        if not path.endswith(".py"):
+            continue
+        source = files[f"/mnt/mmc/romkade/vendor/{path}"][0].decode()
+        for module in re.findall(r"^\s*from (app(?:\.\w+)+) import", source, re.M):
+            target = module.replace(".", "/")
+            assert f"{target}.py" in vendor or f"{target}/__init__.py" in vendor, f"{path} importe {module}, absent"
+
+
+class _FakeFile:
+    def __init__(self, store, path):
+        self.store, self.path = store, path
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def write(self, data):
+        self.store[self.path] = data
+
+
+class _FakeSftp:
+    def __init__(self):
+        self.files = {}
+
+    async def makedirs(self, path, exist_ok=False):
+        pass
+
+    def open(self, path, mode):
+        return _FakeFile(self.files, path)
+
+    async def chmod(self, path, mode):
+        pass
+
+
+def test_install_writes_version_and_shows_splash_unless_a_game_runs():
+    sftp, commands = _FakeSftp(), []
+
+    async def run(_client, command, timeout=0):
+        commands.append(command)
+        return 0, "started" if "romkade-agent.pid" in command else "shown"
+
+    shown = asyncio.run(cloud_agent.install(run, None, sftp, "/mnt/mmc/Roms", "https://cloud", "s", splash="updated"))
+    assert shown and sftp.files["/mnt/mmc/romkade/VERSION"].decode().strip() == cloud_agent.manager_version()
+    assert "for p in retroarch" in commands[-1] and "pidof $p" in commands[-1] and "splash.sh updated 6" in commands[-1]
+    # Sans écran demandé (ou pendant un jeu : la commande ne répond pas « shown »), rien ne s'affiche.
+    assert not asyncio.run(cloud_agent.install(run, None, sftp, "/mnt/mmc/Roms", "https://cloud", "s"))

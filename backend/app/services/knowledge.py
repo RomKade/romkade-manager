@@ -594,6 +594,8 @@ class KnowledgeJobs:
         """Jeux jamais recherchés ; avec `refresh`, tous les jeux à nouveau (nouvelle source, pages mises à jour)."""
         if self.running():
             return False
+        # En cours dès maintenant (total 0 tant que la liste se prépare) : l'interface masque le bouton et suit.
+        self.state.update(running=True, total=0, done=0, found=0, current=None, stopping=False)
         self.task = asyncio.create_task(self._run(refresh))
         return True
 
@@ -606,13 +608,14 @@ class KnowledgeJobs:
             with self.sessions() as s:
                 if refresh:  # les jamais recherchés d'abord, puis les autres
                     pending = pending_games(s)
+                    seen = {tuple(g) for g in pending}
                     return pending + [g for g in s.execute(_games_query().order_by(
-                        RemoteFile.platform_id, RemoteFile.normalized_title)).all() if tuple(g) not in set(pending)]
+                        RemoteFile.platform_id, RemoteFile.normalized_title)).all() if tuple(g) not in seen]
                 return pending_games(s)
 
-        games = await asyncio.to_thread(todo)
-        self.state.update(running=True, total=len(games), done=0, found=0, current=None, stopping=False)
         try:
+            games = await asyncio.to_thread(todo)
+            self.state["total"] = len(games)
             for platform_id, title in games:
                 if self.state["stopping"]:
                     break

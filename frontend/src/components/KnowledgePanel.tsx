@@ -23,6 +23,7 @@ export function KnowledgePanel() {
     <section className="block knowledge" aria-labelledby="kn-h">
       <div className="block__head">
         <h2 id="kn-h"><BookOpenText size={18} aria-hidden /> {t("settings.kn.title")}</h2>
+        <span className="tag tag--ok">{t("settings.noAi")}</span>
       </div>
       <p className="muted block__lead">{t("settings.kn.lead")}</p>
       {q.isPending ? <Spinner label={t("common.loading")} /> : q.isError ? <ErrorNotice error={q.error} /> : st && (
@@ -33,15 +34,21 @@ export function KnowledgePanel() {
             <span className="muted"> · {t("settings.kn.details", { notFound: st.not_found, pending: st.pending, chunks: st.chunks })}</span>
           </p>
           {job?.running ? (
-            <div className="form__actions">
+            <div className="knowledge__job">
               <p className="desc-run" role="status">
                 <Loader2 size={16} aria-hidden className="spin" />{" "}
-                {t("settings.kn.running", { done: job.done, total: job.total, found: job.found })}
-                {job.current && <span className="muted"> · {job.current}</span>}
+                {job.stopping ? t("settings.kn.stopping") : job.total === 0 ? t("settings.kn.preparing")
+                  : t("settings.kn.running", { done: job.done, total: job.total, found: job.found,
+                      minutes: Math.max(1, Math.round((job.total - job.done) * 10 / 60)) })}
               </p>
-              <button type="button" className="button button--small" disabled={job.stopping || stop.isPending} onClick={() => stop.mutate()}>
-                <Square size={14} aria-hidden /> {t("settings.kn.stop")}
-              </button>
+              {job.total > 0 && <Meter value={job.done} max={job.total} label={t("settings.kn.progress")} />}
+              {job.current && <p className="muted small">{t("settings.kn.current", { title: job.current })}</p>}
+              <p className="muted small">{t("settings.kn.background")}</p>
+              <div className="form__actions">
+                <button type="button" className="button button--small" disabled={job.stopping || stop.isPending} onClick={() => stop.mutate()}>
+                  <Square size={14} aria-hidden /> {t("settings.kn.stop")}
+                </button>
+              </div>
             </div>
           ) : (st.pending > 0 || st.games > 0) && (
             <div className="form__actions">
@@ -64,7 +71,8 @@ export function KnowledgePanel() {
             {t("settings.kn.auto")}
           </label>
           <p className="muted small">{t("settings.kn.sources", { license: st.license })}</p>
-          {(start.isError || stop.isError) && <ErrorNotice error={start.error ?? stop.error} />}
+          {((start.isError && (start.error as { code?: string }).code !== "knowledge_running") || stop.isError) &&
+            <ErrorNotice error={start.error ?? stop.error} />}
           <KnowledgeTest />
         </>
       )}
@@ -178,7 +186,10 @@ export function CheatsPanel() {
   const st = q.data;
   return (
     <section className="block knowledge" aria-labelledby="ch-h">
-      <h2 id="ch-h"><KeyRound size={18} aria-hidden /> {t("settings.ch.title")}</h2>
+      <div className="block__head">
+        <h2 id="ch-h"><KeyRound size={18} aria-hidden /> {t("settings.ch.title")}</h2>
+        <span className="tag tag--ok">{t("settings.noAi")}</span>
+      </div>
       <p className="muted block__lead">{t("settings.ch.lead")}</p>
       {q.isPending ? <Spinner label={t("common.loading")} /> : q.isError ? <ErrorNotice error={q.error} /> : st && (
         <>

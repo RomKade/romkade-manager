@@ -151,7 +151,10 @@ async def test_sega_retro_source_and_refresh_all(app_factory, monkeypatch):
         assert not any("Magazine" in str(x) for x in calls if x[0] == "segaretro.org" and x[1] == "parse")
 
         total = (await c.get("/api/knowledge")).json()["games"]
-        assert (await c.post("/api/knowledge/start", params={"refresh": "true"})).status_code == 200
+        r = await c.post("/api/knowledge/start", params={"refresh": "true"})
+        assert r.status_code == 200 and r.json()["job"]["running"]  # en cours dès la réponse : bouton masqué
+        again = await c.post("/api/knowledge/start")
+        assert again.status_code == 409 and again.json()["error"]["code"] == "knowledge_running"
         for _ in range(200):
             if not app.state.knowledge.running():
                 break

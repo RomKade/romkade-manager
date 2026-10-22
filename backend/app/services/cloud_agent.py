@@ -34,10 +34,21 @@ CLOUD_URL = os.environ.get("ROMKADE_CLOUD_URL", "https://mcp.romkade.com").rstri
 SUPPORTED = {"anbernic-stock-mod"}
 AUTOSTART = "/mnt/mod/ctrl/autostart"
 MARK = "# ROMKADE"
-VENDOR = ("__init__.py", "errors.py")
+# Modules du Manager exécutés sur la console : tout ce qu'ils importent de app (même dans une fonction) doit y être,
+# sinon l'app ROMKADE échoue au premier appel (test_bundle_covers_every_app_import).
+VENDOR = ("__init__.py", "errors.py", "platforms.py")
 VENDOR_SERVICES = ("__init__.py", "saves.py")  # sauvegardes de la carte, lues sur place (outil game_details)
-VENDOR_DEVICE = ("__init__.py", "launcher.py", "volume.py", "systems.py", "launch.sh", "onion_launch.sh",
+VENDOR_DEVICE = ("__init__.py", "launcher.py", "volume.py", "systems.py", "bluetooth.py", "launch.sh", "onion_launch.sh",
                  "players_apply.sh", "volume_keys.py")
+
+
+def manager_version() -> str:
+    """Version du Manager qui installe l'app : devient celle de l'app sur la console (fichier VERSION)."""
+    try:
+        from importlib.metadata import version
+        return version("anbernic-game-manager")
+    except Exception:  # noqa: BLE001 — sources non installées
+        return "dev"
 
 
 def agent_source() -> Path:
@@ -53,7 +64,8 @@ def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
     src = agent_source()
     base = roms_root.rstrip("/").rsplit("/", 1)[0] + "/romkade"
     files: dict[str, tuple[bytes, int]] = {}
-    for name, mode in (("romkade_agent.py", 0o755), ("screen.py", 0o755), ("start.sh", 0o755), ("uninstall.sh", 0o755)):
+    for name, mode in (("romkade_agent.py", 0o755), ("screen.py", 0o755), ("splash.sh", 0o755), ("start.sh", 0o755),
+                       ("uninstall.sh", 0o755)):
         files[f"{base}/{name}"] = ((src / name).read_bytes(), mode)
     for asset in sorted((src / "assets").iterdir()):
         if asset.is_file() and asset.name != "apps-icon.png":
@@ -70,6 +82,7 @@ def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
         path = src.parents[1] / legal
         if path.is_file():
             files[f"{base}/{legal}"] = (path.read_bytes(), 0o644)
+    files[f"{base}/VERSION"] = (manager_version().encode() + b"\n", 0o644)
     apps = roms_root.rstrip("/") + "/APPS"
     files[f"{apps}/ROMKADE.sh"] = ((src / "RomKade.sh").read_bytes(), 0o755)
     files[f"{apps}/Imgs/ROMKADE.png"] = ((src / "assets" / "apps-icon.png").read_bytes(), 0o644)
@@ -78,6 +91,15 @@ def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
 
 def agent_dir(roms_root: str) -> str:
     return roms_root.rstrip("/").rsplit("/", 1)[0] + "/romkade"
+
+
+async def read_version(sftp, roms_root: str) -> str | None:
+    """Version de l'app ROMKADE installée sur la console (None avant que le Manager l'écrive)."""
+    try:
+        async with sftp.open(f"{agent_dir(roms_root)}/VERSION", "rb") as f:
+            return (await f.read()).decode().strip() or None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 async def read_agent(sftp, roms_root: str) -> dict | None:
@@ -149,8 +171,10 @@ async def register(token: str, name: str | None, info: dict, secret: str | None,
     return r.json()
 
 
-async def install(run, client, sftp, roms_root: str, server: str, secret: str) -> None:
-    """Copie l'agent, écrit sa configuration, l'ajoute au démarrage de la console et le (re)lance."""
+async def install(run, client, sftp, roms_root: str, server: str, secret: str, splash: str | None = None) -> bool:
+    """Copie l'agent, écrit sa configuration, l'ajoute au démarrage de la console et le (re)lance. Avec `splash`
+    (« installed » ou « updated »), l'écran ROMKADE l'annonce quelques secondes sur la console, sauf pendant un jeu :
+    renvoie True s'il s'est affiché."""
     for path, (data, mode) in bundle(roms_root).items():
         await sftp.makedirs(path.rsplit("/", 1)[0], exist_ok=True)
         async with sftp.open(path, "wb") as f:
@@ -176,6 +200,15 @@ async def install(run, client, sftp, roms_root: str, server: str, secret: str) -
     if "started" not in out:
         raise errors.AppError("agent_start_failed", "L'app ROMKADE n'a pas démarré sur la console.", 502,
                               {"exit": code, "output": out[-300:]})
+    if splash not in ("installed", "updated"):
+        return False
+    from app.device.launcher import GAME_PROCESSES  # jeu en cours : on ne le recouvre pas
+    _, out = await run(client, (
+        f"for p in {' '.join(GAME_PROCESSES)}; do pidof $p >/dev/null 2>&1 && exit 0; done; "
+        # splash.sh ferme le menu le temps de l'écran (il s'affiche au-dessus de l'app), puis le laisse revenir.
+        f"(setsid bash {shlex.quote(base + '/splash.sh')} {splash} 6 </dev/null >/tmp/romkade-splash.log 2>&1 &); "
+        "echo shown"), timeout=15)
+    return "shown" in out
 
 
 async def uninstall(run, client, roms_root: str) -> None:

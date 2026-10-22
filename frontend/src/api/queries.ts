@@ -1,7 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { api, type Capabilities, type GameControls, type GameDetail, type KnowledgeStatus, type GameControlsIn, type Query, type Transfer } from "./client";
+import { api, ApiError, type Capabilities, type GameControls, type GameDetail, type KnowledgeStatus, type GameControlsIn, type Query, type Transfer } from "./client";
 
 export const PAGE_SIZE = 120;
 
@@ -83,7 +83,9 @@ export function useKnowledgeMutations() {
   const qc = useQueryClient();
   const onSuccess = (d: KnowledgeStatus) => qc.setQueryData(["knowledge"], d);
   return {
-    start: useMutation({ mutationFn: (refresh: boolean = false) => api.startKnowledge(refresh), onSuccess }),
+    // Déjà en cours (autre onglet, synchronisation) : pas une erreur, on relit l'état pour suivre la tâche.
+    start: useMutation({ mutationFn: (refresh: boolean = false) => api.startKnowledge(refresh), onSuccess,
+      onError: (e) => { if (e instanceof ApiError && e.code === "knowledge_running") qc.invalidateQueries({ queryKey: ["knowledge"] }); } }),
     stop: useMutation({ mutationFn: api.stopKnowledge, onSuccess }),
     auto: useMutation({ mutationFn: api.knowledgeSettings, onSuccess }),
   };
