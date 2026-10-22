@@ -1446,6 +1446,12 @@ kbd {
 .assistant__game { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; cursor: pointer;
   border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 700; }
 .assistant__game em { font-style: normal; color: var(--accent-2); font-weight: 600; }
+/* Jaquette miniature du jeu cité : pour reconnaître un jeu sans ouvrir sa fiche */
+.assistant__game:has(.assistant__cover) { padding: 3px 9px 3px 3px; gap: 8px; }
+.assistant__cover.cover { width: 34px; height: 46px; flex: none; border-radius: 4px; }
+.assistant__cover .cover__initials { font-size: 11px; }
+.assistant__cover .cover__platform { display: none; }
+.assistant__game-text { text-align: left; }
 .assistant__sources a { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--ink-3); }
 .assistant__foot { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
 .assistant__form { display: flex; gap: 6px; }

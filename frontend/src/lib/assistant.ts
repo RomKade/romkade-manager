@@ -7,7 +7,10 @@ import { useSyncExternalStore } from "react";
 import type { Shot } from "../api/client";
 import { DEFAULT_ASSISTANT_NAME, isValidName } from "./assistantNames";
 
-export type AssistantGame = { id: number; title: string; platform: string };
+/** Jeu cité par l'assistant ; code (dossier de la console) et adresses des images : pour sa jaquette miniature. */
+export type AssistantGame = {
+  id: number; title: string; platform: string; code?: string; image_url?: string | null; boxart_url?: string | null;
+};
 export type Scope = { kind: "library" } | { kind: "game"; game: AssistantGame };
 export type ChatSource = { source: string; page: string; url: string; license: string };
 /** Action sur la console proposée par l'assistant (événement SSE « action ») : exécutée seulement au clic. */

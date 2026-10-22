@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.models import BrokenGame, GameControls, GameText, RemoteFile
 from app.platforms import canonical
 from app.services import cheats
+from app.services.boxart import has_source as has_boxart_source
 from app.services.gameinfo import LINK_DIRS
 from app.services import knowledge as kn
 from app.services.classify import display_title
@@ -288,8 +289,10 @@ def app_help(question: str) -> str:
 
 
 def game_out(f: RemoteFile) -> dict:
+    """Jeu cité par l'assistant, avec de quoi afficher sa jaquette dans la réponse (mêmes adresses que le catalogue)."""
     return {"id": f.id, "title": _game_title(f), "platform": f.platform.label or f.platform.directory,
-            "code": f.platform.directory}
+            "code": f.platform.directory, "image_url": f"/api/games/{f.id}/image" if f.image_relpath else None,
+            "boxart_url": f"/api/games/{f.id}/boxart" if has_boxart_source(f.platform.directory) else None}
 
 
 def console_dirs(s: Session, console: str) -> list[str]:

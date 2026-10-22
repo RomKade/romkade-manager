@@ -2,10 +2,13 @@ import { ChevronDown, ChevronUp, ExternalLink, Gamepad2, Send, Sparkles, Trash2,
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
+import type { Game } from "../api/client";
 import { useDeviceStatus, useLlmSettings, useNowPlaying } from "../api/queries";
+import { useAuth } from "../auth/AuthContext";
 import { getLang, useT } from "../i18n";
 import { type ActionState, askAssistant, assistant, type AssistantGame, type ChatMessage, type ConsoleAction, type Scope, useAssistant } from "../lib/assistant";
 import { AssistantAction } from "./AssistantAction";
+import { Cover } from "./Cover";
 import { DukeAvatar } from "./DukeAvatar";
 
 const MAX_QUESTION = 500;
@@ -63,6 +66,8 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
     ? detected : null;
   const userTurns = messages.filter((m) => m.role === "user").length;
   const gameScope = scope.kind === "game" ? scope.game : null;
+  // Pseudo du compte ROMKADE, pour l'accueil (rien sur un téléphone associé par QR code : pas de session).
+  const account = (useAuth().session?.user.user_metadata as { name?: string } | undefined)?.name?.trim();
 
   const send = async (question: string) => {
     const q = question.trim().slice(0, MAX_QUESTION);
@@ -181,7 +186,10 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
           <p className="assistant__note">{t("assistant.noAi")} <Link to="/parametres/ia" onClick={() => assistant.setOpen(false)}>{t("assistant.connectAi")}</Link></p>
         )}
         {messages.length === 0 && ready && (
-          <p className="assistant__note">{t(gameScope ? "assistant.introGame" : "assistant.introLibrary", { title: gameScope?.title ?? "" })}</p>
+          <p className="assistant__note">
+            {account && <>{t("assistant.hello", { name: account })}{" "}</>}
+            {t(gameScope ? "assistant.introGame" : "assistant.introLibrary", { title: gameScope?.title ?? "" })}
+          </p>
         )}
         <ol className="assistant__messages">
           {messages.map((m, i) => <Message key={i} m={m} game={gameScope} onOpenGame={onOpenGame} onSettle={(st, note) => settle(i, st, note)} />)}
@@ -250,7 +258,11 @@ function Message({ m, game, onOpenGame, onSettle }: {
         <span className="assistant__games">
           {m.games!.map((g) => (
             <button key={g.id} type="button" className="assistant__game" onClick={() => { assistant.setCollapsed(true); onOpenGame?.(g.id); }} disabled={!onOpenGame}>
-              <Gamepad2 size={12} aria-hidden /> {g.title} <em>{g.platform}</em>
+              {g.image_url || g.boxart_url
+                ? <Cover game={{ title: g.title, image_url: g.image_url ?? null, boxart_url: g.boxart_url ?? null,
+                    platform: { directory: g.code ?? "" } as Game["platform"] }} className="assistant__cover" />
+                : <Gamepad2 size={12} aria-hidden />}
+              <span className="assistant__game-text">{g.title} <em>{g.platform}</em></span>
             </button>
           ))}
         </span>
