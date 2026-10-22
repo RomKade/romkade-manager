@@ -329,3 +329,43 @@ def test_mcp_analytics_never_sends_call_content(env, monkeypatch):
     assert calls and calls[0]["properties"]["$mcp_tool_name"] == "search_games"
     assert "Sonic" not in json.dumps(sent, default=str)
     assert not {"$mcp_parameters", "$mcp_response", "$mcp_intent"} & {k for e in sent for k in e.get("properties", {})}
+
+
+def test_account_api_for_the_manager(env):
+    store, _ = env
+
+    async def scenario():
+        port = free_port()
+        base = f"http://127.0.0.1:{port}"
+        server = uvicorn.Server(uvicorn.Config(create_app(store, Relay(), public_url=base, auth=FakeAuth()),
+                                               host="127.0.0.1", port=port, log_level="warning"))
+        task = asyncio.create_task(server.serve())
+        while not server.started:
+            await asyncio.sleep(0.02)
+        try:
+            ok = {"authorization": "Bearer bon-jeton", "origin": "http://127.0.0.1:8765"}
+            async with httpx.AsyncClient(base_url=base) as h:
+                assert (await h.get("/api/me/consoles")).status_code == 401
+                pre = await h.options("/api/me/consoles", headers={"origin": "http://127.0.0.1:5173",
+                                                                   "access-control-request-method": "POST"})
+                assert pre.status_code == 204 and pre.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+                assert (await h.options("/api/me/consoles", headers={"origin": "https://evil.example"})).status_code == 403
+                # Liaison sans code : console déjà rattachée au compte, secret remis pour son agent.
+                r = await h.post("/api/me/consoles", headers=ok, json={"name": "Ma RG", "model": "RG35xxPRO"})
+                assert r.status_code == 201 and r.headers["access-control-allow-origin"] == "http://127.0.0.1:8765"
+                linked = r.json()
+                assert linked["console"]["name"] == "Ma RG" and linked["secret"] and linked["server"] == base
+                assert store.console_for_secret(linked["secret"]).account_id == "sb:u-123"
+                listed = (await h.get("/api/me/consoles", headers=ok)).json()["consoles"]
+                assert [c["name"] for c in listed] == ["Ma RG"]
+                cid = listed[0]["id"]
+                assert (await h.patch(f"/api/me/consoles/{cid}", headers=ok, json={"name": "Salon"})).json()["console"]["name"] == "Salon"
+                other = store.register_console({})[0]
+                assert (await h.delete(f"/api/me/consoles/{other.id}", headers=ok)).status_code == 404  # pas à moi
+                assert (await h.delete(f"/api/me/consoles/{cid}", headers=ok)).json() == {"deleted": cid}
+                assert (await h.delete("/api/me", headers=ok)).status_code == 503  # sans clé d'administration
+        finally:
+            server.should_exit = True
+            await task
+
+    asyncio.run(scenario())

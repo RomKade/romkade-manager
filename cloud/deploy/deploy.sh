@@ -5,6 +5,6 @@ set -e
 cd "$(dirname "$0")/../.."
 DEST=app/romkade-cloud
 rsync -az --delete --exclude .venv --exclude __pycache__ --exclude tests --exclude '*.egg-info' \
-  --exclude .DS_Store --relative backend/pyproject.toml backend/app cloud/server/pyproject.toml \
+  --exclude .DS_Store --exclude '.env*' --relative backend/pyproject.toml backend/app cloud/server/pyproject.toml \
   cloud/server/romkade_cloud cloud/deploy do-deployer:$DEST/
 ssh do-deployer "cd $DEST/cloud/deploy && docker compose up -d --build"

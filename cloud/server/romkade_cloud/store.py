@@ -126,6 +126,20 @@ class Store:
                              (console_id, digest(secret), json.dumps(info), time.time(), time.time()))
         return self.console(console_id), secret
 
+    def register_console_for(self, account_id: str, info: dict, name: str | None = None) -> tuple[Console, str]:
+        """Console déjà rattachée à un compte (liaison depuis le Manager, sans code d'appairage) et son secret."""
+        c, secret = self.register_console(info)
+        with self._lock, self._db:
+            self._db.execute("UPDATE consoles SET account_id = ?, name = ? WHERE id = ?", (account_id, name, c.id))
+        return self.console(c.id), secret
+
+    def delete_account(self, account_id: str) -> int:
+        """Supprime un compte, ses consoles et leurs catalogues. Renvoie le nombre de consoles supprimées."""
+        with self._lock, self._db:
+            n = self._db.execute("DELETE FROM consoles WHERE account_id = ?", (account_id,)).rowcount
+            self._db.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
+        return n
+
     def console_for_secret(self, secret: str) -> Console | None:
         return self._console(self._db.execute("SELECT * FROM consoles WHERE secret_hash = ?",
                                               (digest(secret),)).fetchone())

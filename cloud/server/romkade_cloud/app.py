@@ -9,6 +9,8 @@
     /agent/catalog           l'agent envoie la liste des fichiers de son dossier de ROMs
     /agent/poll, /result     ordres pour la console et leurs résultats (voir relay.py)
     /.well-known/oauth-protected-resource   serveur d'autorisation de ce serveur MCP (Supabase Auth)
+    /api/me/…                API du compte pour ROMKADE Manager (jeton de session Supabase) : consoles reliées,
+                             liaison d'une console sans code, suppression du compte
     /oauth/consent           ancienne adresse de la page de connexion -> https://romkade.com/authentification/
     /icon.png, /romkade-logo.webp, /fonts/…, /consoles/…   logo, polices et illustrations de l'interface
     /art/<clé>.webp          jaquette d'un jeu (libretro-thumbnails, mise en cache)
@@ -46,6 +48,7 @@ from .tools import build
 
 log = logging.getLogger("romkade.cloud")
 STATIC = Path(__file__).parent / "static"
+LOCAL_ORIGIN = re.compile(r"^http://(127\.0\.0\.1|localhost)(:\d+)?$")  # ROMKADE Manager, chez l'utilisateur
 LOGIN_PAGE = "https://romkade.com/authentification/"  # page de connexion ROMKADE (site romkade.com, OAuth Supabase)
 PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp", "romkade-logo.png"}  # .png : e-mails
 MAX_BODY = 8 * 1024 * 1024
@@ -256,6 +259,77 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         query = f"?{request.url.query}" if request.url.query else ""
         return Response(status_code=302, headers={"Location": f"{LOGIN_PAGE}{query}", "Cache-Control": "no-store"})
 
+    # ---------- API du compte (ROMKADE Manager, jeton de session Supabase) ----------
+    supabase_secret = os.environ.get("ROMKADE_SUPABASE_SECRET_KEY", "")
+
+    async def me(request: Request) -> tuple[str, dict] | None:
+        header = request.headers.get("authorization", "")
+        if auth is None or not header.lower().startswith("bearer "):
+            return None
+        claims = await asyncio.to_thread(auth.verify, header[7:].strip())
+        if claims is None:
+            return None
+        return store.ensure_account(account_id(claims), claims.get("email")), claims
+
+    def console_json(c) -> dict:
+        return {"id": c.id, "name": c.label, "model": c.info.get("model"), "firmware": c.info.get("firmware"),
+                "online": relay.online(c.id), "games": store.search([c.id], [], None, 0)[1],
+                "last_seen": relay.last_poll(c.id) or c.last_seen}
+
+    async def my_consoles(request: Request) -> Response:
+        who = await me(request)
+        if who is None:
+            return JSONResponse({"error": "unauthorized"}, 401)
+        account, _ = who
+        if request.method == "POST":  # nouvelle console reliée par le Manager : secret remis à son agent
+            try:
+                body = await body_json(request)
+            except ValueError:
+                return JSONResponse({"error": "bad_request"}, 400)
+            info = {k: body.get(k) for k in AGENT_FIELDS if body.get(k) is not None}
+            name = (str(body.get("name") or "").strip()[:40]) or None
+            c, secret = store.register_console_for(account, info, name)
+            return JSONResponse({"console": console_json(c), "secret": secret, "server": public_url}, 201)
+        return JSONResponse({"consoles": [console_json(c) for c in store.consoles_of(account)]})
+
+    async def my_console(request: Request) -> Response:
+        who = await me(request)
+        if who is None:
+            return JSONResponse({"error": "unauthorized"}, 401)
+        account, _ = who
+        c = store.console(request.path_params["console_id"])
+        if c is None or c.account_id != account:
+            return JSONResponse({"error": "not_found"}, 404)
+        if request.method == "DELETE":
+            store.unpair(c.id)
+            return JSONResponse({"deleted": c.id})
+        try:
+            body = await body_json(request)
+        except ValueError:
+            return JSONResponse({"error": "bad_request"}, 400)
+        if body.get("name"):
+            store.rename(c.id, str(body["name"]).strip()[:40])
+        return JSONResponse({"console": console_json(store.console(c.id))})
+
+    async def delete_me(request: Request) -> Response:
+        """Suppression du compte : données ROMKADE Cloud, puis l'utilisateur Supabase (clé d'administration)."""
+        who = await me(request)
+        if who is None:
+            return JSONResponse({"error": "unauthorized"}, 401)
+        account, claims = who
+        if not supabase_secret:
+            return JSONResponse({"error": "unavailable"}, 503)
+        import httpx
+        async with httpx.AsyncClient(timeout=20) as http:
+            r = await http.delete(f"{auth.url}/auth/v1/admin/users/{claims['sub']}",
+                                  headers={"apikey": supabase_secret, "Authorization": f"Bearer {supabase_secret}"})
+        if r.status_code not in (200, 204, 404):
+            log.warning("suppression Supabase refusée : %s", r.status_code)
+            return JSONResponse({"error": "delete_failed"}, 502)
+        consoles = store.delete_account(account)
+        log.info("compte supprimé (%s console(s))", consoles)
+        return JSONResponse({"deleted": True, "consoles": consoles})
+
     async def home(_: Request) -> Response:
         return Response(status_code=302, headers={"Location": "https://romkade.com"})
 
@@ -270,6 +344,9 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
         Route("/.well-known/oauth-authorization-server", authorization_server),
         Route("/oauth/consent", consent),
+        Route("/api/me/consoles", my_consoles, methods=["GET", "POST"]),
+        Route("/api/me/consoles/{console_id}", my_console, methods=["PATCH", "DELETE"]),
+        Route("/api/me", delete_me, methods=["DELETE"]),
         Route("/", home),
         Mount("/fonts", StaticFiles(directory=STATIC / "fonts")),
         Mount("/consoles", StaticFiles(directory=STATIC / "consoles")),
@@ -304,6 +381,25 @@ class CrossOrigin:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["path"].startswith(("/mcp", "/agent")):
             await self.app(scope, receive, send)
+            return
+        if scope["path"].startswith("/api/"):  # API du compte, appelée par ROMKADE Manager (navigateur, en local)
+            headers = dict(scope.get("headers") or [])
+            origin = headers.get(b"origin", b"").decode("latin-1")
+            allowed = bool(LOCAL_ORIGIN.match(origin))
+            if scope["method"] == "OPTIONS":
+                await Response(status_code=204 if allowed else 403, headers={
+                    "access-control-allow-origin": origin, "access-control-allow-methods": "GET, POST, PATCH, DELETE",
+                    "access-control-allow-headers": "authorization, content-type", "access-control-max-age": "600",
+                    "vary": "Origin"} if allowed else {})(scope, receive, send)
+                return
+
+            async def send_api(message):
+                if message["type"] == "http.response.start" and allowed:
+                    message.setdefault("headers", []).extend([(b"access-control-allow-origin", origin.encode()),
+                                                              (b"vary", b"Origin")])
+                await send(message)
+
+            await self.app(scope, receive, send_api)
             return
         if scope["method"] == "OPTIONS":  # pré-vol du fetch de secours de l'interface (en-tête ngrok)
             await Response(status_code=204, headers={
