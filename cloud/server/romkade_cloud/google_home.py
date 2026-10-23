@@ -249,6 +249,9 @@ class GoogleHome:
         for item in body.get("inputs", []):
             intent = item.get("intent")
             payload = item.get("payload") or {}
+            cmds = [ex.get("command", "").rsplit(".", 1)[-1] + str(ex.get("params") or {})
+                    for cmd in payload.get("commands", []) for ex in cmd.get("execution", [])]
+            log.warning("Google Home %s %s", (intent or "").rsplit(".", 1)[-1], " ".join(cmds))
             if intent == "action.devices.SYNC":
                 return JSONResponse({"requestId": request_id, "payload": {
                     "agentUserId": account, "devices": [self.device(c) for c in mine.values()]}})
