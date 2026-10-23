@@ -4,6 +4,8 @@ Intégration « cloud-to-cloud » de Google Home (developers.home.google.com/clo
 au compte ROMKADE devient un appareil de type console de jeux (GAME_CONSOLE) dans l'app Google Home. Ses jeux sont
 les « applications » de l'appareil (trait AppSelector) : les favoris d'abord, puis complétés ; un nom prononcé qui
 n'est pas dans la liste est cherché dans tout le catalogue. On/Off et Stop quittent le jeu, Volume règle le son.
+Google ne comprend « ouvre <app> sur <appareil> » qu'en anglais : chaque favori est donc aussi une scène (« Hey Google,
+active Zelda »), comprise dans toutes les langues ; l'activer lance le jeu sur sa console.
 Les ordres passent par le même relais que ChatGPT et Claude (relay.py) jusqu'à l'app ROMKADE de la console.
 
 Connexion du compte (« account linking » OAuth de Google) : Google ne fait pas de PKCE, que Supabase exige. Le
@@ -39,6 +41,8 @@ GOOGLE_REDIRECTS = ("https://oauth-redirect.googleusercontent.com/r/",
                     "https://oauth-redirect-sandbox.googleusercontent.com/r/")
 CODE_TTL = 600            # secondes : connexion en cours, puis code rendu à Google
 MAX_APPS = 120            # jeux déclarés par console (favoris d'abord)
+MAX_SCENES = 40           # favoris déclarés aussi comme scènes (« Hey Google, active Zelda », en français)
+SCENE_SEP = ":g"          # identifiant d'une scène : <console>:g<jeu>
 TRAITS = ["action.devices.traits.AppSelector", "action.devices.traits.MediaState", "action.devices.traits.OnOff",
           "action.devices.traits.TransportControl", "action.devices.traits.Volume"]
 LANGS = ("fr", "en", "es", "de", "it")
@@ -184,6 +188,33 @@ class GoogleHome:
                            "volumeMaxLevel": 100, "volumeCanMuteAndUnmute": True, "levelStepSize": 10},
         }
 
+    def scenes(self, c: Console) -> list[dict]:
+        """Favoris de la console en scènes Google Home. Un surnom partagé par deux jeux (« Zelda ») est retiré des
+        deux : Google ne saurait pas lequel lancer."""
+        rows, _ = self.store.favorites(c.id, MAX_SCENES)
+        names = {r["id"]: synonyms(r["title"]) for r in rows}
+        count: dict[str, int] = {}
+        for ns in names.values():
+            for n in {n.lower() for n in ns}:
+                count[n] = count.get(n, 0) + 1
+        out = []
+        for r in rows:
+            ns = names[r["id"]]
+            unique = [n for n in ns if count[n.lower()] == 1] or ns[:1]
+            out.append({"id": f"{c.id}{SCENE_SEP}{r['id']}", "type": "action.devices.types.SCENE",
+                        "traits": ["action.devices.traits.Scene"],
+                        "name": {"name": unique[-1], "defaultNames": [ns[0]], "nicknames": unique},
+                        "willReportState": False, "attributes": {"sceneReversible": False},
+                        "deviceInfo": {"manufacturer": "ROMKADE", "model": "jeu"}})
+        return out
+
+    def _scene(self, mine: dict, device_id: str):
+        """(console, jeu) d'une scène de ce compte, sinon (None, None)."""
+        console_id, sep, game = (device_id or "").rpartition(SCENE_SEP)
+        c = mine.get(console_id) if sep and game.isdigit() else None
+        row = self.store.game(int(game), c.account_id) if c else None
+        return (c, row) if row is not None and row["console_id"] == c.id else (None, None)
+
     def _game(self, c: Console, params: dict):
         key = str(params.get("newApplication") or "")
         if key.startswith("g") and key[1:].isdigit():
@@ -256,13 +287,16 @@ class GoogleHome:
             log.warning("Google Home %s %s", (intent or "").rsplit(".", 1)[-1], " ".join(cmds))
             if intent == "action.devices.SYNC":
                 return JSONResponse({"requestId": request_id, "payload": {
-                    "agentUserId": account, "devices": [self.device(c) for c in mine.values()]}})
+                    "agentUserId": account,
+                    "devices": [*(self.device(c) for c in mine.values()), *(sc for c in mine.values() for sc in self.scenes(c))]}})
             if intent == "action.devices.QUERY":
                 devices = {}
                 for d in payload.get("devices", []):
                     c = mine.get(d.get("id"))
                     if c is None:
-                        devices[d.get("id")] = {"status": "ERROR", "errorCode": "deviceNotFound"}
+                        sc, _ = self._scene(mine, d.get("id"))
+                        devices[d.get("id")] = ({"status": "SUCCESS", "online": True} if sc else
+                                                {"status": "ERROR", "errorCode": "deviceNotFound"})
                         continue
                     online = self.relay.online(c.id)
                     devices[c.id] = {"status": "SUCCESS", "online": online, "on": online, "isMuted": False,
@@ -273,6 +307,15 @@ class GoogleHome:
                 for cmd in payload.get("commands", []):
                     for d in cmd.get("devices", []):
                         c = mine.get(d.get("id"))
+                        if c is None:  # scène d'un favori : on lance ce jeu sur sa console
+                            sc, row = self._scene(mine, d.get("id"))
+                            if sc is not None:
+                                for ex in cmd.get("execution", []):
+                                    r = await self.execute(sc, "action.devices.commands.appSelect",
+                                                           {"newApplication": f"g{row['id']}"})
+                                    results.append({"ids": [d.get("id")], **{k: v for k, v in r.items() if k != "states"},
+                                                    **({"states": {"online": True}} if r["status"] == "SUCCESS" else {})})
+                                continue
                         for ex in cmd.get("execution", []):
                             r = (await self.execute(c, ex.get("command", ""), ex.get("params") or {}) if c
                                  else {"status": "ERROR", "errorCode": "deviceNotFound"})

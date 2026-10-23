@@ -159,3 +159,33 @@ async def _test_sync_query_execute(env):
         env["relay"].up = False
         off = (await h.post("/google/fulfillment", headers=auth, json=execute("appSelect", {"newApplication": zelda["key"]}))).json()
         assert off["payload"]["commands"][0]["errorCode"] == "deviceOffline"
+
+
+def test_favorites_are_french_friendly_scenes(env):
+    asyncio.run(_test_favorites_are_french_friendly_scenes(env))
+
+
+async def _test_favorites_are_french_friendly_scenes(env):
+    c, auth = env["console"], {"authorization": "Bearer sb-access"}
+    env["store"].replace_favorites(c.id, [["NES", "Legend of Zelda, The (USA).nes"]])
+    async with client(env["app"]) as h:
+        sync = (await h.post("/google/fulfillment", headers=auth, json={
+            "requestId": "1", "inputs": [{"intent": "action.devices.SYNC"}]})).json()
+        scene = next(d for d in sync["payload"]["devices"] if d["type"] == "action.devices.types.SCENE")
+        assert scene["name"]["name"] == "Zelda" and "The Legend of Zelda" in scene["name"]["nicknames"]
+        assert scene["traits"] == ["action.devices.traits.Scene"] and scene["id"].startswith(c.id)
+
+        query = (await h.post("/google/fulfillment", headers=auth, json={"requestId": "2", "inputs": [
+            {"intent": "action.devices.QUERY", "payload": {"devices": [{"id": scene["id"]}]}}]})).json()
+        assert query["payload"]["devices"][scene["id"]]["online"] is True
+
+        r = (await h.post("/google/fulfillment", headers=auth, json={"requestId": "3", "inputs": [
+            {"intent": "action.devices.EXECUTE", "payload": {"commands": [{"devices": [{"id": scene["id"]}], "execution": [
+                {"command": "action.devices.commands.ActivateScene", "params": {"deactivate": False}}]}]}}]})).json()
+        assert r["payload"]["commands"][0]["status"] == "SUCCESS"
+        assert env["relay"].calls[-1][0] == "launch" and env["relay"].calls[-1][1]["platform_dir"] == "NES"
+        # Scène d'un autre compte ou inconnue : refusée.
+        r = (await h.post("/google/fulfillment", headers=auth, json={"requestId": "4", "inputs": [
+            {"intent": "action.devices.EXECUTE", "payload": {"commands": [{"devices": [{"id": "autre:g1"}], "execution": [
+                {"command": "action.devices.commands.ActivateScene", "params": {}}]}]}}]})).json()
+        assert r["payload"]["commands"][0]["errorCode"] == "deviceNotFound"
