@@ -416,8 +416,18 @@ function ConnectedApps() {
                 <strong>{g.client.name || g.client.id}</strong>
                 <span className="muted small">{t("account.apps.since", { date: date(g.granted_at) })}</span>
               </span>
-              <button className="button button--ghost" disabled={a.busy} onClick={() => a.run(async () => {
-                const { error } = await supabase.auth.oauth.revokeGrant({ clientId: g.client.id }); fail(error); await load(); })}>
+              <button className="button button--ghost" disabled={a.busy} onClick={() => {
+                const name = g.client.name || g.client.id;
+                if (!window.confirm(t("account.apps.revokeConfirm", { name }))) return;
+                a.run(async () => {
+                  const { error } = await supabase.auth.oauth.revokeGrant({ clientId: g.client.id }); fail(error);
+                  // Relu après coup : le message ne dit « retiré » que si l'assistant a bien disparu de la liste.
+                  const { data } = await supabase.auth.oauth.listGrants();
+                  setGrants(data ?? []);
+                  if ((data ?? []).some((x) => x.client.id === g.client.id)) throw new Error(t("account.apps.revokeFailed", { name }));
+                  return t("account.apps.revoked", { name });
+                });
+              }}>
                 {t("account.apps.revoke")}
               </button>
             </li>
