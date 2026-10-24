@@ -354,7 +354,7 @@ function Consoles() {
           {here && agent && (
             <p className="field__hint">
               {t("account.linked.update", { version: agent.version ?? t("account.linked.old") })}{" "}
-              {agent.version !== agent.latest && <strong className="account__new">{t("account.linked.available", { version: agent.latest })} </strong>}
+              {agent.update && <strong className="account__new">{t("account.linked.available", { version: agent.latest })} </strong>}
               <button className="auth__link" disabled={a.busy} onClick={() => a.run(async () => {
                 const r = await localAgent.link(); await load();
                 return t(r.splash ? "account.linked.updatedLook" : "account.linked.updated"); })}>

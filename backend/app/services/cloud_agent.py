@@ -16,10 +16,12 @@ Seul le firmware Anbernic + Stock OS Mod est pris en charge (Python 3, menu APPS
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import shlex
+import time
 from pathlib import Path
 
 import httpx
@@ -53,6 +55,24 @@ def manager_version() -> str:
         return "dev"
 
 
+UPDATE_EVERY = 3600  # secondes : vérification de la version de l'app au plus une fois par heure et par console
+_updates: dict[str, float] = {}  # dernière vérification, par console (hôte)
+_build: str | None = None
+
+
+def build_id() -> str:
+    """Empreinte des fichiers de l'app que ce Manager installe : change à chaque modification de l'app, même sans
+    nouveau numéro de version. Écrite sur la console (BUILD) : une autre empreinte = mise à jour à faire."""
+    global _build
+    if _build is None:
+        files = bundle("/mnt/mmc/Roms", with_build=False)
+        h = hashlib.sha256()
+        for path in sorted(files):
+            h.update(path.encode() + b"\0" + files[path][0] + b"\0")
+        _build = h.hexdigest()[:12]
+    return _build
+
+
 def agent_source() -> Path:
     """Dossier de l'agent : ROMKADE_AGENT_DIR (image Docker), sinon cloud/agent du dépôt."""
     path = Path(os.environ.get("ROMKADE_AGENT_DIR") or REPO / "cloud" / "agent")
@@ -61,7 +81,7 @@ def agent_source() -> Path:
     return path
 
 
-def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
+def bundle(roms_root: str, with_build: bool = True) -> dict[str, tuple[bytes, int]]:
     """{chemin sur la console: (contenu, droits)} de l'agent, de son écran et de l'app du menu APPS."""
     src = agent_source()
     base = roms_root.rstrip("/").rsplit("/", 1)[0] + "/romkade"
@@ -85,6 +105,8 @@ def bundle(roms_root: str) -> dict[str, tuple[bytes, int]]:
         if path.is_file():
             files[f"{base}/{legal}"] = (path.read_bytes(), 0o644)
     files[f"{base}/VERSION"] = (manager_version().encode() + b"\n", 0o644)
+    if with_build:
+        files[f"{base}/BUILD"] = (build_id().encode() + b"\n", 0o644)
     apps = roms_root.rstrip("/") + "/APPS"
     files[f"{apps}/{APP_NAME}.sh"] = ((src / "RomKade.sh").read_bytes(), 0o755)
     files[f"{apps}/Imgs/{APP_NAME}.png"] = ((src / "assets" / "apps-icon.png").read_bytes(), 0o644)
@@ -95,13 +117,55 @@ def agent_dir(roms_root: str) -> str:
     return roms_root.rstrip("/").rsplit("/", 1)[0] + "/romkade"
 
 
+async def _read_text(sftp, path: str) -> str | None:
+    try:
+        async with sftp.open(path, "rb") as f:
+            return (await f.read()).decode().strip() or None
+    except Exception:  # noqa: BLE001 — fichier absent : app plus ancienne
+        return None
+
+
 async def read_version(sftp, roms_root: str) -> str | None:
     """Version de l'app ROMKADE installée sur la console (None avant que le Manager l'écrive)."""
+    return await _read_text(sftp, f"{agent_dir(roms_root)}/VERSION")
+
+
+async def read_build(sftp, roms_root: str) -> str | None:
+    """Empreinte de l'app installée sur la console (voir build_id)."""
+    return await _read_text(sftp, f"{agent_dir(roms_root)}/BUILD")
+
+
+def update_later(state, client) -> None:
+    """Console connectée au Manager : son app ROMKADE est mise à jour en tâche de fond si ce Manager en a une autre
+    version (au plus une vérification par heure). Rien si l'app n'est pas installée (console pas reliée)."""
+    host = client.settings.host
+    if time.time() - _updates.get(host, 0) < UPDATE_EVERY:
+        return
+    _updates[host] = time.time()
+    task = asyncio.get_running_loop().create_task(_auto_update(state, client))
+    _pushes.add(task)
+    task.add_done_callback(_pushes.discard)
+
+
+async def _auto_update(state, client) -> bool:
     try:
-        async with sftp.open(f"{agent_dir(roms_root)}/VERSION", "rb") as f:
-            return (await f.read()).decode().strip() or None
-    except Exception:  # noqa: BLE001
-        return None
+        profile = await state.system.ensure()
+        if profile.id not in SUPPORTED:
+            return False
+        roms_root = client.settings.roms_root
+        async with state.pool.session(client) as (_conn, sftp):
+            config = await read_agent(sftp, roms_root)
+            if not (config and config.get("secret") and config.get("server")):
+                return False
+            if await read_build(sftp, roms_root) == build_id():
+                return False
+            await install(state.device_runner, client, sftp, roms_root, config["server"], config["secret"],
+                          splash="updated")
+        log.info("app ROMKADE de la console mise à jour (%s)", build_id())
+        return True
+    except Exception as exc:  # noqa: BLE001 — console occupée, en veille… : réessayé dans une heure
+        log.warning("mise à jour de l'app ROMKADE impossible : %s", exc)
+        return False
 
 
 async def read_agent(sftp, roms_root: str) -> dict | None:

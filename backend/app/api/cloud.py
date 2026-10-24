@@ -39,9 +39,11 @@ async def agent_status(request: Request) -> dict:
     async with request.app.state.pool.session(client) as (_conn, sftp):
         config = await cloud_agent.read_agent(sftp, client.settings.roms_root)
         version = await cloud_agent.read_version(sftp, client.settings.roms_root) if config else None
+        build = await cloud_agent.read_build(sftp, client.settings.roms_root) if config else None
     return {"supported": profile.id in cloud_agent.SUPPORTED, "installed": bool(config and config.get("secret")),
             "server": (config or {}).get("server"), "cloud": cloud_agent.CLOUD_URL,
-            "version": version, "latest": cloud_agent.manager_version()}
+            "version": version, "latest": cloud_agent.manager_version(),
+            "update": bool(config) and build != cloud_agent.build_id()}
 
 
 @router.post("/link")
