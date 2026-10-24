@@ -40,10 +40,10 @@ log = logging.getLogger(__name__)
 GOOGLE_REDIRECTS = ("https://oauth-redirect.googleusercontent.com/r/",
                     "https://oauth-redirect-sandbox.googleusercontent.com/r/")
 CODE_TTL = 600            # secondes : connexion en cours, puis code rendu à Google
-MAX_APPS = 120            # jeux déclarés par console (favoris d'abord)
+MAX_APPS = 1500           # titres déclarés par console (favoris d'abord, un seul par titre)
 TRAITS = ["action.devices.traits.AppSelector", "action.devices.traits.MediaState", "action.devices.traits.OnOff",
           "action.devices.traits.TransportControl", "action.devices.traits.Volume"]
-LANGS = ("fr", "en", "es", "de", "it")
+LANGS = ("fr", "en")      # langues des noms déclarés (les titres de jeux ne se traduisent pas)
 
 
 def _b64(data: bytes) -> str:
@@ -163,13 +163,20 @@ class GoogleHome:
 
     # ---------- appareils et commandes ----------
     def apps(self, c: Console) -> list[dict]:
-        rows, _ = self.store.favorites(c.id, MAX_APPS)
-        if len(rows) < MAX_APPS:
-            more, _ = self.store.search([c.id], [], None, MAX_APPS)
-            seen = {r["id"] for r in rows}
-            rows = [*rows, *[r for r in more if r["id"] not in seen]][:MAX_APPS]
-        return [{"key": f"g{r['id']}", "names": [{"lang": lang, "name_synonym": synonyms(r["title"])} for lang in LANGS]}
-                for r in rows]
+        """Jeux déclarés à Google : favoris d'abord, puis la bibliothèque par ordre alphabétique, un seul par titre
+        (« 1942 » en quatre versions : une entrée). Google ne lance que ce qu'il reconnaît dans cette liste."""
+        favorites, _ = self.store.favorites(c.id, MAX_APPS)
+        library, _ = self.store.search([c.id], [], None, 100_000)
+        out, seen = [], set()
+        for r in [*favorites, *sorted(library, key=lambda r: r["title"].lower())]:
+            key = normalize_title(r["title"])
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append({"key": f"g{r['id']}", "names": [{"lang": lang, "name_synonym": synonyms(r["title"])} for lang in LANGS]})
+            if len(out) >= MAX_APPS:
+                break
+        return out
 
     def device(self, c: Console) -> dict:
         info = c.info
