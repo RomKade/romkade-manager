@@ -161,6 +161,12 @@ class Store:
         rows = self._db.execute("SELECT * FROM consoles WHERE account_id = ? ORDER BY created", (account_id,))
         return [self._console(r) for r in rows]
 
+    def demo_consoles(self) -> list[Console]:
+        """Consoles simulées par le serveur (demo.py), rattachées à un compte."""
+        rows = self._db.execute("SELECT * FROM consoles WHERE json_extract(info, '$.demo') = 1 "
+                                "AND account_id IS NOT NULL")
+        return [self._console(r) for r in rows]
+
     def update_info(self, console_id: str, info: dict) -> None:
         with self._lock, self._db:
             self._db.execute("UPDATE consoles SET info = ?, last_seen = ? WHERE id = ?",

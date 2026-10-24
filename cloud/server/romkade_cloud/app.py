@@ -40,7 +40,7 @@ from starlette.staticfiles import StaticFiles
 
 from app.services import cheats as cheat_db
 
-from . import catalog
+from . import catalog, demo
 from .analytics import Analytics
 from .art import Art
 from .auth import SupabaseAuth, account_id
@@ -389,10 +389,12 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         await asyncio.to_thread(rebuild_catalogs, store)
         if cheat_db.index() is None and os.environ.get("ROMKADE_FETCH_CHEATS", "1") == "1":
             asyncio.get_running_loop().create_task(_fetch_cheats())
+        demos = asyncio.get_running_loop().create_task(demo.run_all(store, relay))  # consoles de démo (demo.py)
         try:
             async with inner_lifespan(a) as state:
                 yield state
         finally:
+            demos.cancel()
             await analytics.close()
 
     app.router.lifespan_context = lifespan

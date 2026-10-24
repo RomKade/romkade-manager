@@ -453,3 +453,42 @@ def test_favorites_and_saves(env):
             await task
 
     asyncio.run(scenario())
+
+
+def test_demo_console(env):
+    """Console de démonstration (relecteurs des annuaires) : simulée par le serveur, toujours en ligne."""
+    from romkade_cloud import demo
+
+    store, token = env
+    account = store.account_for_token(token)
+    demo.setup(store, account)
+    demo.setup(store, account)  # rejouable : toujours une seule console de démo
+
+    async def scenario():
+        base, server, task = await serving(store, Relay())
+        try:
+            async with Client(f"{base}/{token}") as mcp:
+                for _ in range(50):  # run_all démarre avec le serveur
+                    consoles = data(await mcp.call_tool("list_consoles", {}))["consoles"]
+                    if consoles[0]["online"]:
+                        break
+                    await asyncio.sleep(0.05)
+                assert len(consoles) == 1 and consoles[0]["online"] and consoles[0]["games"] == len(demo.GAMES)
+                games = data(await mcp.call_tool("search_games", {"query": "anguna"}))["games"]
+                anguna = games[0]["game_id"]
+                sheet = data(await mcp.call_tool("game_details", {"game_id": anguna}))
+                assert sheet["game"]["developer"] == "Nathan Tolbert" and sheet["game"]["favorite"]
+                assert sheet["saves"]["checked"] and sheet["saves"]["in_game_save"] and sheet["saves"]["save_states"]
+                assert error_code(await mcp.call_tool("save_state", {})) == "no_retroarch_game"
+                data(await mcp.call_tool("launch_game", {"game_id": anguna}))
+                now = data(await mcp.call_tool("console_status", {}))
+                assert now["playing"] and now["game"]["title"] == "Anguna"
+                assert data(await mcp.call_tool("save_state", {}))["saved"]
+                assert data(await mcp.call_tool("set_volume", {"percent": 25}))["volume"]["percent"] == 25
+                assert data(await mcp.call_tool("quit_game", {}))["result"] == "quit"
+                assert data(await mcp.call_tool("favorite_games", {}))["total"] == 2
+        finally:
+            server.should_exit = True
+            await task
+
+    asyncio.run(scenario())
