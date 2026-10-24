@@ -310,6 +310,48 @@ const GENRE = {
   en: { action: "Action", aventure: "Adventure", beat: "Beat 'em up", combat: "Fighting", course: "Racing", plateforme: "Platformer", rpg: "Role-playing", shmup: "Shoot 'em up", tir: "Shooter", sport: "Sports", reflexion: "Puzzle", labyrinthe: "Maze", strategie: "Strategy", simulation: "Simulation", flipper: "Pinball", societe: "Board and casino", quiz: "Quiz", musique: "Music and rhythm", educatif: "Educational", compilation: "Compilation", autre: "Other" },
   es: { action: "Acción", aventure: "Aventura", beat: "Beat 'em up", combat: "Lucha", course: "Carreras", plateforme: "Plataformas", rpg: "Rol", shmup: "Shoot 'em up", tir: "Disparos", sport: "Deportes", reflexion: "Puzle", labyrinthe: "Laberinto", strategie: "Estrategia", simulation: "Simulación", flipper: "Pinball", societe: "Mesa y casino", quiz: "Preguntas", musique: "Música y ritmo", educatif: "Educativo", compilation: "Recopilación", autre: "Otros" },
 };
+/* Erreurs des outils : le serveur les écrit en anglais avec un code (structuredContent.error), traduit ici. */
+const ERRORS = {
+  fr: { no_account: "Compte ROMKADE introuvable : reconnecte-toi à ROMKADE.",
+    unknown_platform: (e) => `Console « ${e.name} » inconnue. Exemples : Super Nintendo, Mega Drive, Game Boy Advance, PlayStation, Arcade.`,
+    unknown_genre: (e) => `Genre « ${e.name} » inconnu.`,
+    no_console: "Aucune console appairée. Sur la console, ouvre l'app ROMKADE (menu APPS) : elle affiche un code à 6 caractères à donner ici.",
+    several_consoles: (e) => `Plusieurs consoles : précise laquelle (${(e.consoles || []).join(", ")}).`,
+    unknown_console: (e) => `Console « ${e.name} » introuvable. Consoles : ${(e.consoles || []).join(", ")}`,
+    console_asleep: (e) => `La console ${e.console} ne répond pas : elle est sans doute éteinte ou en veille (le Wi-Fi se coupe en veille). Réveille-la, puis réessaie.`,
+    console_timeout: (e) => `La console ${e.console} n'a pas répondu à temps. Elle s'est peut-être mise en veille : réessaie dans un instant.`,
+    too_many_codes: "Trop d'essais de code : réessaie dans une heure.",
+    console_limit: "Une seule console par compte pour l'instant : retire l'autre dans le Manager (Mon compte > Console) avant d'en relier une nouvelle.",
+    bad_code: "Code inconnu ou expiré. Ouvre de nouveau l'app ROMKADE sur la console pour avoir un code à jour (valable 15 minutes).",
+    unknown_game: "Jeu introuvable dans la bibliothèque.",
+    volume_missing: "Indique un volume (0 à 100) ou coupe le son.", volume_range: "Le volume va de 0 à 100 %.",
+    not_on_card: "Ce jeu n'est plus sur la carte de la console.", no_retroarch_game: "Aucun jeu RetroArch en cours sur la console.",
+    save_state_unsupported: "Sauvegarde à distance impossible sur ce firmware : utilise le raccourci de la console.",
+    bad_path: "Jeu invalide.", device_command_timeout: "La console n'a pas répondu à temps.",
+    unknown_action: "L'app ROMKADE de la console est trop ancienne pour ça : mets-la à jour depuis ROMKADE Manager." },
+  es: { no_account: "Cuenta ROMKADE no encontrada: vuelve a conectarte a ROMKADE.",
+    unknown_platform: (e) => `Consola «${e.name}» desconocida. Ejemplos: Super Nintendo, Mega Drive, Game Boy Advance, PlayStation, Arcade.`,
+    unknown_genre: (e) => `Género «${e.name}» desconocido.`,
+    no_console: "Ninguna consola vinculada. En la consola, abre la app ROMKADE (menú APPS): muestra un código de 6 caracteres para darlo aquí.",
+    several_consoles: (e) => `Varias consolas: indica cuál (${(e.consoles || []).join(", ")}).`,
+    unknown_console: (e) => `Consola «${e.name}» no encontrada. Consolas: ${(e.consoles || []).join(", ")}`,
+    console_asleep: (e) => `La consola ${e.console} no responde: seguramente está apagada o en reposo (el Wi-Fi se corta en reposo). Despiértala y vuelve a intentarlo.`,
+    console_timeout: (e) => `La consola ${e.console} no respondió a tiempo. Quizá entró en reposo: vuelve a intentarlo en un momento.`,
+    too_many_codes: "Demasiados códigos erróneos: vuelve a intentarlo dentro de una hora.",
+    console_limit: "Una sola consola por cuenta por ahora: quita la otra en el Manager (Mi cuenta > Consola) antes de vincular una nueva.",
+    bad_code: "Código desconocido o caducado. Vuelve a abrir la app ROMKADE en la consola para obtener un código nuevo (válido 15 minutos).",
+    unknown_game: "Juego no encontrado en la biblioteca.",
+    volume_missing: "Indica un volumen (0 a 100) o silencia el sonido.", volume_range: "El volumen va de 0 a 100 %.",
+    not_on_card: "Este juego ya no está en la tarjeta de la consola.", no_retroarch_game: "Ningún juego RetroArch en curso en la consola.",
+    save_state_unsupported: "No se puede guardar a distancia con este firmware: usa el atajo de la consola.",
+    bad_path: "Juego no válido.", device_command_timeout: "La consola no respondió a tiempo.",
+    unknown_action: "La app ROMKADE de la consola es demasiado antigua para esto: actualízala desde ROMKADE Manager." },
+};
+function errorText(r) {
+  const e = r?.structuredContent || {}, table = ERRORS[lang];
+  const v = table && (table[e.error === "console_failed" ? e.reason : e.error]);
+  return (typeof v === "function" ? v(e) : v) || textOf(r);
+}
 let lang = "fr";
 const t = (k, ...a) => { const v = (TEXT[lang] || TEXT.fr)[k]; return typeof v === "function" ? v(...a) : v; };
 const genreName = (g) => g ? ((GENRE[lang] || GENRE.fr)[g] || g) : "";
@@ -375,7 +417,7 @@ async function callTool(name, args) {
   let result;
   if (window.openai?.callTool && !bridged) result = await window.openai.callTool(name, args);
   else result = await request("tools/call", { name, arguments: args });
-  if (result?.isError) throw new Error(textOf(result) || t("error"));
+  if (result?.isError) throw new Error(errorText(result) || t("error"));
   return result?.structuredContent || parseText(result);
 }
 function textOf(r) { return (r?.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").replace(/^Error executing tool \w+: /, ""); }
@@ -396,7 +438,7 @@ let bridged = false;
 function receive(result) {
   if (!result) return;
   const r = result.result && !result.content ? result.result : result;  // enveloppe éventuelle de l'hôte
-  if (r.isError) { render(errorView(textOf(r))); return; }
+  if (r.isError) { render(errorView(errorText(r))); return; }
   const data = r.structuredContent || parseText(r);
   if (data && typeof data === "object") show(data, false);
 }

@@ -40,8 +40,12 @@ ROMKADE_PUBLIC_URL=https://… .venv/bin/python -m romkade_cloud new-account "Mo
 ROMKADE_PUBLIC_URL=https://… .venv/bin/python -m romkade_cloud serve --port 8787
 ```
 
-Prototype : le jeton dans l'adresse (`https://mcp.romkade.com/<jeton>`) tient lieu de connexion. À remplacer par OAuth (comptes
-ROMKADE) avant toute ouverture au public : c'est aussi ce qu'exigent les annuaires d'apps ChatGPT et Claude.
+Sans `ROMKADE_SUPABASE_URL` (essais en local), le jeton dans l'adresse (`/<jeton>`, `new-account`) tient lieu de
+connexion. Avec Supabase (production), seule la connexion OAuth est acceptée, comme l'exigent les annuaires d'apps
+ChatGPT et Claude ; `ROMKADE_TOKEN_URLS=1` rouvre les adresses à jeton en cas de besoin.
+
+Erreurs des outils : message en anglais (relu par les annuaires, reformulé par l'assistant dans la langue de
+l'utilisateur) et code dans `structuredContent.error`, que l'interface traduit en français et en espagnol.
 
 ## Agent (`agent/`)
 
@@ -73,12 +77,12 @@ fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, s
 - `deploy/supabase_setup.py` : configuration rejouable de Supabase Auth par l'API de gestion (OAuth, Mailjet,
   codes à 6 chiffres, règles de mot de passe, e-mails ROMKADE en français, anglais et espagnol). Secrets dans
   `deploy/.env` (jamais commité).
-- Connecteur : `https://mcp.romkade.com`, authentification **OAuth**. L'adresse à jeton (`/<jeton>`) reste
-  acceptée le temps de la bascule ; `python -m romkade_cloud move-consoles <ancien> sb:<id>` y transfère les consoles.
+- Connecteur : `https://mcp.romkade.com`, authentification **OAuth**. Les adresses à jeton (`/<jeton>`) sont
+  coupées ; `python -m romkade_cloud move-consoles <ancien> sb:<id>` transfère les consoles d'un ancien compte.
 
 ## Déploiement (droplet)
 
-En ligne sur **https://mcp.romkade.com** (connecteur : `https://mcp.romkade.com/<jeton>`). DNS : entrée A
+En ligne sur **https://mcp.romkade.com** (connecteur : `https://mcp.romkade.com`, OAuth). DNS : entrée A
 `mcp` de la zone romkade.com (OVH) vers la droplet ; le site romkade.com reste sur l'hébergement OVH.
 
 - `deploy/Dockerfile`, `deploy/compose.yaml` : conteneur `romkade-cloud`, sans port publié, sur le réseau

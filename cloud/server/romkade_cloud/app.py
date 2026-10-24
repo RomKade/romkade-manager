@@ -3,8 +3,8 @@
     /                        MCP (Streamable HTTP) avec OAuth : jeton d'accès Supabase (comptes ROMKADE) ; sans
                              jeton, 401 et adresse des métadonnées (RFC 9728) pour que ChatGPT, Claude… connectent
                              l'utilisateur
-    /<jeton du compte>       MCP avec le jeton dans l'adresse (comptes du prototype, le temps de la bascule) ;
-                             la V1 passera à OAuth (comptes ROMKADE), exigé par les annuaires d'apps.
+    /<jeton du compte>       MCP avec le jeton dans l'adresse (comptes du prototype) : seulement sans OAuth (tests,
+                             essais en local) ou avec ROMKADE_TOKEN_URLS=1 ; coupé en production (annuaires d'apps).
     /agent/hello             l'agent se présente (et reçoit son secret et un code d'appairage la première fois)
     /agent/catalog           l'agent envoie la liste des fichiers de son dossier de ROMs
     /agent/favorites         l'agent envoie les favoris de la console (posés sur la carte par le Manager)
@@ -18,7 +18,8 @@
 
 Variables : ROMKADE_CLOUD_DB (base SQLite), ROMKADE_DATA_DIR (paquet de cheats), ROMKADE_PUBLIC_URL (adresse
 publique), ROMKADE_ALLOWED_HOSTS (noms d'hôte acceptés par le MCP, séparés par des virgules), ROMKADE_SUPABASE_URL
-et ROMKADE_SUPABASE_PUBLISHABLE_KEY (comptes ROMKADE ; sans elles, pas d'OAuth).
+et ROMKADE_SUPABASE_PUBLISHABLE_KEY (comptes ROMKADE ; sans elles, pas d'OAuth), ROMKADE_TOKEN_URLS=1 (garde les
+adresses à jeton du prototype à côté d'OAuth).
 """
 
 import asyncio
@@ -74,10 +75,13 @@ class AccountPath:
     dans la requête (« romkade.account »), jamais fourni par le client :
     - « / » + jeton OAuth (Authorization: Bearer, émis par Supabase Auth) : compte « sb:<id> » ; sans jeton valide,
       401 avec l'adresse des métadonnées, d'où ChatGPT, Claude… lancent la connexion ;
-    - « /<jeton> » (comptes du prototype) : jeton inconnu, ou /mcp appelé directement : 404, sans dire pourquoi."""
+    - « /<jeton> » (comptes du prototype, si `token_urls`) : jeton inconnu, adresses à jeton coupées, ou /mcp
+      appelé directement : 404, sans dire pourquoi."""
 
-    def __init__(self, app, store: Store, auth: SupabaseAuth | None = None, public_url: str = ""):
+    def __init__(self, app, store: Store, auth: SupabaseAuth | None = None, public_url: str = "",
+                 token_urls: bool = True):
         self.app, self.store, self.auth, self.public_url = app, store, auth, public_url
+        self.token_urls = token_urls
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
@@ -94,7 +98,7 @@ class AccountPath:
                     return
                 scope = {**scope, "path": "/mcp", "raw_path": b"/mcp", "romkade.account": account}
             elif m or path == "/mcp" or path.startswith("/mcp/"):
-                account = self.store.account_for_token(m.group(1)) if m else None
+                account = self.store.account_for_token(m.group(1)) if m and self.token_urls else None
                 if account is None:
                     await JSONResponse({"error": "not_found"}, 404)(scope, receive, send)
                     return
@@ -112,7 +116,7 @@ class AccountPath:
 
 
 def create_app(store: Store | None = None, relay: Relay | None = None, public_url: str | None = None,
-               auth: SupabaseAuth | None = None):
+               auth: SupabaseAuth | None = None, token_urls: bool | None = None):
     store = store or Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3"))
     relay = relay or Relay()
     public_url = (public_url or os.environ.get("ROMKADE_PUBLIC_URL", "")).rstrip("/")
@@ -393,7 +397,9 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
 
     app.router.lifespan_context = lifespan
     app.state.store, app.state.relay = store, relay
-    return AccountPath(CrossOrigin(app), store, auth, public_url)
+    if token_urls is None:  # adresses à jeton : par défaut, seulement là où il n'y a pas d'OAuth
+        token_urls = auth is None or os.environ.get("ROMKADE_TOKEN_URLS") == "1"
+    return AccountPath(CrossOrigin(app), store, auth, public_url, token_urls)
 
 
 class CrossOrigin:

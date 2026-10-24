@@ -71,7 +71,7 @@ class Relay:
                 pending.future.cancel()
         if not reply.get("ok"):
             err = reply.get("error") or {}
-            raise CommandFailed(str(err.get("code") or "failed"), str(err.get("message") or "La console a échoué."))
+            raise CommandFailed(str(err.get("code") or "failed"), str(err.get("message") or "The console failed."))
         return reply.get("result") or {}
 
     async def poll(self, console_id: str, wait: float = 25) -> dict | None:

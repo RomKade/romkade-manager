@@ -7,11 +7,14 @@ allumée, en Wi-Fi).
 Chaque outil est relié à l'interface ROMKADE (MCP Apps, ui://romkade/app.html, voir ui/app.html) : l'assistant
 affiche la vue indiquée par le champ « view » du résultat (jeux, fiche, en cours, bibliothèque, cheats, consoles).
 Un client sans MCP Apps reçoit les mêmes données en texte. Les messages d'erreur sont écrits pour être relayés à
-l'utilisateur par l'assistant, dans sa langue.
+l'utilisateur par l'assistant, dans sa langue : écrits en anglais (relecteurs des annuaires, modèle), avec un code
+(`error`) que l'interface traduit (fr, en, es).
 """
 
 import asyncio
 import base64
+import functools
+import inspect
 import json
 import time
 from datetime import UTC, datetime
@@ -58,8 +61,16 @@ READ = ToolAnnotations(read_only_hint=True, open_world_hint=False)
 ACT = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
 SETTING = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 
-SLEEP_HINT = ("La console {name} ne répond pas : elle est sans doute éteinte ou en veille (le Wi-Fi se coupe en "
-              "veille). Demande à l'utilisateur de la réveiller, puis réessaie.")
+# Erreurs de l'agent (messages en français, venus des modules du Manager) : texte anglais par code.
+AGENT_ERRORS = {
+    "not_on_card": "This game is no longer on the console's SD card.",
+    "no_retroarch_game": "No RetroArch game is running on the console.",
+    "save_state_unsupported": ("Remote save states are not possible with this console's firmware: use the "
+                               "console's own shortcut."),
+    "bad_path": "Invalid game.",
+    "device_command_timeout": "The console did not answer in time.",
+    "unknown_action": "The ROMKADE app on the console is too old for this: update it from ROMKADE Manager.",
+}
 MAX_PAIR_FAILURES = 10  # par compte et par heure : le code d'appairage ne se devine pas à l'aveugle
 CONSOLE_ART = {p.stem for p in (STATIC / "consoles").glob("*.webp")}
 
@@ -87,7 +98,34 @@ def data_uri(path: Path, mime: str) -> str:
 
 
 class UserError(ToolError):
-    """Erreur à relayer telle quelle à l'utilisateur (le SDK transmet le message d'un ToolError)."""
+    """Erreur à relayer à l'utilisateur : `code` stable (traduit par l'interface), message en anglais, détails."""
+
+    def __init__(self, code: str, message: str, **details):
+        super().__init__(message)
+        self.code, self.message, self.details = code, message, details
+
+    def result(self) -> CallToolResult:
+        return CallToolResult(content=[TextContent(type="text", text=self.message)],
+                              structured_content={"error": self.code, **self.details}, is_error=True)
+
+
+def user_errors(fn):
+    """Une UserError devient un résultat en erreur avec son code (sinon le SDK n'en garde que le texte)."""
+    if inspect.iscoroutinefunction(fn):
+        @functools.wraps(fn)
+        async def run(*args, **kwargs):
+            try:
+                return await fn(*args, **kwargs)
+            except UserError as exc:
+                return exc.result()
+    else:
+        @functools.wraps(fn)
+        def run(*args, **kwargs):
+            try:
+                return fn(*args, **kwargs)
+            except UserError as exc:
+                return exc.result()
+    return run
 
 
 def account_of(ctx: Context) -> str:
@@ -95,7 +133,7 @@ def account_of(ctx: Context) -> str:
     request = ctx.request_context.request
     account = getattr(request, "scope", {}).get("romkade.account")
     if not account:
-        raise UserError("Compte ROMKADE inconnu : vérifie l'adresse du connecteur.")
+        raise UserError("no_account", "ROMKADE account not found: sign in to ROMKADE again.")
     return account
 
 
@@ -109,8 +147,8 @@ def platform_codes(name: str | None) -> list[str] | None:
     key = normalize_title(name)
     found = [c for c, i in PLATFORMS.items() if i.label and key and key in normalize_title(i.label)]
     if not found:
-        raise UserError(f"Console « {name} » inconnue. Exemples : Super Nintendo, Mega Drive, Game Boy Advance, "
-                        "PlayStation, Arcade.")
+        raise UserError("unknown_platform", f"Unknown system \"{name}\". Examples: Super Nintendo, Mega Drive, "
+                        "Game Boy Advance, PlayStation, Arcade.", name=name)
     return found
 
 
@@ -127,7 +165,8 @@ def genre_key(name: str | None) -> str | None:
                "sports": "sport", "strategy": "strategie", "adventure": "aventure", "beat em up": "beat"}
     if k := aliases.get(key):
         return k
-    raise UserError(f"Genre « {name} » inconnu. Genres : " + ", ".join(GENRES.values()))
+    raise UserError("unknown_genre", f"Unknown genre \"{name}\". Genres: " + ", ".join(GENRES), name=name,
+                    genres=list(GENRES))
 
 
 def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
@@ -136,7 +175,8 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
     pair_failures: dict[str, list[float]] = {}
 
     def ui_tool(**kwargs):
-        return apps.tool(resource_uri=UI, **kwargs)
+        register = apps.tool(resource_uri=UI, **kwargs)
+        return lambda fn: register(user_errors(fn))
 
     # ---------- utilitaires ----------
     def consoles(account: str) -> list[Console]:
@@ -145,28 +185,35 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
     def pick(account: str, console: str | None) -> Console:
         mine = consoles(account)
         if not mine:
-            raise UserError("Aucune console appairée. Sur la console, ouvre l'app ROMKADE (menu APPS) : elle "
-                            "affiche un code à 6 caractères à donner ici (pair_console).")
+            raise UserError("no_console", "No console is paired yet. On the console, open the ROMKADE app (APPS "
+                            "menu): it shows a 6-character code to give here (pair_console).")
         if not console:
             if len(mine) == 1:
                 return mine[0]
-            raise UserError("Plusieurs consoles : précise laquelle (" + ", ".join(c.label for c in mine) + ").")
+            names = [c.label for c in mine]
+            raise UserError("several_consoles", "Several consoles: say which one (" + ", ".join(names) + ").",
+                            consoles=names)
         key = console.strip().lower()
         for c in mine:
             if key in (c.id, c.label.lower()):
                 return c
-        raise UserError(f"Console « {console} » introuvable. Consoles : " + ", ".join(c.label for c in mine))
+        names = [c.label for c in mine]
+        raise UserError("unknown_console", f"Console \"{console}\" not found. Consoles: " + ", ".join(names),
+                        name=console, consoles=names)
 
     async def device(c: Console, action: str, params: dict | None = None, timeout: float = 45) -> CallToolResult:
         try:
             return await relay.call(c.id, action, params, timeout)
         except ConsoleOffline as exc:
-            raise UserError(SLEEP_HINT.format(name=c.label)) from exc
+            raise UserError("console_asleep", f"The console {c.label} does not answer: it is probably off or "
+                            "asleep (Wi-Fi turns off in sleep mode). Ask the user to wake it up, then try again.",
+                            console=c.label) from exc
         except CommandTimeout as exc:
-            raise UserError(f"La console {c.label} n'a pas répondu à temps. Elle s'est peut-être mise en "
-                            "veille : réessaie dans un instant.") from exc
+            raise UserError("console_timeout", f"The console {c.label} did not answer in time. It may have gone "
+                            "to sleep: try again in a moment.", console=c.label) from exc
         except CommandFailed as exc:
-            raise UserError(exc.message) from exc
+            raise UserError("console_failed", AGENT_ERRORS.get(exc.code, exc.message), console=c.label,
+                            reason=exc.code) from exc
 
     def console_art(code: str) -> str | None:
         return f"{base}/consoles/{code}.webp" if base and code in CONSOLE_ART else None
@@ -219,7 +266,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         return out
 
     # ---------- appairage et consoles ----------
-    @ui_tool(title="Appairer une console", annotations=ACT)
+    @ui_tool(title="Pair a console", annotations=ACT)
     def pair_console(code: str, ctx: Context, name: str | None = None) -> CallToolResult:
         """Links a console to the user's ROMKADE account with the 6-character code shown by the ROMKADE app on
         the console (APPS menu). `name`: optional nickname for the console."""
@@ -227,23 +274,23 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         now = time.time()
         recent = [t for t in pair_failures.get(account, []) if now - t < 3600]
         if len(recent) >= MAX_PAIR_FAILURES:
-            raise UserError("Trop d'essais de code : réessaie dans une heure.")
+            raise UserError("too_many_codes", "Too many wrong codes: try again in an hour.")
         if len(consoles(account)) >= MAX_CONSOLES:
-            raise UserError("Une seule console par compte pour l'instant : retire l'autre dans le Manager "
-                            "(Mon compte > Console) avant d'en relier une nouvelle.")
+            raise UserError("console_limit", "One console per account for now: remove the other one in ROMKADE "
+                            "Manager (My account > Console) before pairing a new one.")
         c = store.pair(code, account, (name or "").strip()[:40] or None)
         if c is None:
             pair_failures[account] = [*recent, now]
-            raise UserError("Code inconnu ou expiré. Ouvre de nouveau l'app ROMKADE sur la console pour avoir "
-                            "un code à jour (valable 15 minutes).")
+            raise UserError("bad_code", "Unknown or expired code. Open the ROMKADE app on the console again to "
+                            "get a fresh code (valid for 15 minutes).")
         return view({"view": "consoles", "paired": True, "consoles": [describe(c)]})
 
-    @ui_tool(title="Mes consoles", annotations=READ)
+    @ui_tool(title="List my consoles", annotations=READ)
     def list_consoles(ctx: Context) -> CallToolResult:
         """Lists the user's paired consoles: name, model, firmware, number of games, online now or not."""
         return view({"view": "consoles", "consoles": [describe(c) for c in consoles(account_of(ctx))]})
 
-    @ui_tool(title="Renommer une console", annotations=SETTING)
+    @ui_tool(title="Rename a console", annotations=SETTING)
     def rename_console(name: str, ctx: Context, console: str | None = None) -> CallToolResult:
         """Gives a console a nickname (e.g. « Ma RG35XX »)."""
         c = pick(account_of(ctx), console)
@@ -251,7 +298,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         return view({"view": "consoles", "consoles": [describe(store.console(c.id))]})
 
     # ---------- catalogue (cloud) ----------
-    @ui_tool(title="Chercher un jeu", annotations=READ)
+    @ui_tool(title="Search games", annotations=READ)
     def search_games(ctx: Context, query: str = "", platform: str | None = None, genre: str | None = None,
                      console: str | None = None, limit: int = 24) -> CallToolResult:
         """Searches the games on the user's console(s) by title words, optionally for one system (« Super
@@ -270,20 +317,20 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                      "shown": len(rows),
                      "games": [game_out(r, by_id[r["console_id"]] if len(by_id) > 1 else None) for r in rows]})
 
-    @ui_tool(title="Fiche du jeu", annotations=READ)
+    @ui_tool(title="Game details", annotations=READ)
     async def game_details(game_id: int, ctx: Context) -> CallToolResult:
         """Full sheet of one game: cover, year, genre, developer, publisher, summary, whether it is a favorite,
         and the user's saves for it on the console (in-game save, save states, with dates; checked only while the
         console is on). Use it when the user asks about a game or whether they have a save for it."""
         row = store.game(game_id, account_of(ctx))
         if row is None:
-            raise UserError("Jeu introuvable dans la bibliothèque (game_id d'après search_games).")
+            raise UserError("unknown_game", "Game not found in the library (use a game_id from search_games).")
         c = store.console(row["console_id"])
         game = {**game_out(row, full=True),
                 "favorite": store.is_favorite(c.id, row["platform_dir"], row["relative_path"])}
         return view({"view": "game", "game": game, "console": describe(c), "saves": await game_saves(c, row)})
 
-    @ui_tool(title="Mes favoris", annotations=READ)
+    @ui_tool(title="Favorite games", annotations=READ)
     def favorite_games(ctx: Context, console: str | None = None, limit: int = 24) -> CallToolResult:
         """The user's favorite games on their console (starred in ROMKADE Manager), the most recently added
         first. Shows covers; returns game_id values for launch_game, game_details and get_cheats."""
@@ -292,7 +339,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         return view({"view": "games", "favorites": True, "total": total, "shown": len(rows),
                      "games": [game_out(r) for r in rows]})
 
-    @ui_tool(title="Ma bibliothèque", annotations=READ)
+    @ui_tool(title="Library overview", annotations=READ)
     def library_overview(ctx: Context, console: str | None = None) -> CallToolResult:
         """Overview of a console's library: number of games per system and per genre."""
         c = pick(account_of(ctx), console)
@@ -302,13 +349,13 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                      "genres": [{"genre": r["genre"], "games": r["games"]} for r in store.genres(c.id)],
                      "catalog_updated_minutes_ago": round((time.time() - c.catalog_at) / 60) if c.catalog_at else None})
 
-    @ui_tool(title="Codes de triche", annotations=READ)
+    @ui_tool(title="Cheat codes", annotations=READ)
     async def get_cheats(game_id: int, ctx: Context, search: str | None = None) -> CallToolResult:
         """Cheat codes (Game Genie, Action Replay, GameShark…) for a game of the library, from the libretro
         cheat database (CC BY-SA 4.0). `search`: optional words to filter codes (« lives », « invincible »…)."""
         row = store.game(game_id, account_of(ctx))
         if row is None:
-            raise UserError("Jeu introuvable dans la bibliothèque (game_id d'après search_games).")
+            raise UserError("unknown_game", "Game not found in the library (use a game_id from search_games).")
         game = game_out(row)
         files = await asyncio.to_thread(cheat_db.for_game, row["platform_dir"], row["relative_path"])
         if not files:
@@ -333,50 +380,53 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         return {"view": "now", "console": describe(c), "playing": bool(st.get("playing")), "game": game,
                 "in_menu": st.get("menu"), "process": st.get("process"), "volume": st.get("volume")}
 
-    @ui_tool(title="État de la console", annotations=READ)
+    @ui_tool(title="Console status", annotations=READ)
     async def console_status(ctx: Context, console: str | None = None) -> CallToolResult:
         """Live state of the console: game being played (if any), volume, save and quit buttons. Needs the
         console on."""
         return view(await now_playing(pick(account_of(ctx), console)))
 
-    @ui_tool(title="Lancer un jeu", annotations=ACT)
+    @ui_tool(title="Launch a game", annotations=ACT)
     async def launch_game(game_id: int, ctx: Context, resume: bool = False) -> CallToolResult:
-        """Starts a game on the console (closes the menu or the game in progress). `resume`: continue from
-        the automatic save state when there is one. Get game_id from search_games."""
+        """Starts a game on the console. A game already running is closed first (RetroArch writes its in-game
+        save; progress since the last save point is lost). `resume`: continue from the automatic save state when
+        there is one. Get game_id from search_games."""
         row = store.game(game_id, account_of(ctx))
         if row is None:
-            raise UserError("Jeu introuvable dans la bibliothèque (game_id d'après search_games).")
+            raise UserError("unknown_game", "Game not found in the library (use a game_id from search_games).")
         c = store.console(row["console_id"])
         await device(c, "launch", {"platform_dir": row["platform_dir"], "relative_path": row["relative_path"],
                                    "slot": "auto" if resume else None}, timeout=60)
         return view({"view": "now", "launching": True, "console": describe(c), "playing": True,
                      "game": game_out(row, full=True), "volume": None})
 
-    @ui_tool(title="Quitter le jeu", annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True,
+    @ui_tool(title="Quit the game", annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True,
                                                                  idempotent_hint=True, open_world_hint=False))
     async def quit_game(ctx: Context, console: str | None = None) -> CallToolResult:
         """Quits the game in progress (RetroArch writes the in-game save) and returns to the console menu.
-        Progress since the last save point may be lost: suggest save_state first."""
+        Progress since the last save point is lost unless a save state was made first (save_state)."""
         c = pick(account_of(ctx), console)
         r = await device(c, "quit")
         return view({"view": "now", "console": describe(c), "playing": False, "game": None, "in_menu": True,
                      "result": {"quit": "quit", "none": "no game was running"}.get(r.get("result"), r.get("result"))})
 
-    @ui_tool(title="Sauvegarder la partie", annotations=ACT)
+    @ui_tool(title="Save state", annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True,
+                                                             idempotent_hint=False, open_world_hint=False))
     async def save_state(ctx: Context, console: str | None = None) -> CallToolResult:
-        """Save state of the RetroArch game in progress, in its current slot."""
+        """Save state of the RetroArch game in progress, in its current slot (replaces the state already in that
+        slot)."""
         c = pick(account_of(ctx), console)
         await device(c, "save_state")
         return view({**await now_playing(c), "saved": True})
 
-    @ui_tool(title="Régler le son", annotations=SETTING)
+    @ui_tool(title="Set the volume", annotations=SETTING)
     async def set_volume(ctx: Context, percent: int | None = None, muted: bool | None = None,
                          console: str | None = None) -> CallToolResult:
         """Sets the game volume (0-100 %) or mutes/unmutes. Works best for games launched from ROMKADE."""
         if percent is None and muted is None:
-            raise UserError("Indique un volume (0 à 100) ou muted=true/false.")
+            raise UserError("volume_missing", "Give a volume (0 to 100) or muted=true/false.")
         if percent is not None and not 0 <= percent <= 100:
-            raise UserError("Le volume va de 0 à 100 %.")
+            raise UserError("volume_range", "The volume goes from 0 to 100 %.")
         c = pick(account_of(ctx), console)
         await device(c, "volume", {"percent": percent, "muted": muted})
         return view(await now_playing(c))
@@ -390,7 +440,7 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
     html = html.replace("__ROMKADE_BASE__", base).replace("__ROMKADE_VERSION__", VERSION)
     origin = "/".join(base.split("/")[:3])  # la CSP ne prend que des origines (sans le chemin /romkade)
     csp = ResourceCsp(resource_domains=[origin], connect_domains=[origin]) if base else None
-    apps.add_html_resource(UI, html, name="romkade", title="ROMKADE", description="Interface ROMKADE", csp=csp,
+    apps.add_html_resource(UI, html, name="romkade", title="ROMKADE", description="ROMKADE interface", csp=csp,
                            prefers_border=False)
 
     icons = [Icon(src=f"{base}/icon.png", mime_type="image/png", sizes=["512x512"])] if base else None

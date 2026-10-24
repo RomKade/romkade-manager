@@ -136,6 +136,13 @@ def error_text(result) -> str:
     return result.content[0].text
 
 
+def error_code(result) -> str:
+    """Code de l'erreur (traduit par l'interface) ; pour une erreur de la console, celui de l'agent."""
+    assert result.is_error and result.content[0].text.isascii()  # message en anglais
+    err = result.structured_content
+    return err["reason"] if err["error"] == "console_failed" else err["error"]
+
+
 def test_pairing_catalog_cheats_and_play(env):
     store, token = env
 
@@ -159,8 +166,13 @@ def test_pairing_catalog_cheats_and_play(env):
                 assert ui.mime_type == "text/html;profile=mcp-app" and "ui/initialize" in ui.text
                 assert "__ROMKADE_BASE__" not in ui.text and "Tous droits réservés" in ui.text
 
-                assert "Aucune console" in error_text(await mcp.call_tool("search_games", {"query": "sonic"}))
-                assert "Code inconnu" in error_text(await mcp.call_tool("pair_console", {"code": "ZZZZZZ"}))
+                # Annuaires d'apps : chaque outil a un titre et dit s'il lit seulement ou s'il modifie.
+                for tool in (await mcp.list_tools()).tools:
+                    a = tool.annotations
+                    assert tool.title and tool.title.isascii() and len(tool.name) <= 64
+                    assert a.read_only_hint is True or (a.read_only_hint is False and a.destructive_hint is not None)
+                assert error_code(await mcp.call_tool("search_games", {"query": "sonic"})) == "no_console"
+                assert error_code(await mcp.call_tool("pair_console", {"code": "ZZZZZZ"})) == "bad_code"
                 paired = data(await mcp.call_tool("pair_console", {"code": first["pairing_code"].lower(),
                                                                     "name": "Ma RG35XX"}))
                 mine = paired["consoles"][0]
@@ -193,7 +205,8 @@ def test_pairing_catalog_cheats_and_play(env):
                 st = data(await mcp.call_tool("console_status", {}))
                 assert st["playing"] and st["game"]["title"] == "Sonic The Hedgehog" and st["volume"]["percent"] == 40
 
-                assert "RetroArch" in error_text(await mcp.call_tool("save_state", {}))
+                r = await mcp.call_tool("save_state", {})
+                assert "RetroArch" in error_text(r) and r.structured_content["error"] == "console_failed"
                 assert data(await mcp.call_tool("quit_game", {}))["result"] == "quit"
                 lib = data(await mcp.call_tool("library_overview", {}))
                 assert lib["view"] == "library" and lib["games"] == 5
@@ -202,7 +215,7 @@ def test_pairing_catalog_cheats_and_play(env):
             _, other = store.create_account("autre")
             async with Client(f"{base}/mcp/{other}") as mcp:
                 assert data(await mcp.call_tool("list_consoles", {}))["consoles"] == []
-                assert "introuvable" in error_text(await mcp.call_tool("launch_game", {"game_id": sonic}))
+                assert error_code(await mcp.call_tool("launch_game", {"game_id": sonic})) == "unknown_game"
             async with httpx.AsyncClient() as h:
                 font = await h.get(f"{base}/fonts/archivo.woff2")
                 assert font.status_code == 200 and font.headers["access-control-allow-origin"] == "*"
@@ -237,7 +250,7 @@ def test_console_offline_is_reported_as_asleep(env):
             async with Client(f"{base}/{token}") as mcp:
                 data(await mcp.call_tool("pair_console", {"code": code}))
                 # Jamais venue chercher d'ordre : hors ligne. Le catalogue reste consultable.
-                assert "veille" in error_text(await mcp.call_tool("console_status", {}))
+                assert error_code(await mcp.call_tool("console_status", {})) == "console_asleep"
                 assert data(await mcp.call_tool("search_games", {"query": "mario"}))["total"] == 1
         finally:
             server.should_exit = True
@@ -272,7 +285,7 @@ class FakeAuth:
 
 
 def test_oauth_accounts(env):
-    store, _ = env
+    store, token = env
 
     async def scenario():
         port = free_port()
@@ -290,6 +303,8 @@ def test_oauth_accounts(env):
                 assert r.status_code == 401
                 assert f'resource_metadata="{base}/.well-known/oauth-protected-resource"' in r.headers["www-authenticate"]
                 assert (await h.post(f"{base}/", json={}, headers={"authorization": "Bearer faux"})).status_code == 401
+                # Avec OAuth, les adresses à jeton du prototype sont coupées (exigence des annuaires d'apps).
+                assert (await h.post(f"{base}/{token}", json={})).status_code == 404
                 meta = (await h.get(f"{base}/.well-known/oauth-protected-resource")).json()
                 assert meta["resource"] == base and meta["authorization_servers"] == [FakeAuth.issuer]
                 page = await h.get(f"{base}/oauth/consent?authorization_id=abc")  # page déplacée sur le site
@@ -299,7 +314,7 @@ def test_oauth_accounts(env):
             transport = streamable_http_client(f"{base}/", http_client=httpx2.AsyncClient(
                 headers={"authorization": "Bearer bon-jeton"}))
             async with Client(transport) as mcp:
-                assert "Aucune console" in error_text(await mcp.call_tool("library_overview", {}))
+                assert error_code(await mcp.call_tool("library_overview", {})) == "no_console"
             assert any(a["id"] == "sb:u-123" and a["label"] == "joueur@example.com" for a in store.accounts())
             # Les consoles d'un compte à jeton passent au compte ROMKADE.
             old = store.create_account("ancien")[0]

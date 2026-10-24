@@ -1,8 +1,9 @@
 """Statistiques d'usage du serveur MCP (PostHog MCP Analytics, Cloud EU, même projet que romkade.com et le Manager).
 
-Ce qui part : nom de l'outil appelé, durée, erreur ou non, client (ChatGPT, Claude…), identifiant de session et de
-conversation, liste des outils, exceptions du serveur. Ce qui ne part jamais : les arguments et les réponses des
-outils (titres de jeux, recherches, code d'appairage, noms des consoles) ni l'intention de l'utilisateur. Aucun
+Ce qui part : nom de l'outil appelé, durée, erreur ou non, client (ChatGPT, Claude…), identifiant de session,
+liste des outils, exceptions du serveur. Ce qui ne part jamais : les arguments et les réponses des outils (titres
+de jeux, recherches, code d'appairage, noms des consoles), l'intention de l'utilisateur ni l'identifiant de la
+conversation (règle des annuaires : rien de la conversation au-delà de ce que l'outil demande). Aucun
 paramètre « context » n'est ajouté aux outils : ChatGPT et Claude voient exactement les mêmes outils qu'avant.
 
 Clé absente (POSTHOG_PROJECT_TOKEN) : rien n'est envoyé, le serveur fonctionne pareil.
@@ -40,7 +41,7 @@ class Analytics:
 
         self.client = Posthog(token, host=os.environ.get("POSTHOG_HOST", "").strip() or "https://eu.i.posthog.com")
         self.handle = instrument(mcp, self.client, MCPAnalyticsOptions(
-            context=False, enable_conversation_id=True, before_send=strip_private, logger=log.warning))
+            context=False, enable_conversation_id=False, before_send=strip_private, logger=log.warning))
 
     async def close(self):
         if self.handle is not None:
