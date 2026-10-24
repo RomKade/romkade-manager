@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
 GOOGLE_REDIRECTS = ("https://oauth-redirect.googleusercontent.com/r/",
                     "https://oauth-redirect-sandbox.googleusercontent.com/r/")
 CODE_TTL = 600            # secondes : connexion en cours, puis code rendu à Google
-MAX_APPS = 1500           # titres déclarés par console (favoris d'abord, un seul par titre)
+MAX_APPS = 4000           # titres déclarés par console (favoris d'abord, un seul par titre)
 TRAITS = ["action.devices.traits.AppSelector", "action.devices.traits.MediaState", "action.devices.traits.OnOff",
           "action.devices.traits.TransportControl", "action.devices.traits.Volume"]
 LANGS = ("fr", "en")      # langues des noms déclarés (les titres de jeux ne se traduisent pas)
@@ -163,12 +163,13 @@ class GoogleHome:
 
     # ---------- appareils et commandes ----------
     def apps(self, c: Console) -> list[dict]:
-        """Jeux déclarés à Google : favoris d'abord, puis la bibliothèque par ordre alphabétique, un seul par titre
+        """Jeux déclarés à Google : favoris d'abord, puis la bibliothèque (jeux connus d'abord), un seul par titre
         (« 1942 » en quatre versions : une entrée). Google ne lance que ce qu'il reconnaît dans cette liste."""
         favorites, _ = self.store.favorites(c.id, MAX_APPS)
         library, _ = self.store.search([c.id], [], None, 100_000)
         out, seen = [], set()
-        for r in [*favorites, *sorted(library, key=lambda r: r["title"].lower())]:
+        # Jeux connus (avec une fiche) avant les autres, au cas où la liste serait tronquée.
+        for r in [*favorites, *sorted(library, key=lambda r: (not (r["description"] or r["year"]), r["title"].lower()))]:
             key = normalize_title(r["title"])
             if not key or key in seen:
                 continue
