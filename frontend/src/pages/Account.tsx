@@ -93,6 +93,11 @@ function AddToAssistant() {
       <div className="remote__howto">
         <div><strong>ChatGPT</strong><p className="muted small">{t("account.remote.add.chatgpt")}</p></div>
         <div><strong>Claude</strong><p className="muted small">{t("account.remote.add.claude")}</p></div>
+        <div>
+          <strong>Google Home</strong> <span className="account__badge account__badge--soon">{t("account.remote.add.googleSoon")}</span>
+          <p className="muted small">{t("account.remote.add.google")}</p>
+          <p className="small remote__say">{t("account.remote.add.googleSay")}</p>
+        </div>
       </div>
       <p className="field__hint">{t("account.remote.add.then")}</p>
     </Block>

@@ -39,3 +39,17 @@ def test_favorites_file(tmp_path, monkeypatch):
     assert sig and favs is None
     path.write_text(json.dumps({"favorites": [["SFC", "Mario.sfc"], ["bad"], ["MD", "Sonic.md"]]}))
     assert romkade_agent.read_favorites()[1] == [["SFC", "Mario.sfc"], ["MD", "Sonic.md"]]
+
+
+def test_recent_games_from_retroarch_history(tmp_path):
+    import json
+
+    hist = tmp_path / "content_history.lpl"
+    assert romkade_agent.read_recent(str(hist), "/mnt/mmc/Roms") == (None, None)
+    hist.write_text(json.dumps({"items": [
+        {"path": "/mnt/mmc/Roms/MD/Sonic.md"}, {"path": "/mnt/mmc/Roms/FBNEO/atetris.zip#atetris.bin"},
+        {"path": "/mnt/sdcard/Roms/SFC/Ailleurs.sfc"}, {"path": "/mnt/mmc/Roms/MD/Sonic.md"}, {}]}))
+    sig, recent = romkade_agent.read_recent(str(hist), "/mnt/mmc/Roms")
+    assert sig and recent == [["MD", "Sonic.md"], ["FBNEO", "atetris.zip"]]
+    hist.write_text("{ en cours d'écriture")
+    assert romkade_agent.read_recent(str(hist), "/mnt/mmc/Roms")[1] is None

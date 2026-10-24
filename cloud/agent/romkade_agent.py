@@ -38,6 +38,7 @@ from app.services import saves  # noqa: E402
 VERSION = "0.2.0"
 CONFIG = HERE / "agent.json"            # {"server": "https://…", "secret": "…"} (sur la carte : survit au redémarrage)
 FAVORITES = HERE / "favorites.json"   # écrit par le Manager : {"favorites": [[dossier, chemin relatif], …]}
+MAX_RECENT = 30                       # jeux joués récemment envoyés au cloud (historique de RetroArch)
 MAX_FAVORITES = 500
 MAX_SAVES = 300
 STATUS = Path("/tmp/romkade-status.json")  # état lu par l'app ROMKADE (RomKade.sh) pour l'écran de la console
@@ -158,6 +159,34 @@ def read_favorites() -> tuple[tuple | None, list | None]:
     return sig, [[str(f[0]), str(f[1])] for f in favs if isinstance(f, list) and len(f) == 2][:MAX_FAVORITES]
 
 
+def read_recent(history: str | None, roms_root: str) -> tuple[tuple | None, list | None]:
+    """(signature, [[dossier, chemin relatif], …]) des derniers jeux de l'historique de RetroArch (le plus récent en
+    tête), limités au dossier des ROMs ; (None, None) sans historique, (signature, None) s'il est illisible."""
+    if not history:
+        return None, None
+    try:
+        st = os.stat(history)
+    except OSError:
+        return None, None
+    sig = (st.st_mtime_ns, st.st_size)
+    try:
+        items = json.loads(Path(history).read_text(errors="replace")).get("items") or []
+    except (OSError, ValueError, AttributeError):
+        return sig, None  # en cours d'écriture par RetroArch : relu au tour suivant
+    root = roms_root.rstrip("/") + "/"
+    out: list[list[str]] = []
+    for item in items:
+        path = str((item or {}).get("path") or "").split("#", 1)[0]  # « jeu.zip#rom.bin » : l'archive
+        if not path.startswith(root):
+            continue
+        platform, _, rel = path[len(root):].partition("/")
+        if rel and [platform, rel] not in out:
+            out.append([platform, rel])
+        if len(out) >= MAX_RECENT:
+            break
+    return sig, out
+
+
 # ---------- catalogue ----------
 def scan(root: str) -> list[list]:
     """[[dossier de plateforme, chemin relatif, taille], …] : noms et tailles seulement."""
@@ -196,6 +225,7 @@ class Agent:
         self.catalog_digest = None
         self.catalog_at = 0.0
         self.favorites_sig = None
+        self.recent_sig = None
         self.device_lock = asyncio.Lock()  # un ordre à la fois sur la console
 
     @property
@@ -264,6 +294,14 @@ class Agent:
         await http(self.cfg, "POST", "/agent/favorites", {"favorites": favs})
         self.favorites_sig = sig
         log.info("favoris envoyés : %s", len(favs))
+
+    async def sync_recent(self, force: bool = False) -> None:
+        sig, recent = await asyncio.to_thread(read_recent, getattr(self.profile, "ra_history", None), self.roms_root)
+        if sig is None or recent is None or (sig == self.recent_sig and not force):
+            return
+        await http(self.cfg, "POST", "/agent/recent", {"recent": recent})
+        self.recent_sig = sig
+        log.info("jeux récents envoyés : %s", len(recent))
 
     # ---------- ordres ----------
     def rom_path(self, platform_dir: str, relative_path: str) -> str:
@@ -383,6 +421,7 @@ class Agent:
                 await self.hello()
                 await self.sync_catalog(force=True)
                 await self.sync_favorites(force=True)
+                await self.sync_recent(force=True)
                 last_scan = time.time()
                 backoff = 2
                 while True:
@@ -398,6 +437,7 @@ class Agent:
                         elif not r["paired"] and (status.get("code_until") or 0) < time.time() + 30:
                             await self.hello()  # code bientôt expiré : le cloud en donne un nouveau
                     await self.sync_favorites()  # un stat par tour : favori ajouté dans le Manager
+                    await self.sync_recent()     # et jeu joué (historique de RetroArch)
                     if time.time() - last_scan > RESCAN_EVERY:
                         last_scan = time.time()
                         await self.sync_catalog()
