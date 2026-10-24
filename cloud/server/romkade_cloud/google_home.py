@@ -174,7 +174,13 @@ class GoogleHome:
             if not key or key in seen:
                 continue
             seen.add(key)
-            out.append({"key": f"g{r['id']}", "names": [{"lang": lang, "name_synonym": synonyms(r["title"])} for lang in LANGS]})
+            names = synonyms(r["title"])
+            # « le jeu Alien 3 » : sans ce mot, Google prend parfois le titre pour un film (Prime Video, YouTube…).
+            game = {"fr": "jeu", "en": "game"}
+            out.append({"key": f"g{r['id']}", "names": [
+                {"lang": lang, "name_synonym": list(dict.fromkeys([*names, f"{game[lang]} {names[-1]}"] if lang == "fr"
+                                                                   else [*names, f"{names[-1]} {game[lang]}"]))}
+                for lang in LANGS]})
             if len(out) >= MAX_APPS:
                 break
         return out
