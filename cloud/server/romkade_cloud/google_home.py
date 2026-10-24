@@ -40,7 +40,8 @@ log = logging.getLogger(__name__)
 GOOGLE_REDIRECTS = ("https://oauth-redirect.googleusercontent.com/r/",
                     "https://oauth-redirect-sandbox.googleusercontent.com/r/")
 CODE_TTL = 600            # secondes : connexion en cours, puis code rendu à Google
-MAX_APPS = 4000           # titres déclarés par console (favoris d'abord, un seul par titre)
+MAX_APPS = 120            # titres déclarés (favoris d'abord, un seul par titre) ; au-delà, Google tronque la liste
+                          # et refuse les autres jeux, alors qu'un nom hors liste court lui est transmis tel quel
 TRAITS = ["action.devices.traits.AppSelector", "action.devices.traits.MediaState", "action.devices.traits.OnOff",
           "action.devices.traits.TransportControl", "action.devices.traits.Volume"]
 LANGS = ("fr", "en")      # langues des noms déclarés (les titres de jeux ne se traduisent pas)
