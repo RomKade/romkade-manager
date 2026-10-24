@@ -190,9 +190,10 @@ class GoogleHome:
         info = c.info
         return {
             "id": c.id, "type": "action.devices.types.GAME_CONSOLE", "traits": TRAITS,
-            # Nom facile à dire et bien reconnu (« ouvre Zelda sur la console ») ; le nom ROMKADE de la console reste un surnom.
+            # Nom facile à dire et bien reconnu (« ouvre Zelda sur la console ») ; « jeu » pour « arrête le jeu » ; le nom ROMKADE de la console reste un surnom.
             "name": {"name": "Console", "defaultNames": ["Console ROMKADE"],
-                     "nicknames": list(dict.fromkeys(["Console", "ma console", "console rétro", "retro console", c.label]))},
+                     "nicknames": list(dict.fromkeys(["Console", "ma console", "jeu", "le jeu", "jeu vidéo",
+                                                     "console rétro", "retro console", c.label]))},
             "willReportState": False,
             "deviceInfo": {"manufacturer": "ROMKADE", "model": info.get("model") or "console",
                            "swVersion": str(info.get("agent_version") or "")},
