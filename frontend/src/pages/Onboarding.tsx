@@ -5,10 +5,12 @@ import { useNavigate } from "react-router-dom";
 import { useDeviceStatus, useLlmSettings, useSettings, useStartSync, useStatus } from "../api/queries";
 import logo240 from "../assets/brand/romkade-manager-logo-240.webp";
 import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
+import { useCloudConsoles } from "../auth/cloud";
 import { LlmPanel } from "../components/LlmPanel";
 import { LanguageSwitcher } from "../components/TopBar";
 import { ErrorNotice, Spinner } from "../components/ui";
 import { useT } from "../i18n";
+import { RemoteControl } from "./Account";
 import { ConnectionForm, HostKeyPanel, TestPanel } from "./Settings";
 
 /** Installation terminée ou remise à plus tard : l'accueil n'y renvoie plus (navigateur seulement). */
@@ -26,12 +28,15 @@ function markDone() {
   try { localStorage.setItem(DONE_KEY, "1"); } catch { /* navigation privée : l'installation sera reproposée */ }
 }
 
-const STEPS = ["console", "identity", "test", "library", "ai"] as const;
+const STEPS = ["console", "identity", "test", "library", "ai", "remote"] as const;
+/** Étapes facultatives : « Plus tard » les passe. */
+const OPTIONAL = new Set<string>(["ai", "remote"]);
 
 /**
  * Installation du premier lancement, sur une page à part (ni barre latérale, ni bandeaux, ni bulle de Duke) :
  * 1. la console (trouvée sur le réseau, mot de passe) ; 2. son empreinte ; 3. le test ; 4. la lecture de la
- * bibliothèque ; 5. Duke, l'assistant IA, facultatif. Chaque étape faite est cochée et reste consultable ; l'étape
+ * bibliothèque ; 5. Duke, l'assistant IA, et 6. parler à la console depuis ChatGPT, Claude ou Google Home (ROMKADE
+ * Cloud), tous deux facultatifs. Chaque étape faite est cochée et reste consultable ; l'étape
  * en cours est la première qui reste à faire. Le tableau de bord y renvoie tant que la bibliothèque n'a jamais été
  * lue et que l'installation n'a pas été terminée (ou remise à plus tard).
  */
@@ -42,8 +47,9 @@ export function OnboardingPage() {
   const device = useDeviceStatus();
   const status = useStatus();
   const llm = useLlmSettings();
+  const remote = useCloudConsoles();
   const [picked, setPicked] = useState<number | null>(null);
-  const [aiSkipped, setAiSkipped] = useState(false);
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
 
   const finish = () => { markDone(); navigate("/", { replace: true }); };
 
@@ -54,8 +60,10 @@ export function OnboardingPage() {
   const st = status.data;
   const auth = s.auth_method === "password" ? s.has_password : !!s.key_path;
   // Bibliothèque déjà lue : la connexion a forcément réussi, même si la console dort en ce moment.
+  const aiOn = llm.data?.state === "connected";
+  const remoteOn = (remote.data?.length ?? 0) > 0;
   const done = [!!s.host && auth, s.host_key_trusted, device.data?.connected === true || st.synced, st.synced,
-    llm.data?.state === "connected" || aiSkipped];
+    aiOn || skipped.has("ai"), remoteOn || skipped.has("remote")];
   const first = done.findIndex((d) => !d);
   const auto = first === -1 ? STEPS.length : first;  // STEPS.length : écran final
   const current = picked !== null && picked <= auto ? picked : auto;
@@ -87,7 +95,7 @@ export function OnboardingPage() {
                     <span className="stepper__dot" aria-hidden>{state === "done" ? <Check size={15} /> : i + 1}</span>
                     <span className="stepper__label">
                       {t(`onboarding.step.${key}`)}
-                      {key === "ai" && <small> · {t("onboarding.optional")}</small>}
+                      {OPTIONAL.has(key) && <small> · {t("onboarding.optional")}</small>}
                     </span>
                   </button>
                 </li>
@@ -114,12 +122,13 @@ export function OnboardingPage() {
                   </div>
                 </div>
               )}
-              <div className={`onboarding__embed ${current === 4 ? "onboarding__embed--ai" : ""}`}>
+              <div className={`onboarding__embed ${OPTIONAL.has(STEPS[current]!) ? "onboarding__embed--ai" : ""}`}>
                 {current === 0 && <ConnectionForm initial={s} hasPassword={s.has_password} />}
                 {current === 1 && <HostKeyPanel trusted={s.host_key_trusted} host={s.host} />}
                 {current === 2 && !done[2] && <TestPanel auto />}
                 {current === 3 && !done[3] && <LibraryStep />}
                 {current === 4 && <LlmPanel />}
+                {current === 5 && <RemoteControl />}
               </div>
               <details className="onboarding__why">
                 <summary>{t("onboarding.why")}</summary>
@@ -137,8 +146,10 @@ export function OnboardingPage() {
                   <button type="button" className="button button--primary" onClick={() => go(current + 1)}>
                     {t("onboarding.next")} <ChevronRight size={16} aria-hidden />
                   </button>
-                ) : STEPS[current] === "ai" ? (
-                  <button type="button" className="button" onClick={() => { setAiSkipped(true); setPicked(null); }}>{t("onboarding.ai.skip")}</button>
+                ) : OPTIONAL.has(STEPS[current]!) ? (
+                  <button type="button" className="button" onClick={() => { setSkipped((x) => new Set(x).add(STEPS[current]!)); setPicked(null); }}>
+                    {t("onboarding.ai.skip")}
+                  </button>
                 ) : null}
                 <p className="onboarding__hint">{t("onboarding.nextHint", {
                   step: current + 1 < STEPS.length ? t(`onboarding.step.${STEPS[current + 1]}`) : t("onboarding.step.done") })}</p>
@@ -146,7 +157,7 @@ export function OnboardingPage() {
             </div>
           </section>
         ) : (
-          <DoneStep games={st.game_count} consoles={st.platform_count} ai={llm.data?.state === "connected"} onOpen={finish} />
+          <DoneStep games={st.game_count} consoles={st.platform_count} ai={aiOn} remote={remoteOn} onOpen={finish} />
         )}
       </main>
     </div>
@@ -180,7 +191,7 @@ function LibraryStep() {
   );
 }
 
-function DoneStep({ games, consoles, ai, onOpen }: { games: number; consoles: number; ai: boolean; onOpen: () => void }) {
+function DoneStep({ games, consoles, ai, remote, onOpen }: { games: number; consoles: number; ai: boolean; remote: boolean; onOpen: () => void }) {
   const t = useT();
   return (
     <div className="onboarding__done">
@@ -193,8 +204,11 @@ function DoneStep({ games, consoles, ai, onOpen }: { games: number; consoles: nu
           {ai ? <Check size={16} aria-hidden /> : <span className="onboarding__dash" aria-hidden>–</span>}
           {t("onboarding.done.ai")} : {t(ai ? "onboarding.done.aiOn" : "onboarding.done.aiOff")}
         </li>
+        <li className={remote ? "" : "is-off"}>
+          {remote ? <Check size={16} aria-hidden /> : <span className="onboarding__dash" aria-hidden>–</span>}
+          {t("onboarding.done.remoteLabel")} : {t(remote ? "onboarding.done.remoteOn" : "onboarding.done.remoteOff")}
+        </li>
       </ul>
-      <p className="muted small">{t("onboarding.done.remote")}</p>
       <button type="button" className="button button--primary onboarding__open" onClick={onOpen}>{t("onboarding.done.open")}</button>
     </div>
   );

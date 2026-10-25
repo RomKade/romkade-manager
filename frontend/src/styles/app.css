@@ -1640,7 +1640,7 @@ kbd {
 .onboarding__lead { color: var(--ink-2); font-size: var(--fs-lg); max-width: 70ch; margin: 0; text-wrap: pretty; }
 
 /* Fil d'étapes : pastilles numérotées reliées par un trait ; faites (coche), en cours (halo), à venir (grisées). */
-.stepper { list-style: none; margin: 18px 0 6px; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); counter-reset: none; }
+.stepper { list-style: none; margin: 18px 0 6px; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); counter-reset: none; }
 .stepper__step { position: relative; display: flex; justify-content: center; }
 .stepper__step + .stepper__step::before { content: ""; position: absolute; top: 17px; right: calc(50% + 22px); left: calc(-50% + 22px);
   height: 2px; border-radius: 2px; background: var(--line-strong); }

@@ -572,11 +572,11 @@ describe("Installation du premier lancement", () => {
     const steps = screen.getByRole("navigation", { name: "Étapes de l'installation" });
     expect(within(steps).getByRole("button", { name: /Son identité/ })).toHaveAttribute("aria-current", "step");
     expect(within(steps).getByRole("button", { name: /Ta bibliothèque/ })).toBeDisabled();
-    expect(screen.getByText("Étape 2 sur 5")).toBeInTheDocument();
+    expect(screen.getByText("Étape 2 sur 6")).toBeInTheDocument();
     const panel = (await screen.findByText(/Approuve l'identité de ta console/)).closest<HTMLElement>(".onboarding__card")!;
     expect(await within(panel).findByText("SHA256:abc")).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: "Approuver cette clé" }));
-    expect(await screen.findByText("Étape 3 sur 5")).toBeInTheDocument();
+    expect(await screen.findByText("Étape 3 sur 6")).toBeInTheDocument();
     await waitFor(() => expect(calls).toContain("/api/device/diagnose"));
   });
 
@@ -599,7 +599,7 @@ describe("Installation du premier lancement", () => {
       return base(input, init);
     }));
     renderAt("/bienvenue");
-    expect(await screen.findByText("Étape 1 sur 5")).toBeInTheDocument();
+    expect(await screen.findByText("Étape 1 sur 6")).toBeInTheDocument();
     const found = (await screen.findByText("anbernic · 192.168.86.242")).closest("li")!;
     expect(screen.getByText("mac.lan · 192.168.86.240")).toBeInTheDocument();
     await userEvent.click(within(found).getByRole("button", { name: "C'est ma console" }));
@@ -609,7 +609,7 @@ describe("Installation du premier lancement", () => {
     await waitFor(() => expect(calls).toContain("/api/device/discover?scan=true"));
   });
 
-  it("console connectée : lecture de la bibliothèque, puis Duke facultatif (« Plus tard »), puis l'écran final", async () => {
+  it("console connectée : lecture de la bibliothèque, puis Duke IA et le pilotage depuis ChatGPT ou Claude, facultatifs (« Plus tard »), puis l'écran final", async () => {
     const base = mockFetch();
     let synced = false;
     const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
@@ -620,10 +620,12 @@ describe("Installation du premier lancement", () => {
       return base(input, init);
     }));
     renderAt("/bienvenue");
-    expect(await screen.findByText("Étape 4 sur 5")).toBeInTheDocument();
+    expect(await screen.findByText("Étape 4 sur 6")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Lire la bibliothèque" }));
     await waitFor(() => expect(calls).toContain("/api/catalog/sync"));
-    expect(await screen.findByText("Étape 5 sur 5", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText("Étape 5 sur 6", {}, { timeout: 3000 })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Plus tard" }));
+    expect(await screen.findByText("Étape 6 sur 6")).toBeInTheDocument();  // ChatGPT, Claude, Google Home : facultatif aussi
     await userEvent.click(screen.getByRole("button", { name: "Plus tard" }));
     expect(await screen.findByRole("heading", { name: "Tout est prêt" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Ouvrir ROMKADE Manager" }));
