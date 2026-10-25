@@ -131,9 +131,11 @@ async def _test_sync_query_execute(env):
                      if "Zelda" in a["names"][0]["name_synonym"][-1])
         assert "Zelda" in zelda["names"][0]["name_synonym"]
 
+        assert dev["attributes"]["availableApplications"][0]["key"] == "menu"   # console sur son menu
         query = (await h.post("/google/fulfillment", headers=auth, json={"requestId": "2", "inputs": [
             {"intent": "action.devices.QUERY", "payload": {"devices": [{"id": c.id}, {"id": "nope"}]}}]})).json()
         assert query["payload"]["devices"][c.id]["online"] is True
+        assert query["payload"]["devices"][c.id]["currentApplication"] == "menu"   # toujours une app de la liste
         assert query["payload"]["devices"]["nope"]["errorCode"] == "deviceNotFound"
 
         def execute(command, params):
@@ -206,7 +208,7 @@ async def _test_recent_games_and_automatic_updates(env, monkeypatch):
         sync = (await h.post("/google/fulfillment", headers=auth, json={
             "requestId": "1", "inputs": [{"intent": "action.devices.SYNC"}]})).json()
         apps = sync["payload"]["devices"][0]["attributes"]["availableApplications"]
-        assert "Sonic The Hedgehog" in apps[0]["names"][0]["name_synonym"]        # joué récemment : en tête
+        assert "Sonic The Hedgehog" in apps[1]["names"][0]["name_synonym"]        # joué récemment : juste après le menu
         # Relié : un favori ajouté -> Google redemande la liste ; un jeu lancé -> état signalé.
         await h.post("/agent/favorites", json={"favorites": [["NES", "Legend of Zelda, The (USA).nes"]]},
                      headers={"authorization": f"Bearer {env['secret']}"})
