@@ -208,6 +208,10 @@
 .account__row > .button { flex: none; }
 .account__grow { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; }
 .account__actions { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+/* Code, champs puis boutons : chacun son espace (formulaires en plusieurs étapes : e-mail, mot de passe, suppression) */
+.account__form { display: flex; flex-direction: column; gap: 22px; }
+.account__form > .button { align-self: flex-start; }
+.account__form .account__actions { margin-top: 6px; gap: 12px; }
 .account__status { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 700; }
 .account__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .account__list li { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }

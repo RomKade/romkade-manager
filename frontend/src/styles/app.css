@@ -402,12 +402,12 @@ button, input, select { font: inherit; color: inherit; }
 /* ---------- Tableau de bord ---------- */
 .dashboard { gap: 22px; }
 .hero { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 4px; }
-.hero__line { font-size: var(--fs-hero); font-stretch: 125%; font-weight: 800; letter-spacing: -0.02em; max-width: 26ch; line-height: 1.08; }
+.hero__line { font-size: var(--fs-hero); font-stretch: 125%; font-weight: 800; letter-spacing: -0.02em; line-height: 1.08; text-wrap: balance; }
 /* Compteurs réels mis en valeur : jeux en cyan, consoles en rose */
 .hero__num { font-variant-numeric: tabular-nums; }
 .hero__num--games { color: var(--accent); text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent); }
 .hero__num--consoles { color: var(--accent-2); text-shadow: 0 0 22px color-mix(in srgb, var(--accent-2) 45%, transparent); }
-.hero__sub { color: var(--ink-2); font-size: var(--fs-lg); max-width: 62ch; }
+.hero__sub { color: var(--ink-2); font-size: var(--fs-lg); max-width: 88ch; }
 .hero__hello { margin: 0; color: var(--accent); font-size: var(--fs-lg); font-weight: 700; }
 .finder { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 8px; }
 .finder__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }

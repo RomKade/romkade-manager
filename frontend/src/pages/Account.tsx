@@ -192,7 +192,7 @@ function EmailChange() {
           </div>
         </form>
       ) : (
-        <form onSubmit={(e: FormEvent) => { e.preventDefault();
+        <form className="account__form" onSubmit={(e: FormEvent) => { e.preventDefault();
           a.run(async () => { const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email_change" }); fail(error);
             setSent(false); setCode(""); setEmail(""); return t("account.email.done"); }); }}>
           <CodeInput id="acc-email-code" value={code} onChange={setCode} compact />
@@ -221,7 +221,7 @@ function PasswordChange() {
           const { error } = await supabase.auth.reauthenticate(); fail(error); setSent(true);
           return t("account.password.sent", { email: session?.user.email ?? "" }); })}>{t("account.sendCode")}</button>
       ) : (
-        <form onSubmit={(e: FormEvent) => { e.preventDefault();
+        <form className="account__form" onSubmit={(e: FormEvent) => { e.preventDefault();
           a.run(async () => { const { error } = await supabase.auth.updateUser({ password, nonce: code }); fail(error);
             setSent(false); setCode(""); setPassword(""); return t("account.password.done"); }); }}>
           <CodeInput id="acc-pw-code" value={code} onChange={setCode} compact />
@@ -460,7 +460,7 @@ function DeleteAccount() {
   const email = session?.user.email ?? "";
   return (
     <Block title={t("account.danger.title")} lead={t("account.danger.lead")} danger>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault();
+      <form className="account__form" onSubmit={(e: FormEvent) => { e.preventDefault();
         a.run(async () => { await cloud.deleteAccount(); await supabase.auth.signOut(); }); }}>
         <div className="field">
           <label htmlFor="acc-delete">{t("account.danger.type")}</label>
