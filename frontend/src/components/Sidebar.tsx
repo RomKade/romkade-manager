@@ -129,7 +129,8 @@ function DeviceCard() {
           <div className="minibar" aria-hidden>
             <div style={{ width: `${usedPct}%` }} />
           </div>
-          <p>{t("common.device.free", { free: gb(s!.storage_free_bytes), total: gb(s!.storage_total_bytes) })}</p>
+          {/* La barre montre la place occupée : le texte dit la même chose. */}
+          <p>{t("common.device.used", { used: gb(s!.storage_total_bytes! - s!.storage_free_bytes!), total: gb(s!.storage_total_bytes) })}</p>
         </div>
       )}
       {s?.sync_running && <p className="device-card__sync">{t("common.device.syncing")}</p>}
