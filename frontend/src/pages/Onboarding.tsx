@@ -151,8 +151,6 @@ export function OnboardingPage() {
                     {t("onboarding.ai.skip")}
                   </button>
                 ) : null}
-                <p className="onboarding__hint">{t("onboarding.nextHint", {
-                  step: current + 1 < STEPS.length ? t(`onboarding.step.${STEPS[current + 1]}`) : t("onboarding.step.done") })}</p>
               </div>
             </div>
           </section>

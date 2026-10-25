@@ -1690,14 +1690,13 @@ kbd {
 .onboarding__why[open] summary::after { transform: rotate(225deg) translateY(-3px); }
 .onboarding__why p { margin: 10px 0 0; color: var(--ink-2); max-width: 75ch; }
 /* Sous la carte, collée en bas de l'écran quand l'étape est plus haute que la fenêtre : Retour et Continuer toujours visibles. */
-.onboarding__nav { position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+.onboarding__nav { position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 12px;
   padding: 18px 0 14px; }
 /* Fond flou plutôt que coloré : invisible sur le quadrillage, il ne se voit que quand l'étape défile dessous. */
 .onboarding__nav::before { content: ""; position: absolute; inset: 0 -16px; z-index: -1; pointer-events: none;
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   mask-image: linear-gradient(to bottom, transparent, #000 45%); -webkit-mask-image: linear-gradient(to bottom, transparent, #000 45%); }
-.onboarding__forward { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
-.onboarding__hint { margin: 0; color: var(--ink-2); font-size: var(--fs-sm); text-align: right; }
+.onboarding__forward { display: flex; justify-content: flex-end; margin-left: auto; }  /* ferré à droite */
 .onboarding__progress { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--ink); }
 .onboarding__done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 36px 20px;
   border: 1px solid var(--line); border-radius: var(--r-shell); background: var(--panel); }
