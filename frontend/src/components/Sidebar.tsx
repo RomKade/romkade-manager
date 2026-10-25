@@ -87,6 +87,9 @@ export function Sidebar() {
   );
 }
 
+/** Console pas encore (ou plus) réglée : le tableau de bord guide la mise en route. */
+const SETUP_ERRORS = new Set(["console_not_configured", "credentials_missing", "key_path_missing", "host_key_unknown"]);
+
 function DeviceCard() {
   const t = useT();
   const device = useDeviceStatus();
@@ -118,6 +121,7 @@ function DeviceCard() {
       {!connected && device.data?.error && (
         <p className="device-card__error">
           {getLang() !== "fr" && has(`common.error.${device.data.error.code}`) ? t(`common.error.${device.data.error.code}`) : device.data.error.message}
+          {SETUP_ERRORS.has(device.data.error.code) && <> <Link to="/">{t("common.device.setup")}</Link></>}
         </p>
       )}
       {usedPct != null && (

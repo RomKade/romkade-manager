@@ -557,6 +557,26 @@ describe("Nouvelle console : clé à approuver", () => {
   });
 });
 
+describe("Première connexion depuis le tableau de bord", () => {
+  it("guide étape par étape, de la clé à approuver jusqu'au test, sans proposer de synchroniser", async () => {
+    hostKeyTrusted = false;
+    deviceOnline = false;
+    const base = mockFetch();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).startsWith("/api/catalog/status")
+      ? new Response(JSON.stringify({ ...status, synced: false }), { headers: { "Content-Type": "application/json" } })
+      : base(input, init)));
+    renderAt("/");
+    expect(await screen.findByRole("heading", { name: "Connecte ta console" })).toBeInTheDocument();
+    expect(await screen.findByText("Étape 2 sur 3 : Identifier la console")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Synchroniser/ })).toBeNull();
+    const panel = (await screen.findByRole("heading", { name: /Identité de la console/ })).closest("section")!;
+    expect(await within(panel).findByText("SHA256:abc")).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Approuver cette clé" }));
+    expect(await screen.findByText("Étape 3 sur 3 : Tester la connexion")).toBeInTheDocument();
+    await waitFor(() => expect(calls).toContain("/api/device/diagnose"));
+  });
+});
+
 describe("Paramètres : assistant et connaissances", () => {
   it("onglet Assistant IA : les trois étapes d'abord (état et déconnexion à l'étape 3), puis le prénom (Duke, modifiable) et l'affichage", async () => {
     renderAt("/parametres/ia");

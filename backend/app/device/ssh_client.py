@@ -72,6 +72,8 @@ class HostKeyStore:
 
 async def fetch_host_key(settings: DeviceSettings) -> asyncssh.SSHKey:
     """Récupère la clé d'hôte sans s'authentifier (pour le TOFU explicite)."""
+    if not settings.host:
+        raise errors.console_not_configured()
     try:
         key = await asyncio.wait_for(
             asyncssh.get_server_host_key(settings.host, settings.port),
@@ -109,6 +111,8 @@ class DeviceClient:
     @asynccontextmanager
     async def connect(self) -> AsyncIterator[asyncssh.SSHClientConnection]:
         s = self.settings
+        if not s.host:
+            raise errors.console_not_configured()
         if not self.host_keys.has_entry(s.host, s.port):
             raise errors.host_key_unknown()
         kwargs = self._auth_kwargs()

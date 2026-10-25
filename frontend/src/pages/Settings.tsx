@@ -141,7 +141,7 @@ function ConnectionSteps({ settings }: { settings: Settings }) {
 }
 
 /** Étape 1 : la console. Le choix d'authentification affiche son propre champ (mot de passe ou clé SSH). */
-function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; hasPassword: boolean }) {
+export function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; hasPassword: boolean }) {
   const t = useT();
   const qc = useQueryClient();
   const [form, setForm] = useState<DeviceSettings>(initial);
@@ -371,7 +371,7 @@ function Field({ id, label, hint, error, wide, children }: { id: string; label: 
 
 /** Identité de la console (clé SSH). Pas encore approuvée (nouvelle console, nouvelle adresse) : l'empreinte est lue
  * tout de suite, il ne reste qu'à la comparer et à l'approuver ; « Paramètres#hk » (lien des erreurs) y amène. */
-function HostKeyPanel({ trusted, host }: { trusted: boolean; host: string }) {
+export function HostKeyPanel({ trusted, host }: { trusted: boolean; host: string }) {
   const t = useT();
   const qc = useQueryClient();
   const [key, setKey] = useState<HostKey | null>(null);
@@ -493,13 +493,20 @@ function gap(seconds: number): string {
   return t("settings.clock.unit.s", { count: seconds });
 }
 
-/** Diagnostic de la connexion, étape par étape (POST /api/device/diagnose). */
-function TestPanel() {
+/**
+ * Diagnostic de la connexion, étape par étape (POST /api/device/diagnose). `auto` le lance dès l'affichage : dernière
+ * étape de la mise en route sur le tableau de bord.
+ */
+export function TestPanel({ auto = false }: { auto?: boolean }) {
   const t = useT();
   const test = useMutation({ mutationFn: api.diagnose });
   const r = test.data;
   const qc = useQueryClient();
   const run = () => test.mutate(undefined, { onSuccess: () => qc.invalidateQueries({ queryKey: ["device-status"] }) });
+  useEffect(() => {
+    if (auto) run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto]);
   return (
     <section className="block" aria-labelledby="test-h">
       <div className="block__head">

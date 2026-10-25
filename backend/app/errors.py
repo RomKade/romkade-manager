@@ -31,6 +31,10 @@ def credentials_missing() -> AppError:
     return AppError("credentials_missing", "Aucun mot de passe enregistré dans le trousseau", 409)
 
 
+def console_not_configured() -> AppError:
+    return AppError("console_not_configured", "Aucune console indiquée : saisis son adresse dans Paramètres > Connexion.", 409)
+
+
 def host_key_unknown(fingerprint: str | None = None) -> AppError:
     return AppError(
         "host_key_unknown",

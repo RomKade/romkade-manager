@@ -3,9 +3,10 @@ import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
-  isActive, useCaps, useDeviceStatus, useFavorites, useLaunchGame, useNowPlaying, usePlatforms, usePlayState, useRecentGames, useRecentPlayed, useStartSync,
-  useStatus, useTransfers,
+  isActive, useCaps, useDeviceStatus, useFavorites, useLaunchGame, useNowPlaying, usePlatforms, usePlayState, useRecentGames, useRecentPlayed, useSettings,
+  useStartSync, useStatus, useTransfers,
 } from "../api/queries";
+import type { Settings } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ConsoleBadge } from "../components/ConsoleBadge";
 import { Cover } from "../components/Cover";
@@ -17,6 +18,7 @@ import { Empty, ErrorNotice, errorMessage, Spinner } from "../components/ui";
 import { locale, useT } from "../i18n";
 import { ago, count, gb } from "../lib/format";
 import { LimitGauge, useDuration } from "./Playtime";
+import { ConnectionForm, HostKeyPanel, TestPanel } from "./Settings";
 
 /**
  * « 4 838 jeux sur 34 consoles » : la phrase reste celle de la traduction (et son nom accessible inchangé),
@@ -61,12 +63,31 @@ function Greeting({ playing, last }: { playing?: string; last?: string }) {
   return <p className="hero__hello">{text}</p>;
 }
 
+/**
+ * Mise en route, tant que la bibliothèque n'a jamais été lue et que la console ne répond pas : l'étape en cours
+ * (1. la console : adresse et mot de passe ; 2. approuver son empreinte ; 3. le test), avec les panneaux de
+ * Paramètres > Connexion. Une fois la console en ligne, l'accueil propose la première synchronisation.
+ */
+function setupStep(settings: Settings): 1 | 2 | 3 {
+  const auth = settings.auth_method === "password" ? settings.has_password : !!settings.key_path;
+  if (!settings.host || !auth) return 1;
+  return settings.host_key_trusted ? 3 : 2;
+}
+
+function SetupStep({ settings }: { settings: Settings }) {
+  const step = setupStep(settings);
+  if (step === 1) return <ConnectionForm initial={settings} hasPassword={settings.has_password} />;
+  if (step === 2) return <HostKeyPanel trusted={settings.host_key_trusted} host={settings.host} />;
+  return <TestPanel auto />;
+}
+
 export function DashboardPage() {
   const t = useT();
   const status = useStatus();
   const platforms = usePlatforms();
   const recent = useRecentGames();
   const device = useDeviceStatus();
+  const settings = useSettings();
   const start = useStartSync(() => undefined);
   const [openId, setOpenId] = useState<number | null>(null);
   const activeTransfers = (useTransfers().data ?? []).filter(isActive);
@@ -86,6 +107,9 @@ export function DashboardPage() {
   const run = s.last_run;
   const online = device.data?.connected;
   const nowId = nowPlaying.data?.playing ? nowPlaying.data.game?.id : undefined;
+  // Première fois : la console n'a jamais été lue et ne répond pas (pas encore indiquée, clé à approuver…).
+  const setup = !s.synced && online === false && settings.data ? settings.data : null;
+  const step = setup ? setupStep(setup) : null;
 
   return (
     <div className="page dashboard">
@@ -95,11 +119,13 @@ export function DashboardPage() {
           {s.synced ? (
             <HeroTitle games={s.game_count} consoles={s.platform_count} />
           ) : (
-            t("dashboard.notSynced")
+            t(setup ? "dashboard.setup.title" : "dashboard.notSynced")
           )}
         </h1>
         <p className="hero__sub">
-          {s.synced ? (
+          {setup ? (
+            t("dashboard.setup.sub")
+          ) : s.synced ? (
             <>
               {t("dashboard.summary", { files: t("dashboard.files", { count: s.file_count }), size: gb(s.total_bytes) })}{" "}
               {s.storage_free_bytes != null && <>{t("dashboard.freeLeft", { free: gb(s.storage_free_bytes) })}{" "}</>}
@@ -109,7 +135,12 @@ export function DashboardPage() {
             t("dashboard.notSyncedSub")
           )}
         </p>
-        <div className="hero__actions">
+        {step && (
+          <p className="hero__step">
+            {t("dashboard.setup.step", { n: step, label: t(`settings.steps.${["console", "identity", "test"][step - 1]}`) })}
+          </p>
+        )}
+        {!setup && <div className="hero__actions">
           <button
             type="button"
             className="button button--neon"
@@ -127,9 +158,11 @@ export function DashboardPage() {
           {run?.status === "failed" && !s.sync_running && (
             <p className="text-error">{t("dashboard.lastFailed")} <Link to="/synchronisation">{t("dashboard.seeDetail")}</Link></p>
           )}
-        </div>
+        </div>}
         {start.isError && <ErrorNotice error={start.error} />}
       </section>
+
+      {setup && <SetupStep settings={setup} />}
 
       <NowPlayingCard online={online === true} onOpen={setOpenId} />
 

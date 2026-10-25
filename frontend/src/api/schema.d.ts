@@ -2408,7 +2408,7 @@ export interface components {
         DeviceSettings: {
             /**
              * Host
-             * @default 192.168.86.242
+             * @default
              */
             host: string;
             /**
@@ -3495,7 +3495,7 @@ export interface components {
         SettingsOut: {
             /**
              * Host
-             * @default 192.168.86.242
+             * @default
              */
             host: string;
             /**
