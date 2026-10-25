@@ -93,6 +93,11 @@ function AddToAssistant() {
       <div className="remote__howto">
         <div><strong>ChatGPT</strong><p className="muted small">{t("account.remote.add.chatgpt")}</p></div>
         <div><strong>Claude</strong><p className="muted small">{t("account.remote.add.claude")}</p></div>
+        <div>
+          <strong>Google Home</strong> <span className="account__badge account__badge--soon">{t("account.remote.add.googleSoon")}</span>
+          <p className="muted small">{t("account.remote.add.google")}</p>
+          <p className="small remote__say">{t("account.remote.add.googleSay")}</p>
+        </div>
       </div>
       <p className="field__hint">{t("account.remote.add.then")}</p>
     </Block>
@@ -349,7 +354,7 @@ function Consoles() {
           {here && agent && (
             <p className="field__hint">
               {t("account.linked.update", { version: agent.version ?? t("account.linked.old") })}{" "}
-              {agent.version !== agent.latest && <strong className="account__new">{t("account.linked.available", { version: agent.latest })} </strong>}
+              {agent.update && <strong className="account__new">{t("account.linked.available", { version: agent.latest })} </strong>}
               <button className="auth__link" disabled={a.busy} onClick={() => a.run(async () => {
                 const r = await localAgent.link(); await load();
                 return t(r.splash ? "account.linked.updatedLook" : "account.linked.updated"); })}>
@@ -411,8 +416,18 @@ function ConnectedApps() {
                 <strong>{g.client.name || g.client.id}</strong>
                 <span className="muted small">{t("account.apps.since", { date: date(g.granted_at) })}</span>
               </span>
-              <button className="button button--ghost" disabled={a.busy} onClick={() => a.run(async () => {
-                const { error } = await supabase.auth.oauth.revokeGrant({ clientId: g.client.id }); fail(error); await load(); })}>
+              <button className="button button--ghost" disabled={a.busy} onClick={() => {
+                const name = g.client.name || g.client.id;
+                if (!window.confirm(t("account.apps.revokeConfirm", { name }))) return;
+                a.run(async () => {
+                  const { error } = await supabase.auth.oauth.revokeGrant({ clientId: g.client.id }); fail(error);
+                  // Relu après coup : le message ne dit « retiré » que si l'assistant a bien disparu de la liste.
+                  const { data } = await supabase.auth.oauth.listGrants();
+                  setGrants(data ?? []);
+                  if ((data ?? []).some((x) => x.client.id === g.client.id)) throw new Error(t("account.apps.revokeFailed", { name }));
+                  return t("account.apps.revoked", { name });
+                });
+              }}>
                 {t("account.apps.revoke")}
               </button>
             </li>

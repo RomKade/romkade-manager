@@ -9,12 +9,13 @@ import { ConsoleBadge } from "./ConsoleBadge";
 import { Cover } from "./Cover";
 import { Flag } from "./Flag";
 import { GameSheet } from "./GameSheet";
+import { PhoneButton } from "./PhoneButton";
 import { QuickSearch } from "./QuickSearch";
 import { ScreenshotButton } from "./Screenshots";
 import { errorMessage } from "./ui";
 import { VolumeControl } from "./VolumeControl";
 
-/** Barre du haut, sur toutes les pages : recherche, jeu en cours sur la console, choix de la langue. */
+/** Barre du haut, sur toutes les pages : recherche, jeu en cours sur la console, téléphone (QR code), langue. */
 export function TopBar() {
   // Fiche ouverte depuis la recherche ou le jeu en cours, par-dessus la page affichée.
   const [openId, setOpenId] = useState<number | null>(null);
@@ -22,6 +23,7 @@ export function TopBar() {
     <div className="topbar">
       <QuickSearch onOpen={setOpenId} />
       <NowPlayingChip onOpen={setOpenId} />
+      <PhoneButton />
       <LanguageSwitcher />
       <GameSheet id={openId} onClose={() => setOpenId(null)} onOpen={setOpenId} />
     </div>

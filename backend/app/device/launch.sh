@@ -89,6 +89,18 @@ for _ in $(seq 1 50); do
 done
 if pidof retroarch >/dev/null; then log "RetroArch ne se ferme pas"; exit 3; fi
 
+# 1 bis. Un émulateur autonome tourne encore (DS, PSP, émulateurs du firmware ; AGM_GAMES, voir launcher.py) : il
+# n'a pas de commande « Quitter », on le ferme (SIGTERM, puis SIGKILL). Sinon il reste en arrière-plan, invisible,
+# et garde la sortie audio HDMI : le jeu suivant démarre sans son (la sortie Bluetooth s'en sert d'horloge).
+for name in $AGM_GAMES; do
+    for p in $(pidof "$name"); do
+        kill -TERM "$p" 2>/dev/null
+        for _ in $(seq 1 15); do [ -d "/proc/$p" ] || break; sleep 0.2; done
+        [ -d "/proc/$p" ] && kill -KILL "$p" 2>/dev/null
+        log "$name ($p) fermé"
+    done
+done
+
 # Manette de chaque joueur choisie dans Game Manager (app/device/players_apply.sh, passé dans AGM_PLAYERS).
 # RetroArch est fermé : sa config ne sera plus écrasée. Recalculé à chaque jeu, avec les manettes branchées
 # maintenant (numéro dans l'ordre de RetroArch + réservation de la manette).

@@ -312,12 +312,12 @@ function LaunchButton({ id }: { id: number }) {
   );
 }
 
-/** Étoile de la fiche : met le jeu en favori ou l'en retire. */
-function FavoriteButton({ id, on }: { id: number; on: boolean }) {
+/** Étoile de la fiche (et du jeu en cours, au tableau de bord) : met le jeu en favori ou l'en retire. */
+export function FavoriteButton({ id, on, small = false }: { id: number; on: boolean; small?: boolean }) {
   const t = useT();
   const set = useSetFavorite(id);
   return (
-    <button type="button" className={`button favorite-button ${on ? "is-on" : ""}`} aria-pressed={on}
+    <button type="button" className={`button ${small ? "button--small " : ""}favorite-button ${on ? "is-on" : ""}`} aria-pressed={on}
       disabled={set.isPending} onClick={() => set.mutate(!on)}>
       <Star size={16} fill={on ? "currentColor" : "none"} aria-hidden /> {t(on ? "sheet.favorite.on" : "sheet.favorite.add")}
     </button>

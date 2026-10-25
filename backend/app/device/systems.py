@@ -69,6 +69,7 @@ class SystemProfile:
             "players": self.bluetooth == "stock",
             "volume": self.bluetooth == "stock",  # mixeur de la puce son du firmware d'origine (app/device/volume.py)  # firmware d'origine : config RetroArch fixe (app/device/players.py)
             "on_screen_message": self.ra_network,
+            "break_screen": self.bluetooth == "stock",  # alerte de temps de jeu plein écran (app/device/break_screen.py)
             "clock": self.clock,
             "screenshot": self.bluetooth == "stock",  # écran lu dans /dev/fb0 (app/device/screen.py), essayé sur H700
         }

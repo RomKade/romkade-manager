@@ -330,3 +330,42 @@ async def test_two_player_games_come_from_the_database(app_factory, monkeypatch)
         assert "Sonic" not in system.split("Library:")[0]
         assert "playable by 2 or more on the same console" in system and "never guess it" in system
         assert "shown to the user as clickable game cards" in system and "never list their titles" in system
+
+
+ROUTE = {"in_scope": True, "intent": "find_games", "search": "", "games_mentioned": [], "genre": "", "console": "",
+         "wants_solution": False, "action": "", "volume": -1, "players": -1, "theme": "", "theme_titles": [], "sort": ""}
+
+
+async def test_theme_finds_known_titles_of_the_library_only(app_factory, monkeypatch):
+    """« Des jeux de western ? » : pas un genre ; les titres connus du modèle pour ce thème, s'ils sont dans la
+    bibliothèque (titre exact : un titre absent ne ramène rien d'autre)."""
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        model, seen = fake_llm({**ROUTE, "theme": "wild west, cowboy",
+                                "theme_titles": ["Desperados", "Sonic The Hedgehog", "Sunset Riders"]}, ["Sonic."])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Des jeux de western ?"}]})
+        meta = events(r.text)[0][1]
+        assert [g["title"] for g in meta["games"]] == ["Sonic The Hedgehog"]
+        assert "theme: wild west" in seen["answers"][0]["messages"][0]["content"]
+
+
+async def test_newest_games_sorted_by_year_with_the_year(app_factory, monkeypatch):
+    from app.db.models import RemoteFile
+    from sqlalchemy import select
+
+    app = app_factory()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        with app.state.sessions() as s:
+            years = {"Super Mario World": 1990, "Sonic The Hedgehog": 1991, "Ridge Racer": 1994}
+            for f in s.scalars(select(RemoteFile).where(RemoteFile.role == "candidate")):
+                f.release_year = next((y for t, y in years.items() if f.title.startswith(t)), None)
+            s.commit()
+        model, seen = fake_llm({**ROUTE, "sort": "newest"}, ["Ridge Racer."])
+        monkeypatch.setattr(llm, "resolve", lambda state: model)
+        r = await c.post("/api/assistant", json={"lang": "fr", "messages": [{"role": "user", "content": "Les jeux les plus récents ?"}]})
+        games = events(r.text)[0][1]["games"]
+        assert [g["year"] for g in games][:3] == [1994, 1991, 1990]
+        assert "sorted by release year, newest first" in seen["answers"][0]["messages"][0]["content"]

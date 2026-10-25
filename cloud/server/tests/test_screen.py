@@ -1,4 +1,4 @@
-"""Écran de l'app ROMKADE de la console (agent/screen.py) : chaque état se dessine, dans chaque langue."""
+"""Écran de l'app ROMKADE de la console (agent/screen.py) : chaque état se dessine (en anglais)."""
 
 import importlib.util
 import time
@@ -11,16 +11,16 @@ screen = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(screen)
 
 
-@pytest.mark.parametrize("lang", ["fr", "en", "es"])
 @pytest.mark.parametrize("state", [
     {"status": "code", "code": "X52A4H", "code_until": time.time() + 600},
-    {"status": "paired", "name": "Ma RG35XX", "games": 4838},
+    {"status": "paired", "name": "My RG35XX", "games": 4838},
+    {"status": "updated", "name": "My RG35XX"},
     {"status": "connecting"},
     {"status": "offline"},
 ])
-def test_every_screen_renders(state, lang):
+def test_every_screen_renders(state):
     for size in ((640, 480), (720, 720), (720, 480)):
-        img = screen.render(state, lang, size)
+        img = screen.render(state, size)
         assert img.size == size
         assert img.getbbox() is not None
 

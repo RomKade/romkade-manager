@@ -2,16 +2,17 @@ import { CheckCircle2, Save, Square } from "lucide-react";
 import { useState } from "react";
 
 import { imageUrl } from "../api/client";
-import { useCaps, useNowPlaying, useQuitGame, useSaveStateNow } from "../api/queries";
+import { useCaps, useGame, useNowPlaying, useQuitGame, useSaveStateNow } from "../api/queries";
 import { useT } from "../i18n";
 import { ConsoleBadge } from "./ConsoleBadge";
 import { ScreenshotButton } from "./Screenshots";
 import { Cover } from "./Cover";
+import { FavoriteButton } from "./GameSheet";
 import { VolumeControl } from "./VolumeControl";
 import { errorMessage } from "./ui";
 
-/** Tableau de bord : le jeu qui tourne sur la console, avec « Sauvegarder maintenant », « Quitter le jeu » et
- * « Capture d'écran ». */
+/** Tableau de bord : le jeu qui tourne sur la console, avec « Sauvegarder maintenant », « Quitter le jeu »,
+ * « Capture d'écran » et l'étoile des favoris. */
 export function NowPlayingCard({ online, onOpen }: { online: boolean; onOpen?: (id: number) => void }) {
   const t = useT();
   const now = useNowPlaying(online).data;
@@ -56,12 +57,19 @@ export function NowPlayingCard({ online, onOpen }: { online: boolean; onOpen?: (
           )}
           {save.isSuccess && <span className="ok-text" role="status"><CheckCircle2 size={16} aria-hidden /> {t("dashboard.saved")}</span>}
           {now.game && <ScreenshotButton variant="small" label="full" />}
+          {now.game && <NowFavorite id={now.game.id} />}
         </div>
         {!((ra || !caps.resume_slot) && caps.quit) && <p className="muted">{t("dashboard.quitOnConsole")}</p>}
         {(save.isError || quit.isError) && <p className="text-error">{errorMessage(save.error ?? quit.error)}</p>}
       </div>
     </section>
   );
+}
+
+/** Favori du jeu en cours : l'état vient de sa fiche (même cache que la fiche ouverte). */
+function NowFavorite({ id }: { id: number }) {
+  const game = useGame(id).data;
+  return game ? <FavoriteButton id={id} on={game.favorite ?? false} small /> : null;
 }
 
 /**

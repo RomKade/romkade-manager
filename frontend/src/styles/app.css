@@ -408,6 +408,7 @@ button, input, select { font: inherit; color: inherit; }
 .hero__num--games { color: var(--accent); text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent); }
 .hero__num--consoles { color: var(--accent-2); text-shadow: 0 0 22px color-mix(in srgb, var(--accent-2) 45%, transparent); }
 .hero__sub { color: var(--ink-2); font-size: var(--fs-lg); max-width: 62ch; }
+.hero__hello { margin: 0; color: var(--accent); font-size: var(--fs-lg); font-weight: 700; }
 .hero__actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
 .dashboard__cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; }
 
@@ -1172,6 +1173,15 @@ kbd {
 .lang-switch:hover, .lang-switch[data-state="open"] { box-shadow: inset 0 0 0 1px var(--line-strong); }
 .lang-switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .lang-menu { min-width: 170px; }
+.phone-switch { padding: 0 11px; }
+.phone-pop { width: 260px; padding: 14px; gap: 8px; align-items: center; text-align: center; }
+.phone-pop__title { margin: 0; font-weight: 700; }
+.phone-pop__qr { width: 200px; height: 200px; border-radius: 10px; background: #fff; }
+.phone-pop__hint { margin: 0; color: var(--ink-2); font-size: var(--fs-sm); }
+.phone-pop__fine { margin: 0; color: var(--ink-3); font-size: var(--fs-xs); }
+.phone-pop__devices { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin: 4px 0 0;
+  padding-top: 10px; border-top: 1px solid var(--line); font-size: var(--fs-xs); color: var(--ink-2); }
+.phone-pop__out { border: none; background: none; padding: 0; color: var(--danger); font: inherit; font-weight: 600; cursor: pointer; }
 .lang-menu ul { list-style: none; margin: 0; padding: 0; }
 .lang-menu__item {
   display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; border-radius: 6px;
@@ -1183,6 +1193,7 @@ kbd {
 @media (max-width: 760px) {
   /* En haut à droite de l'écran, au-dessus du bandeau du menu (qui lui laisse la place) */
   .lang-switch { position: fixed; top: 10px; right: 12px; z-index: 40; height: 32px; padding: 0 8px; }
+  .phone-switch { display: none; }  /* écran étroit : sans doute déjà un téléphone, et la place est prise */
   .sidebar { padding-right: 96px; }
 }
 
@@ -1431,10 +1442,26 @@ kbd {
   border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); }
 .assistant__msg--error { align-self: flex-start; color: var(--err); border: 1px solid color-mix(in srgb, var(--err) 45%, var(--line)); }
 .assistant__typing { color: var(--ink-3); font-style: italic; }
-.assistant__games, .assistant__sources { display: flex; flex-wrap: wrap; gap: 4px 8px; white-space: normal; }
-.assistant__game { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; cursor: pointer;
-  border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 700; }
-.assistant__game em { font-style: normal; color: var(--accent-2); font-weight: 600; }
+.assistant__sources { display: flex; flex-wrap: wrap; gap: 4px 8px; white-space: normal; }
+/* Jeux cités : une liste de lignes de même largeur (jaquette, titre, console et année), qui ouvrent la fiche */
+.assistant__msg--bot:has(.assistant__games) { width: 90%; }
+.assistant__games { display: flex; flex-direction: column; gap: 4px; white-space: normal; }
+.assistant__game { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 4px 8px 4px 4px;
+  border-radius: 8px; border: 1px solid transparent; background: color-mix(in srgb, var(--panel-2) 70%, transparent);
+  color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color 120ms, background 120ms; }
+.assistant__game:hover:not(:disabled), .assistant__game:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--panel-2); }
+.assistant__game:disabled { cursor: default; }
+.assistant__cover.cover, .assistant__cover--none { width: 32px; height: 44px; flex: none; border-radius: 4px; }
+.assistant__cover--none { display: grid; place-items: center; background: var(--panel); color: var(--ink-3); border: 1px solid var(--line); }
+.assistant__cover .cover__initials { font-size: 11px; }
+.assistant__cover .cover__platform { display: none; }
+.assistant__game-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.assistant__game-title { font-size: var(--fs-sm); font-weight: 700; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.assistant__game-meta { font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.assistant__game-go { flex: none; color: var(--ink-3); transition: color 120ms, transform 120ms; }
+.assistant__game:hover:not(:disabled) .assistant__game-go { color: var(--accent); transform: translateX(2px); }
 .assistant__sources a { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--ink-3); }
 .assistant__foot { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
 .assistant__form { display: flex; gap: 6px; }
@@ -1586,3 +1613,10 @@ kbd {
 @keyframes duke-nod { 50% { transform: translateY(-1px) rotate(-4deg); } }
 .llm__persona { display: flex; align-items: center; gap: 14px; }
 .llm__persona .assistant__face { width: 64px; height: 64px; margin: 0; }
+
+/* Manette de l'ordinateur : invite à appuyer sur un bouton, puis manette détectée */
+.players__pc { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px; border-radius: var(--r-control);
+  background: var(--panel-2); color: var(--ink-2); font-size: var(--fs-sm); }
+.players__pc svg { flex: none; color: var(--ink-3); }
+.players__pc.is-seen { color: var(--ink); }
+.players__pc.is-seen svg { color: var(--accent); }

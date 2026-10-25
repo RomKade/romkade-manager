@@ -26,8 +26,10 @@ from app.services.staging import validate_filename
 TEMP_RE = re.compile(r"^\.agm-[0-9a-f]{32}\.part$")
 BACKUP_DIR = ".agm-backups"
 FORBIDDEN_TARGETS = {"APPS", "PORTS"}
-BLOCK_SIZE = 256 * 1024
-MAX_REQUESTS = 32
+# 128 Kio : le serveur SFTP de la console (OpenSSH, paquets de 256 Kio au plus, en-têtes compris) ferme la connexion
+# dès un bloc de 256 Kio (« SFTPConnectionLost » sans un octet copié). Mesuré : 13,7 Mo/s en 128 Kio × 16.
+BLOCK_SIZE = 128 * 1024
+MAX_REQUESTS = 16
 
 
 class RemoteWriter:

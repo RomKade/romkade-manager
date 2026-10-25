@@ -40,10 +40,12 @@ from starlette.staticfiles import StaticFiles
 
 from app.services import cheats as cheat_db
 
-from . import catalog, demo
+from . import catalog
 from .analytics import Analytics
 from .art import Art
 from .auth import SupabaseAuth, account_id
+from .google_home import GoogleHome
+from .homegraph import HomeGraph
 from .relay import Relay
 from .store import MAX_CONSOLES, Store
 from .tools import build
@@ -125,6 +127,11 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     if auth is None and supabase_url:
         auth = SupabaseAuth(supabase_url, publishable_key)
     mcp = build(store, relay, public_url)
+    # Google Home (google_home.py) : identifiants donnés à Google et client public Supabase du relais d'autorisation.
+    google = GoogleHome(store, relay, auth, public_url, os.environ.get("ROMKADE_GOOGLE_CLIENT_ID", ""),
+                        os.environ.get("ROMKADE_GOOGLE_CLIENT_SECRET", ""),
+                        os.environ.get("ROMKADE_GOOGLE_SUPABASE_CLIENT_ID", ""),
+                        homegraph=HomeGraph(os.environ.get("ROMKADE_GOOGLE_SERVICE_ACCOUNT_B64", "")))
     analytics = Analytics(mcp)  # statistiques d'usage, sans le contenu des appels (analytics.py)
     art = Art(store)
 
@@ -167,6 +174,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         else:
             store.update_info(c.id, info)
         c = store.console(c.id)
+        google.console_seen(c)  # Google Home : console en ligne (Report State)
         out = {"console_id": c.id, "paired": c.account_id is not None, "name": c.label}
         if secret:
             out["secret"] = secret
@@ -188,17 +196,26 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         count = await asyncio.to_thread(store.replace_catalog, c.id, games, files, catalog.VERSION)
         return JSONResponse({"games": count})
 
-    async def upload_favorites(request: Request) -> Response:
+    async def upload_list(request: Request, field: str, replace) -> Response:
+        """Favoris (posés par le Manager) ou jeux récents (historique de RetroArch), envoyés par l'app ROMKADE."""
         c = console_of(request)
         if c is None:
             return JSONResponse({"error": "unauthorized"}, 401)
         try:
             payload = await body_json(request)
-            favs = [[str(f[0])[:255], str(f[1])[:1024]] for f in payload.get("favorites") or []
-                    if isinstance(f, list) and len(f) == 2][:MAX_FAVORITES]
+            items = [[str(f[0])[:255], str(f[1])[:1024]] for f in payload.get(field) or []
+                     if isinstance(f, list) and len(f) == 2][:MAX_FAVORITES]
         except (ValueError, AttributeError):
             return JSONResponse({"error": "bad_request"}, 400)
-        return JSONResponse({"favorites": await asyncio.to_thread(store.replace_favorites, c.id, favs)})
+        count = await asyncio.to_thread(replace, c.id, items)
+        google.lists_changed(c)  # Google Home : liste des jeux à dire mise à jour (Request Sync)
+        return JSONResponse({field: count})
+
+    async def upload_favorites(request: Request) -> Response:
+        return await upload_list(request, "favorites", store.replace_favorites)
+
+    async def upload_recent(request: Request) -> Response:
+        return await upload_list(request, "recent", store.replace_recent)
 
     async def poll(request: Request) -> Response:
         c = console_of(request)
@@ -364,10 +381,15 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/agent/hello", hello, methods=["POST"]),
         Route("/agent/catalog", upload_catalog, methods=["POST"]),
         Route("/agent/favorites", upload_favorites, methods=["POST"]),
+        Route("/agent/recent", upload_recent, methods=["POST"]),
         Route("/agent/poll", poll, methods=["GET"]),
         Route("/agent/result", result, methods=["POST"]),
         Route("/art/{key}.webp", cover),
         Route("/healthz", health),
+        Route("/google/authorize", google.authorize, methods=["GET"]),
+        Route("/google/callback", google.oauth_callback, methods=["GET"]),
+        Route("/google/token", google.token, methods=["POST"]),
+        Route("/google/fulfillment", google.fulfillment, methods=["POST"]),
         Route("/.well-known/oauth-protected-resource", protected_resource),
         Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
         Route("/.well-known/oauth-authorization-server", authorization_server),
@@ -389,16 +411,14 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         await asyncio.to_thread(rebuild_catalogs, store)
         if cheat_db.index() is None and os.environ.get("ROMKADE_FETCH_CHEATS", "1") == "1":
             asyncio.get_running_loop().create_task(_fetch_cheats())
-        demos = asyncio.get_running_loop().create_task(demo.run_all(store, relay))  # consoles de démo (demo.py)
         try:
             async with inner_lifespan(a) as state:
                 yield state
         finally:
-            demos.cancel()
             await analytics.close()
 
     app.router.lifespan_context = lifespan
-    app.state.store, app.state.relay = store, relay
+    app.state.store, app.state.relay, app.state.google = store, relay, google
     if token_urls is None:  # adresses à jeton : par défaut, seulement là où il n'y a pas d'OAuth
         token_urls = auth is None or os.environ.get("ROMKADE_TOKEN_URLS") == "1"
     return AccountPath(CrossOrigin(app), store, auth, public_url, token_urls)

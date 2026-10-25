@@ -6,6 +6,7 @@ import {
   isActive, useCaps, useDeviceStatus, useFavorites, useLaunchGame, useNowPlaying, usePlatforms, usePlayState, useRecentGames, useRecentPlayed, useStartSync,
   useStatus, useTransfers,
 } from "../api/queries";
+import { useAuth } from "../auth/AuthContext";
 import { ConsoleBadge } from "../components/ConsoleBadge";
 import { Cover } from "../components/Cover";
 import { GameSheet } from "../components/GameSheet";
@@ -44,6 +45,22 @@ function HeroTitle({ games, consoles }: { games: number; consoles: number }) {
   );
 }
 
+/**
+ * « Bonsoir Arnaud, on reprend Zelda ? » : le pseudo du compte ROMKADE, selon l'heure, avec le jeu en cours ou la
+ * dernière partie. Rien sans pseudo (téléphone associé par QR code : pas de session).
+ */
+function Greeting({ playing, last }: { playing?: string; last?: string }) {
+  const t = useT();
+  const name = (useAuth().session?.user.user_metadata as { name?: string } | undefined)?.name?.trim();
+  if (!name) return null;
+  const h = new Date().getHours();
+  const hello = t(h >= 5 && h < 12 ? "dashboard.hello.morning" : h >= 5 && h < 18 ? "dashboard.hello.afternoon" : "dashboard.hello.evening", { name });
+  const text = playing ? t("dashboard.hello.playing", { hello, title: playing })
+    : last ? t("dashboard.hello.resume", { hello, title: last })
+    : t("dashboard.hello.plain", { hello });
+  return <p className="hero__hello">{text}</p>;
+}
+
 export function DashboardPage() {
   const t = useT();
   const status = useStatus();
@@ -73,6 +90,7 @@ export function DashboardPage() {
   return (
     <div className="page dashboard">
       <section className="hero" aria-labelledby="hero-h">
+        <Greeting playing={nowPlaying.data?.playing ? nowPlaying.data.game?.title ?? undefined : undefined} last={lastPlayed?.title} />
         <h1 id="hero-h" className="hero__line">
           {s.synced ? (
             <HeroTitle games={s.game_count} consoles={s.platform_count} />

@@ -46,6 +46,7 @@ export const cloud = {
 /** App ROMKADE de la console branchée : installée, sa version, et celle que ce Manager installerait. */
 export type AgentStatus = {
   supported: boolean; installed: boolean; server: string | null; cloud: string; version: string | null; latest: string;
+  update: boolean;  // ce Manager a une autre version de l'app (il la met aussi à jour tout seul à la connexion)
 };
 
 /** Moteur local du Manager : agent ROMKADE de la console branchée. */

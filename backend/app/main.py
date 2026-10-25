@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import cloud, assistant, bluetooth, catalog, cheats, controls, descriptions, gamepad, knowledge, llm, play, players, playtime, saves, screenshots, system, transfers, videos, volume
+from app.api import cloud, assistant, bluetooth, catalog, cheats, controls, descriptions, gamepad, knowledge, llm, phone, play, players, playtime, saves, screenshots, system, transfers, videos, volume
 from app.api.catalog import console_key
 from app.api.routes import router
 from app.config import SettingsStore, data_dir
@@ -34,6 +34,7 @@ from app.services.search import SearchService
 from app.device.systems import SystemService
 from app.services import cloud_agent
 from app.services.catalog_watch import CatalogWatcher
+from app.services.phone import PhoneAccess
 from app.services.save_vault import SaveVault
 from app.services.screenshots import ScreenshotStore
 from app.services.staging import StagingStore
@@ -56,7 +57,9 @@ def create_app(
             app.state.tracker.start()
         app.state.search.start()
         app.state.watcher.start()  # veille de la carte (AGM_NO_WATCH=1 pour la couper)
+        await app.state.phone.resume()  # téléphone associé : le Manager se rouvre aussi sur le réseau local
         yield
+        await app.state.phone.stop()
         await app.state.watcher.stop()
         await app.state.search.stop()
         await app.state.tracker.stop()
@@ -118,6 +121,9 @@ def create_app(
         lambda: DeviceClient(st.settings_store.load(), st.credentials, st.host_keys))
 
     app.state.presence = Presence()
+    # Le Manager sur le téléphone (QR code, Wi-Fi de la maison) : même application, derrière PhoneGate.
+    app.state.phone = PhoneAccess((cache_dir.parent if cache_dir else base) / "phone.json")
+    app.state.phone.app = app
 
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
@@ -162,6 +168,7 @@ def create_app(
     app.include_router(playtime.router)
     app.include_router(system.router)
     app.include_router(cloud.router)
+    app.include_router(phone.router)
     _mount_frontend(app, frontend_dist)
     return app
 

@@ -401,6 +401,16 @@ Un juego lanzado desde el menú de la consola no usa `/.asoundrc`: solo funciona
 
 ## Desde el móvil (ngrok)
 
+**En casa, misma red Wi-Fi**: el botón del móvil, arriba en la interfaz, muestra un código QR. Escanéalo con la
+cámara del móvil: el Manager se abre en el móvil, sin volver a iniciar sesión (lo ha emparejado el ordenador, con
+la sesión iniciada). El código vale 5 minutos y sirve una sola vez; después, el móvil queda emparejado 90 días.
+Mientras haya un móvil emparejado, el servidor escucha también en la dirección del ordenador en la red local, pero
+solo responde a los móviles emparejados; «Desconectar», en la misma ventana, los desempareja todos y cierra ese
+acceso. Todavía no con Docker. En macOS, la primera vez, permite las conexiones entrantes para Python si se
+pregunta.
+
+**Fuera de casa**, con ngrok:
+
 ```bash
 ./run.sh --telephone
 ```

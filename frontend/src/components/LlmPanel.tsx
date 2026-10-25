@@ -226,7 +226,7 @@ function NameAndDisplay() {
         <input type="checkbox" checked={!hidden} onChange={(e) => assistant.setHidden(!e.target.checked)} />
         {t("settings.as.show")}
       </label>
-      <p className="muted small">{t("settings.ai.uses")} <Link to="/parametres/connaissances">{t("settings.as.knowledge")}</Link></p>
+      <p className="muted small">{t("settings.ai.uses")} <Link to="/parametres/catalogue">{t("settings.as.knowledge")}</Link></p>
     </section>
   );
 }

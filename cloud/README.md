@@ -31,9 +31,9 @@ ordres. Rien à ouvrir sur la box, pas d'IP, pas de SSH.
   Manager : vrai titre des jeux d'arcade, genre, année, développeur, éditeur, résumé. La liste brute est gardée et
   recalculée au démarrage quand `catalog.VERSION` change. Les cheats viennent de la base libretro.
 - `store.py` : comptes, consoles, catalogues (SQLite ; secrets gardés en empreinte SHA-256).
-- `demo.py` : console de démonstration simulée par le serveur, toujours en ligne, pour les relecteurs des annuaires
-  d'apps : homebrews libres seulement, sauvegardes, son, lancement. `python -m romkade_cloud demo-console
-  demo@romkade.com` la rattache au compte (créé d'abord par une connexion normale).
+- `demo_console.py` : console de démonstration toujours en ligne (service `romkade-demo` de la droplet), homebrews
+  gratuits seulement, pour la certification Google Home et les relecteurs des annuaires d'apps (compte
+  demo@romkade.com). `demo-register <compte>` donne son secret (`ROMKADE_DEMO_SECRET`).
 
 ```sh
 cd cloud/server

@@ -83,3 +83,14 @@ def test_standalone_emulator_from_console_menu():
     assert "pcsx" in launcher.STATUS_COMMAND
     st = launcher.parse_status("proc=pcsx\narg=/mnt/mmc/Roms/PS/Crash Bandicoot N. Sane Trilogy.PBP\n")
     assert st["playing"] and st["process"] == "pcsx" and st["rom_path"].endswith("Trilogy.PBP")
+
+
+def test_launch_closes_leftover_standalone_emulators():
+    """Un émulateur autonome resté ouvert (DS…) garde la sortie audio : le jeu suivant serait muet. launch.sh reçoit
+    la liste des émulateurs à fermer avant de lancer."""
+    from app.device import launcher
+
+    cmd = launcher.launch_command("PS", "/mnt/mmc/Roms/PS/Future Cop - L.A.P.D. (USA).chd")
+    games = cmd.split("AGM_GAMES=", 1)[1].split("'")[1].split()
+    assert "drastic" in games and "PPSSPPSDL" in games and "retroarch" not in games
+    assert 'for name in $AGM_GAMES' in launcher.LAUNCH_SCRIPT

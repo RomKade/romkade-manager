@@ -18,7 +18,7 @@ from app.schemas import (
     ConnectionTestOut, FilesPageOut, HostKeyOut, InventoryOut, Page, PasswordIn,
     PlatformOut, SettingsOut, StorageOut, TrustHostKeyIn,
 )
-from app.services import inventory
+from app.services import cloud_agent, inventory
 
 router = APIRouter(prefix="/api")
 
@@ -139,8 +139,10 @@ async def device_status(request: Request) -> dict:
     st = request.app.state
     host = st.settings_store.load().host
     try:
-        await st.pool.run(_client(request), "true", 10)
+        client = _client(request)
+        await st.pool.run(client, "true", 10)
         st.presence.seen(host)
+        cloud_agent.update_later(st, client)  # app ROMKADE de la console à jour (ChatGPT, Claude, Google Home)
         return {"connected": True, "error": None}
     except errors.AppError as exc:
         return {"connected": False, "error": st.presence.explain(exc, host).to_dict()["error"]}

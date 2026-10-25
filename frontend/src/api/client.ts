@@ -6,6 +6,10 @@ export type CheatsStatus = { available: boolean; files: number; updated_at: stri
 export type CheatFile = { name: string; label: string; system: string; count: number; cheats: { desc: string; code: string }[] };
 export type GameCheats = { available: boolean; files: CheatFile[]; can_install: boolean; license: string; source_url: string };
 
+/** Le Manager sur le téléphone (QR code, Wi-Fi de la maison). */
+export type PhoneStatus = { devices: number; listening: boolean; available: boolean };
+export type PhonePair = { url: string; qr: string; expires_in: number; devices: number };
+
 export type DescriptionDraft = {
   mode: "translate" | "write"; model: string; known: boolean; texts: Record<string, { text: string; origin: string }>;
 };
@@ -195,6 +199,9 @@ export const api = {
   players: () => request<Players>("GET", "/players"),
   setPlayers: (players: number[]) => request<Players>("PUT", "/players", { players }),
   setDirections: (directions: number[]) => request<Players>("PUT", "/players", { directions }),
+  phone: () => request<PhoneStatus>("GET", "/phone"),
+  phonePair: () => request<PhonePair>("POST", "/phone/pair"),
+  phoneDisconnect: () => request<PhoneStatus>("DELETE", "/phone"),
   volume: () => request<Volume>("GET", "/volume"),
   setVolume: (body: { percent?: number; muted?: boolean }) => request<Volume>("PUT", "/volume", body),
   nowPlaying: () => request<NowPlaying>("GET", "/device/now-playing"),

@@ -7,7 +7,7 @@ AUTOSTART=/mnt/mod/ctrl/autostart
 LINE="[ -x $AGENT/start.sh ] && $AGENT/start.sh  # ROMKADE"
 
 if [ ! -f "$AGENT/romkade_agent.py" ]; then
-    /mnt/mod/ctrl/printstr "ROMKADE\n\nAgent introuvable : copie le dossier « romkade » à la racine de la carte."
+    /mnt/mod/ctrl/printstr "ROMKADE\n\nAgent not found: copy the \"romkade\" folder to the root of the card."
     exit 1
 fi
 
@@ -23,5 +23,5 @@ if ! python3 "$AGENT/screen.py" "$START" 2> /tmp/romkade-screen.log; then
     # Écran graphique indisponible (autre modèle, Pillow absent) : texte simple du firmware.
     sleep 3
     CODE=$(python3 -c "import json;print(json.load(open('/tmp/romkade-status.json')).get('code') or '')" 2>/dev/null)
-    /mnt/mod/ctrl/printstr "ROMKADE\n\nCode d'appairage : $CODE\n\nDans ChatGPT ou Claude : « Connecte ma console, code $CODE »"
+    /mnt/mod/ctrl/printstr "ROMKADE\n\nPairing code: $CODE\n\nIn ChatGPT or Claude: \"Connect my console, code $CODE\""
 fi

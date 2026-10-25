@@ -16,7 +16,8 @@ def test_bundle_contains_agent_screen_app_and_manager_modules():
     assert "/mnt/mmc/romkade/romkade_agent.py" in names and "/mnt/mmc/romkade/screen.py" in names
     assert "/mnt/mmc/romkade/vendor/app/device/launcher.py" in names          # modules du Manager, sur place
     assert "/mnt/mmc/romkade/vendor/asyncssh.py" in names                     # remplaçant de SSH
-    assert "/mnt/mmc/Roms/APPS/ROMKADE.sh" in names and "/mnt/mmc/Roms/APPS/Imgs/ROMKADE.png" in names
+    app = "/mnt/mmc/Roms/APPS/ROMKADE - Played from Anywhere"
+    assert f"{app}.sh" in names and "/mnt/mmc/Roms/APPS/Imgs/ROMKADE - Played from Anywhere.png" in names
     assert not any(n.endswith("agent.json") for n in names)                   # le secret est écrit à part
     assert files["/mnt/mmc/romkade/start.sh"][1] == 0o755
 
@@ -136,3 +137,46 @@ def test_install_writes_version_and_shows_splash_unless_a_game_runs():
     assert "for p in retroarch" in commands[-1] and "pidof $p" in commands[-1] and "splash.sh updated 6" in commands[-1]
     # Sans écran demandé (ou pendant un jeu : la commande ne répond pas « shown »), rien ne s'affiche.
     assert not asyncio.run(cloud_agent.install(run, None, sftp, "/mnt/mmc/Roms", "https://cloud", "s"))
+
+
+class _ReadFile(_FakeFile):
+    async def read(self):
+        if self.path not in self.store:
+            raise FileNotFoundError(self.path)
+        return self.store[self.path]
+
+
+class _CardSftp(_FakeSftp):
+    def open(self, path, mode):
+        return _ReadFile(self.files, path)
+
+
+def test_console_app_updates_itself_when_the_manager_has_another_build():
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    sftp, commands = _CardSftp(), []
+
+    async def run(_client, command, timeout=0):
+        commands.append(command)
+        return 0, "started" if "romkade-agent.pid" in command else ""
+
+    @asynccontextmanager
+    async def session(_client):
+        yield None, sftp
+
+    async def ensure():
+        return SimpleNamespace(id="anbernic-stock-mod")
+
+    state = SimpleNamespace(system=SimpleNamespace(ensure=ensure), pool=SimpleNamespace(session=session),
+                            device_runner=run)
+    client = SimpleNamespace(settings=SimpleNamespace(host="192.168.1.9", roms_root="/mnt/mmc/Roms"))
+    assert cloud_agent.bundle("/mnt/mmc/Roms")["/mnt/mmc/romkade/BUILD"][0].decode().strip() == cloud_agent.build_id()
+
+    assert not asyncio.run(cloud_agent._auto_update(state, client))            # console pas reliée : rien
+    sftp.files["/mnt/mmc/romkade/agent.json"] = b'{"server": "https://cloud", "secret": "s"}'
+    sftp.files["/mnt/mmc/romkade/BUILD"] = b"ancienne\n"
+    assert asyncio.run(cloud_agent._auto_update(state, client))                # autre version : réinstallée
+    assert sftp.files["/mnt/mmc/romkade/BUILD"].decode().strip() == cloud_agent.build_id()
+    assert json.loads(sftp.files["/mnt/mmc/romkade/agent.json.tmp"])["secret"] == "s"   # même liaison
+    assert not asyncio.run(cloud_agent._auto_update(state, client))            # déjà à jour : rien

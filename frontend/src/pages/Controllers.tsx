@@ -169,6 +169,16 @@ function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirect
           ))}
         </ol>
         <p className="muted">{t("players.directionLead")}</p>
+        {/* Le navigateur ne montre une manette de l'ordinateur qu'après un appui sur un de ses boutons, page ouverte
+            (protection de la vie privée) : aucun bouton « Rafraîchir » ne peut la faire apparaître plus tôt. */}
+        {gamepadsSupported() && (
+          <p className={`players__pc ${pads.length ? "is-seen" : ""}`} role="status">
+            <Gamepad2 size={16} aria-hidden />
+            {pads.length
+              ? t("players.computerSeen", { name: pads.map(padName).join(", ") })
+              : t("players.computerPress")}
+          </p>
+        )}
         {gamepadsSupported() && <p className="muted">{t("players.computerHint")}</p>}
         {linking && <p className="muted" role="status">{t("players.computerLinking")}</p>}
         {linkError && <p className="players__warn"><AlertTriangle size={16} aria-hidden /> {linkError}</p>}

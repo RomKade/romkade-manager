@@ -29,6 +29,27 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
+  # Console de démonstration (romkade_cloud/demo_console.py) : toujours en ligne, pour la Test Suite et la
+  # certification Google Home. Son secret (ROMKADE_DEMO_SECRET) est dans secrets.env ; sans lui, elle attend.
+  romkade-demo:
+    container_name: romkade-demo
+    image: romkade-cloud
+    command: ["python", "-m", "romkade_cloud", "demo-console"]
+    restart: unless-stopped
+    depends_on: [romkade-cloud]
+    environment:
+      ROMKADE_DEMO_SERVER: http://romkade-cloud:8787
+    env_file:
+      - path: ../../secrets.env
+        required: false
+    healthcheck:
+      disable: true
+    networks: [licenses_web]
+    mem_limit: 96m
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+
 volumes:
   romkade_data: {}
 

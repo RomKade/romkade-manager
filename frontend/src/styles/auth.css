@@ -268,3 +268,5 @@
 .account__linked .field__hint { margin: 0; }
 .account__replace { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .account__new { color: var(--accent); }
+.account__badge--soon { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
+.remote__say { margin: 6px 0 0; color: var(--accent); font-weight: 600; }

@@ -2,7 +2,9 @@
 python -m romkade_cloud new-account [libellé]          compte à jeton (prototype), affiche l'adresse du connecteur
 python -m romkade_cloud accounts                        comptes, avec leur nombre de consoles
 python -m romkade_cloud move-consoles <de> <vers>       rattache les consoles d'un compte à un autre
-python -m romkade_cloud demo-console <e-mail ou id>     console de démonstration du compte (relecteurs, demo.py)"""
+python -m romkade_cloud demo-register <compte sb:…>     console de démonstration rattachée à ce compte : affiche son secret
+python -m romkade_cloud demo-console                    fait tourner la console de démonstration (ROMKADE_DEMO_SECRET)
+python -m romkade_cloud demo-device add|rename|remove <compte>   2e console de démo (test Request Sync de Google)"""
 
 import argparse
 import logging
@@ -23,19 +25,50 @@ def main() -> None:
     m = sub.add_parser("move-consoles", help="rattache les consoles d'un compte à un autre")
     m.add_argument("source")
     m.add_argument("target")
-    d = sub.add_parser("demo-console", help="rattache une console de démonstration à un compte")
-    d.add_argument("account", help="adresse e-mail du compte ou identifiant (sb:…)")
+    d = sub.add_parser("demo-register", help="crée la console de démonstration d'un compte et affiche son secret")
+    d.add_argument("account")
+    sub.add_parser("demo-console", help="fait tourner la console de démonstration")
+    dd = sub.add_parser("demo-device", help="ajoute, renomme ou retire une 2e console de démo et prévient Google")
+    dd.add_argument("action", choices=["add", "rename", "remove"])
+    dd.add_argument("account")
     args = p.parse_args()
 
-    if args.cmd == "demo-console":
-        from .demo import find_account, setup
+    if args.cmd == "demo-register":
+        store = Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3"))
+        store.ensure_account(args.account)
+        c, secret = store.register_console_for(args.account, {"model": "Console de démonstration"}, "Console de démo")
+        print(f"console {c.id} rattachée à {args.account}")
+        print(f"ROMKADE_DEMO_SECRET={secret}")
+        return
+
+    if args.cmd == "demo-device":
+        import asyncio
+
+        from .homegraph import HomeGraph
 
         store = Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3"))
-        account = find_account(store, args.account)
-        if account is None:
-            raise SystemExit(f"compte {args.account} introuvable : se connecter une fois à ROMKADE avec ce compte")
-        c = setup(store, account)
-        print(f"console de démo {c.id} ({c.label}) rattachée à {account} ; en ligne d'ici une minute")
+        extra = [c for c in store.consoles_of(args.account) if (c.info or {}).get("model") == "Console de test"]
+        if args.action == "add":
+            c, _ = store.register_console_for(args.account, {"model": "Console de test"}, "Console de test")
+            print(f"console {c.id} ajoutée")
+        elif not extra:
+            raise SystemExit("aucune console de test : lance d'abord « demo-device add »")
+        elif args.action == "rename":
+            store.rename(extra[0].id, "Console de test renommée")
+            print(f"console {extra[0].id} renommée")
+        else:
+            for c in extra:
+                store.unpair(c.id)
+            print(f"{len(extra)} console(s) de test retirée(s)")
+        graph = HomeGraph(os.environ.get("ROMKADE_GOOGLE_SERVICE_ACCOUNT_B64", ""))
+        print("Google prévenu (Request Sync) :", asyncio.run(graph.request_sync(args.account)))
+        return
+
+    if args.cmd == "demo-console":
+        from .demo_console import main as demo
+
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+        demo()
         return
 
     if args.cmd in ("accounts", "move-consoles"):

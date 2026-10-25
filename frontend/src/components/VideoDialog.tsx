@@ -52,7 +52,7 @@ export function VideoDialog({ game, onClose }: { game: Pick<Game, "id" | "title"
               <div className="video-dialog__msg"><ErrorNotice error={q.error} title={t("sheet.video.error")} /></div>
             ) : data?.status === "no_key" ? (
               <div className="video-dialog__msg">
-                <p>{t("sheet.video.noKeyBefore")}<Link to="/parametres/videos">{t("sheet.video.noKeyLink")}</Link>{t("sheet.video.noKeyAfter")}</p>
+                <p>{t("sheet.video.noKeyBefore")}<Link to="/parametres/catalogue">{t("sheet.video.noKeyLink")}</Link>{t("sheet.video.noKeyAfter")}</p>
                 <a className="button" href={data.search_url} target="_blank" rel="noreferrer noopener">
                   <ExternalLink size={16} aria-hidden /> {t("sheet.video.searchYoutube")}
                 </a>

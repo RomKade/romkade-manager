@@ -27,6 +27,7 @@ class AlertOut(BaseModel):
     minutes: int
     scope: str
     game_title: str
+    console_pause: bool = False  # le jeu est figé sur la console par l'écran de pause : « OK » le relance
 
 
 class PlayStateOut(BaseModel):
@@ -119,8 +120,8 @@ async def play_state(request: Request) -> PlayStateOut:
 
 
 @router.post("/alerts/{alert_id}/ack", status_code=204)
-def ack_alert(alert_id: int, request: Request) -> None:
-    request.app.state.tracker.acknowledge(alert_id)
+async def ack_alert(alert_id: int, request: Request) -> None:
+    await request.app.state.tracker.acknowledge(alert_id)
 
 
 @router.get("/stats", response_model=PlayStatsOut)

@@ -10,7 +10,7 @@ ChatGPT, et le connecte en un clic, sans copier d'adresse. Un seul serveur sert 
 
 | | Point | État | À faire |
 |---|---|---|---|
-| ⚠️ | **Compte de démonstration pour les relecteurs** | Console simulée prête (`server/romkade_cloud/demo.py`) : toujours en ligne, 9 homebrews libres, favoris, sauvegardes, lancement, son. | Créer le compte `demo@romkade.com` (connexion normale sur romkade.com, sans double authentification), puis sur la droplet : `python -m romkade_cloud demo-console demo@romkade.com`. Mot de passe dans le formulaire du portail seulement. |
+| ✅ | **Compte de démonstration pour les relecteurs** | Compte demo@romkade.com (alias de contact@romkade.com, sans double authentification) et sa console de démo toujours en ligne (`demo_console.py`, service `romkade-demo`, homebrews gratuits). | Mot de passe à saisir seulement dans le portail. |
 | ✅ | **Adresse à jeton** (`/<jeton>`) | Coupée dès qu'OAuth est configuré (`ROMKADE_TOKEN_URLS=1` pour la rouvrir) ; README à jour. | Déployer. Le connecteur ChatGPT encore sur l'adresse à jeton doit passer en OAuth (`https://mcp.romkade.com`). |
 | ⚠️ | **Fiabilité du serveur** | Disque libéré (système 28 %, volume Docker 68 % le 2026-10-24) ; `/healthz` répond en 0,25 s. | Ajouter une surveillance de `/healthz` (alerte si le serveur tombe pendant la revue). |
 | ⚠️ | **Anglais** | Serveur ✅ : titres des outils et erreurs en anglais, avec un code que l'interface traduit (fr, es). Site en français seulement. | Versions anglaises des pages confidentialité, conditions et support. |

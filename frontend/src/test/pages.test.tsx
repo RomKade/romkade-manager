@@ -568,7 +568,7 @@ describe("Paramètres : assistant et connaissances", () => {
     const steps = screen.getByRole("navigation", { name: "Mise en route de l'assistant IA" });
     expect(within(steps).getByRole("link", { name: /Type d'IA/ })).toHaveAttribute("href", "#ai-1");
     expect(within(steps).getByRole("link", { name: /Tester la connexion/ })).toHaveTextContent("Faire le test");
-    expect(screen.getByRole("link", { name: /Connaissances de l'assistant/ })).toHaveAttribute("href", "/parametres/connaissances");
+    expect(screen.getByRole("link", { name: /Connaissances de l'assistant/ })).toHaveAttribute("href", "/parametres/catalogue");
     expect(screen.queryByRole("heading", { name: /Descriptions des jeux/ })).not.toBeInTheDocument();  // dans Connaissances
     // Prénom : Duke par défaut, aucune liste proposée ; un simple champ, et la bulle prend le nouveau prénom.
     expect(screen.getByRole("button", { name: /^Duke$/ })).toBeInTheDocument();
@@ -593,8 +593,8 @@ describe("Paramètres : assistant et connaissances", () => {
   });
 
   it("connaissances : lance la récupération, puis un seul jeu : pages enregistrées et passages pour une question", async () => {
-    renderAt("/parametres/connaissances");
-    expect(await screen.findByRole("link", { name: /^Connaissances$/ })).toBeInTheDocument();
+    renderAt("/parametres/catalogue");
+    expect(await screen.findByRole("link", { name: /^Catalogue$/ })).toBeInTheDocument();
     const panel = (await screen.findByRole("heading", { name: /Connaissances de l'assistant/ })).closest("section")!;
     expect(within(panel).getByText(/ce n'est pas un simple essai/)).toBeInTheDocument();
     expect(await within(panel).findByText(/1 jeux documentés sur 2/)).toBeInTheDocument();
@@ -684,7 +684,7 @@ describe("Codes de triche (RetroArch)", () => {
   });
 
   it("paramètres : connaissances > codes de triche, téléchargement puis mise à jour", async () => {
-    renderAt("/parametres/connaissances");
+    renderAt("/parametres/catalogue");
     const panel = (await screen.findByRole("heading", { name: "Codes de triche (RetroArch)" })).closest("section")!;
     expect(await within(panel).findByText(/Pas encore téléchargée/)).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: /Télécharger les codes/ }));
@@ -695,7 +695,7 @@ describe("Codes de triche (RetroArch)", () => {
 
 describe("Connaissances : descriptions d'un seul jeu", () => {
   it("montre la description de la fiche, propose celle de l'IA et ne la met dans la fiche qu'une fois validée", async () => {
-    renderAt("/parametres/connaissances");
+    renderAt("/parametres/catalogue");
     const section = (await screen.findByRole("heading", { name: /Descriptions des jeux/ })).closest("section")!;
     await userEvent.type(await within(section).findByRole("searchbox", { name: "Jeu" }), "mario");
     await userEvent.click(await within(section).findByRole("button", { name: /Super Mario World/ }));

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ROMKADE Manager</title>
+  <style>
+    :root {
+      --shell: #eef3fa; --panel: #ffffff; --line: #cfdbea; --ink: #0b1630; --muted: #4a5a75;
+      --accent: #007a96; --accent-hover: #006880; --accent-ink: #ffffff; --ok: #0f7a4f; --wait: #a15c00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --shell: #0b1c35; --panel: #10264a; --line: #24406b; --ink: #f5f8ff; --muted: #a9b8d3;
+        --accent: #2fc4e4; --accent-hover: #5fd3ec; --accent-ink: #071327; --ok: #4fd39a; --wait: #f2b04a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      background: var(--shell); color: var(--ink);
+      font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main {
+      width: 100%; max-width: 520px; padding: 32px; text-align: center;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    }
+    img { width: 72px; height: 72px; border-radius: 16px; }
+    h1 { margin: 16px 0 4px; font-size: 22px; }
+    p { margin: 8px 0; color: var(--muted); }
+    .state { display: inline-flex; align-items: center; gap: 8px; margin: 16px 0; font-weight: 600; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--wait); }
+    .ready .dot { background: var(--ok); }
+    .ready .state { color: var(--ok); }
+    button {
+      margin-top: 8px; padding: 12px 24px; border: 0; border-radius: 10px; cursor: pointer;
+      background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { opacity: .5; cursor: default; }
+    ol { margin: 24px 0 0; padding: 16px 0 0 20px; border-top: 1px solid var(--line); text-align: left; color: var(--muted); }
+    li { margin: 6px 0; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <img src="romkade.png" alt="">
+    <h1>ROMKADE Manager</h1>
+    <p>Votre console rétro, pilotée depuis l'ordinateur.</p>
+    <div class="state" role="status"><span class="dot"></span><span id="state">Démarrage…</span></div>
+    <div><button id="open" disabled>Ouvrir ROMKADE Manager</button></div>
+    <ol>
+      <li>Créez votre compte ROMKADE dans le Manager.</li>
+      <li>Allumez la console sur le même Wi-Fi que cet ordinateur, puis reliez-la depuis <strong>Mon compte</strong>.</li>
+      <li>Pour lui parler, ajoutez le connecteur ROMKADE dans ChatGPT ou Claude.</li>
+    </ol>
+    <p><a href="#" id="guide">Guide d'installation</a></p>
+  </main>
+  <script src="config.js"></script>
+  <script>
+    // Docker Desktop fournit window.ddClient aux onglets d'extension : il ouvre les liens dans le navigateur.
+    const url = `http://localhost:${window.ROMKADE_PORT || 8765}`;
+    const open = (href) => window.ddClient ? window.ddClient.host.openExternal(href) : window.open(href, "_blank");
+    const app = document.getElementById("app");
+    const state = document.getElementById("state");
+    const button = document.getElementById("open");
+    button.addEventListener("click", () => open(url));
+    document.getElementById("guide").addEventListener("click", (e) => { e.preventDefault(); open("https://romkade.com/installation/"); });
+
+    // Le premier démarrage télécharge les images : on attend que le Manager réponde.
+    let since = Date.now();
+    async function check() {
+      try {
+        await fetch(`${url}/api/health`, { mode: "no-cors", cache: "no-store" });
+        app.classList.add("ready");
+        state.textContent = "Prêt";
+        button.disabled = false;
+      } catch {
+        app.classList.remove("ready");
+        button.disabled = true;
+        state.textContent = Date.now() - since > 15000
+          ? "Démarrage… le premier lancement télécharge ROMKADE (quelques minutes)"
+          : "Démarrage…";
+      }
+    }
+    check();
+    setInterval(check, 3000);
+  </script>
+</body>
+</html>

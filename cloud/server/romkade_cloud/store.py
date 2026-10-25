@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS catalogs (
 CREATE TABLE IF NOT EXISTS favorites (
     console_id TEXT NOT NULL REFERENCES consoles(id) ON DELETE CASCADE, platform_dir TEXT NOT NULL,
     relative_path TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (console_id, platform_dir, relative_path));
+CREATE TABLE IF NOT EXISTS recent (
+    console_id TEXT NOT NULL REFERENCES consoles(id) ON DELETE CASCADE, platform_dir TEXT NOT NULL,
+    relative_path TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (console_id, platform_dir, relative_path));
+CREATE TABLE IF NOT EXISTS google_links (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, linked_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS google_oauth (
+    key TEXT PRIMARY KEY, kind TEXT NOT NULL, data TEXT NOT NULL, at REAL NOT NULL);
 """
 
 
@@ -161,12 +168,6 @@ class Store:
         rows = self._db.execute("SELECT * FROM consoles WHERE account_id = ? ORDER BY created", (account_id,))
         return [self._console(r) for r in rows]
 
-    def demo_consoles(self) -> list[Console]:
-        """Consoles simulées par le serveur (demo.py), rattachées à un compte."""
-        rows = self._db.execute("SELECT * FROM consoles WHERE json_extract(info, '$.demo') = 1 "
-                                "AND account_id IS NOT NULL")
-        return [self._console(r) for r in rows]
-
     def update_info(self, console_id: str, info: dict) -> None:
         with self._lock, self._db:
             self._db.execute("UPDATE consoles SET info = ?, last_seen = ? WHERE id = ?",
@@ -282,22 +283,63 @@ class Store:
                                 (key,)).fetchone()
 
     # ---------- favoris (posés par le Manager sur la carte, envoyés par l'agent) ----------
-    def replace_favorites(self, console_id: str, favorites: list[list[str]]) -> int:
-        """Favoris de la console, le dernier ajouté en tête. Gardés par chemin : ils survivent au recalcul du
-        catalogue et reviennent si le jeu réapparaît sur la carte."""
-        rows = {(str(d), str(p)): i for i, (d, p) in reversed(list(enumerate(favorites)))}
+    def _replace_list(self, table: str, console_id: str, items: list[list[str]]) -> int:
+        rows = {(str(d), str(p)): i for i, (d, p) in reversed(list(enumerate(items)))}
         with self._lock, self._db:
-            self._db.execute("DELETE FROM favorites WHERE console_id = ?", (console_id,))
-            self._db.executemany("INSERT INTO favorites VALUES (?, ?, ?, ?)",
+            self._db.execute(f"DELETE FROM {table} WHERE console_id = ?", (console_id,))
+            self._db.executemany(f"INSERT INTO {table} VALUES (?, ?, ?, ?)",
                                  [(console_id, d, p, i) for (d, p), i in rows.items()])
         return len(rows)
 
-    def favorites(self, console_id: str, limit: int) -> tuple[list[sqlite3.Row], int]:
-        """(favoris présents dans le catalogue, le dernier ajouté en tête ; leur nombre)."""
-        where = ("FROM favorites f JOIN games g ON g.console_id = f.console_id AND g.platform_dir = f.platform_dir "
+    def _list(self, table: str, console_id: str, limit: int) -> tuple[list[sqlite3.Row], int]:
+        where = (f"FROM {table} f JOIN games g ON g.console_id = f.console_id AND g.platform_dir = f.platform_dir "
                  "AND g.relative_path = f.relative_path WHERE f.console_id = ?")
         rows = self._db.execute(f"SELECT g.* {where} ORDER BY f.position LIMIT ?", (console_id, limit)).fetchall()
         return rows, self._db.execute(f"SELECT count(*) {where}", (console_id,)).fetchone()[0]
+
+    def replace_favorites(self, console_id: str, favorites: list[list[str]]) -> int:
+        """Favoris de la console, le dernier ajouté en tête. Gardés par chemin : ils survivent au recalcul du
+        catalogue et reviennent si le jeu réapparaît sur la carte."""
+        return self._replace_list("favorites", console_id, favorites)
+
+    def favorites(self, console_id: str, limit: int) -> tuple[list[sqlite3.Row], int]:
+        """(favoris présents dans le catalogue, le dernier ajouté en tête ; leur nombre)."""
+        return self._list("favorites", console_id, limit)
+
+    def replace_recent(self, console_id: str, recent: list[list[str]]) -> int:
+        """Jeux joués récemment sur la console (historique de RetroArch, envoyé par l'app ROMKADE), le dernier en tête."""
+        return self._replace_list("recent", console_id, recent)
+
+    def recent(self, console_id: str, limit: int) -> tuple[list[sqlite3.Row], int]:
+        return self._list("recent", console_id, limit)
+
+    # ---------- Google Home ----------
+    def set_google_link(self, account_id: str, linked: bool) -> None:
+        """Compte relié à Google Home (SYNC reçu) : on prévient alors Google des changements (Home Graph)."""
+        with self._lock, self._db:
+            if linked:
+                self._db.execute("INSERT OR IGNORE INTO google_links VALUES (?, ?)", (account_id, time.time()))
+            else:
+                self._db.execute("DELETE FROM google_links WHERE account_id = ?", (account_id,))
+
+    def google_linked(self, account_id: str) -> bool:
+        return self._db.execute("SELECT 1 FROM google_links WHERE account_id = ?", (account_id,)).fetchone() is not None
+
+    def oauth_put(self, key: str, kind: str, data: dict) -> None:
+        """Connexion Google en cours (état ou code à usage unique), gardée en base : survit à un redémarrage."""
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM google_oauth WHERE at < ?", (time.time() - 3600,))
+            self._db.execute("INSERT OR REPLACE INTO google_oauth VALUES (?, ?, ?, ?)",
+                             (key, kind, json.dumps(data), time.time()))
+
+    def oauth_pop(self, key: str, kind: str, ttl: float) -> dict | None:
+        """Lit et efface (usage unique) ; None si absent, d'un autre type ou plus vieux que ttl secondes."""
+        with self._lock, self._db:
+            row = self._db.execute("SELECT kind, data, at FROM google_oauth WHERE key = ?", (key,)).fetchone()
+            self._db.execute("DELETE FROM google_oauth WHERE key = ?", (key,))
+        if row is None or row[0] != kind or time.time() - row[2] > ttl:
+            return None
+        return json.loads(row[1])
 
     def is_favorite(self, console_id: str, platform_dir: str, relative_path: str) -> bool:
         return self._db.execute("SELECT 1 FROM favorites WHERE console_id = ? AND platform_dir = ? AND relative_path = ?",
