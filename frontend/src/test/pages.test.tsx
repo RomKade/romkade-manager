@@ -575,6 +575,35 @@ describe("Première connexion depuis le tableau de bord", () => {
     expect(await screen.findByText("Étape 3 sur 3 : Tester la connexion")).toBeInTheDocument();
     await waitFor(() => expect(calls).toContain("/api/device/diagnose"));
   });
+
+  it("cherche la console tout seul, la propose, et reprend son adresse quand on confirme", async () => {
+    deviceOnline = false;
+    const base = mockFetch();
+    const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/catalog/status")) return json({ ...status, synced: false });
+      if (url === "/api/settings") return json({ host: "", port: 22, username: "root", auth_method: "password", key_path: null,
+        roms_root: "/mnt/mmc/Roms", connect_timeout: 8, system: "auto", has_password: false, host_key_trusted: false });
+      if (url.startsWith("/api/device/discover")) {
+        calls.push(url);
+        return json({ scanned: false, consoles: [
+          { host: "192.168.86.242", name: "anbernic", banner: "SSH-2.0-OpenSSH_8.9p1", likely: true },
+          { host: "192.168.86.240", name: "mac.lan", banner: "SSH-2.0-OpenSSH_10.2", likely: false },
+        ] });
+      }
+      return base(input, init);
+    }));
+    renderAt("/");
+    expect(await screen.findByText("Étape 1 sur 3 : La console")).toBeInTheDocument();
+    const found = (await screen.findByText("anbernic · 192.168.86.242")).closest("li")!;
+    expect(screen.getByText("mac.lan · 192.168.86.240")).toBeInTheDocument();
+    await userEvent.click(within(found).getByRole("button", { name: "C'est ma console" }));
+    expect(screen.getByLabelText("Adresse IP ou nom")).toHaveValue("192.168.86.242");
+    expect(within(found).getByText(/Adresse reprise/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Chercher sur tout le réseau" }));
+    await waitFor(() => expect(calls).toContain("/api/device/discover?scan=true"));
+  });
 });
 
 describe("Paramètres : assistant et connaissances", () => {

@@ -45,6 +45,18 @@ class DiagnoseStepOut(BaseModel):
     message: str | None = None
 
 
+class DiscoveredConsoleOut(BaseModel):
+    host: str
+    name: str | None
+    banner: str
+    likely: bool
+
+
+class DiscoverOut(BaseModel):
+    consoles: list[DiscoveredConsoleOut]
+    scanned: bool
+
+
 class DiagnoseOut(BaseModel):
     ok: bool
     host: str

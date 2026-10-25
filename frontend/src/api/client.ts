@@ -49,6 +49,8 @@ export type Players = S["PlayersOut"];
 export type Controller = S["ControllerOut"];
 export type Volume = S["VolumeOut"];
 export type Diagnose = S["DiagnoseOut"];
+export type Discover = S["DiscoverOut"];
+export type DiscoveredConsole = S["DiscoveredConsoleOut"];
 export type Clock = S["ClockOut"];
 export type DescriptionsStatus = S["DescriptionsStatusOut"];
 export type LlmSettings = S["LlmSettingsOut"];
@@ -135,6 +137,7 @@ export const api = {
   trustHostKey: (fingerprint: string) => request<HostKey>("POST", "/device/host-key/trust", { fingerprint }),
   testConnection: () => request<ConnectionTest>("POST", "/device/test-connection"),
   diagnose: () => request<Diagnose>("POST", "/device/diagnose"),
+  discover: (scan = false) => request<Discover>("POST", `/device/discover${scan ? "?scan=true" : ""}`),
   clock: () => request<Clock>("GET", "/device/clock"),
   syncClock: (timezone: string | null) => request<Clock>("POST", "/device/clock/sync", { timezone }),
   uploads: () => request<Upload[]>("GET", "/uploads"),
