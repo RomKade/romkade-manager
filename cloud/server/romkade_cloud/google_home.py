@@ -199,7 +199,8 @@ class GoogleHome:
             # Test Suite réclame mais que Google ne documente pas.
             "id": c.id, "type": "action.devices.types.STREAMING_BOX", "traits": TRAITS,
             # Nom facile à dire et bien reconnu (« ouvre Zelda sur la console ») ; « jeu » pour « arrête le jeu » ; le nom ROMKADE de la console reste un surnom.
-            "name": {"name": "Console", "defaultNames": ["Console ROMKADE"],
+            # Nom choisi dans ROMKADE s'il y en a un (renommer la console le change chez Google), sinon « Console ».
+            "name": {"name": c.name or "Console", "defaultNames": ["Console ROMKADE"],
                      "nicknames": list(dict.fromkeys(["Console", "ma console", "jeu", "le jeu", "jeu vidéo",
                                                      "console rétro", "retro console", c.label]))},
             "willReportState": True,
