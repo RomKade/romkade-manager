@@ -304,6 +304,7 @@ beforeEach(() => {
   cheatsReady = false;
   installedCheat = null;
   localStorage.removeItem("agm-recent-searches");
+  localStorage.removeItem("romkade-onboarding-done");
   localStorage.removeItem("romkade-assistant-name");
   localStorage.removeItem("romkade-assistant-hidden");
   systemCaps = null;
@@ -557,8 +558,8 @@ describe("Nouvelle console : clé à approuver", () => {
   });
 });
 
-describe("Première connexion depuis le tableau de bord", () => {
-  it("guide étape par étape, de la clé à approuver jusqu'au test, sans proposer de synchroniser", async () => {
+describe("Installation du premier lancement", () => {
+  it("l'accueil y mène tant que la bibliothèque n'a jamais été lue : page à part, étapes numérotées, de la clé au test", async () => {
     hostKeyTrusted = false;
     deviceOnline = false;
     const base = mockFetch();
@@ -566,13 +567,16 @@ describe("Première connexion depuis le tableau de bord", () => {
       ? new Response(JSON.stringify({ ...status, synced: false }), { headers: { "Content-Type": "application/json" } })
       : base(input, init)));
     renderAt("/");
-    expect(await screen.findByRole("heading", { name: "Connecte ta console" })).toBeInTheDocument();
-    expect(await screen.findByText("Étape 2 sur 3 : Identifier la console")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Synchroniser/ })).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Installation de ROMKADE Manager" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Tableau de bord/ })).toBeNull();  // ni barre latérale ni bandeaux
+    const steps = screen.getByRole("navigation", { name: "Étapes de l'installation" });
+    expect(within(steps).getByRole("button", { name: /Son identité/ })).toHaveAttribute("aria-current", "step");
+    expect(within(steps).getByRole("button", { name: /Ta bibliothèque/ })).toBeDisabled();
+    expect(screen.getByText("Étape 2 sur 5")).toBeInTheDocument();
     const panel = (await screen.findByRole("heading", { name: /Identité de la console/ })).closest("section")!;
     expect(await within(panel).findByText("SHA256:abc")).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: "Approuver cette clé" }));
-    expect(await screen.findByText("Étape 3 sur 3 : Tester la connexion")).toBeInTheDocument();
+    expect(await screen.findByText("Étape 3 sur 5")).toBeInTheDocument();
     await waitFor(() => expect(calls).toContain("/api/device/diagnose"));
   });
 
@@ -594,8 +598,8 @@ describe("Première connexion depuis le tableau de bord", () => {
       }
       return base(input, init);
     }));
-    renderAt("/");
-    expect(await screen.findByText("Étape 1 sur 3 : La console")).toBeInTheDocument();
+    renderAt("/bienvenue");
+    expect(await screen.findByText("Étape 1 sur 5")).toBeInTheDocument();
     const found = (await screen.findByText("anbernic · 192.168.86.242")).closest("li")!;
     expect(screen.getByText("mac.lan · 192.168.86.240")).toBeInTheDocument();
     await userEvent.click(within(found).getByRole("button", { name: "C'est ma console" }));
@@ -603,6 +607,38 @@ describe("Première connexion depuis le tableau de bord", () => {
     expect(within(found).getByText(/Adresse reprise/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Chercher sur tout le réseau" }));
     await waitFor(() => expect(calls).toContain("/api/device/discover?scan=true"));
+  });
+
+  it("console connectée : lecture de la bibliothèque, puis Duke facultatif (« Plus tard »), puis l'écran final", async () => {
+    const base = mockFetch();
+    let synced = false;
+    const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/catalog/status")) return json({ ...status, synced });
+      if (url === "/api/catalog/sync" && init?.method === "POST") { calls.push(url); synced = true; return json({ id: 7, status: "running" }, ); }
+      return base(input, init);
+    }));
+    renderAt("/bienvenue");
+    expect(await screen.findByText("Étape 4 sur 5")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Lire la bibliothèque" }));
+    await waitFor(() => expect(calls).toContain("/api/catalog/sync"));
+    expect(await screen.findByText("Étape 5 sur 5", {}, { timeout: 3000 })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Plus tard" }));
+    expect(await screen.findByRole("heading", { name: "Tout est prêt" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ouvrir ROMKADE Manager" }));
+    expect(localStorage.getItem("romkade-onboarding-done")).toBe("1");
+  });
+
+  it("« Terminer plus tard » mène au tableau de bord, qui n'y renvoie plus", async () => {
+    deviceOnline = false;
+    const base = mockFetch();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).startsWith("/api/catalog/status")
+      ? new Response(JSON.stringify({ ...status, synced: false }), { headers: { "Content-Type": "application/json" } })
+      : base(input, init)));
+    renderAt("/bienvenue");
+    await userEvent.click(await screen.findByRole("button", { name: "Terminer plus tard" }));
+    expect(await screen.findByRole("heading", { name: "Connecte ta console" })).toBeInTheDocument();
   });
 });
 

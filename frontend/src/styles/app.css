@@ -1627,3 +1627,61 @@ kbd {
 .players__pc svg { flex: none; color: var(--ink-3); }
 .players__pc.is-seen { color: var(--ink); }
 .players__pc.is-seen svg { color: var(--accent); }
+
+/* ---------- Installation guidée du premier lancement (/bienvenue) ---------- */
+.onboarding { min-height: 100vh; background: var(--shell);
+  background-image: var(--ambient), linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px; padding: clamp(16px, 3vw, 32px) clamp(16px, 4vw, 48px) 48px; }
+.onboarding__top { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 920px; margin: 0 auto; }
+.onboarding__logo { width: 190px; height: auto; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 30%, transparent)); }
+.onboarding__top-actions { display: flex; align-items: center; gap: 18px; }
+.onboarding__main { max-width: 920px; margin: 0 auto; padding-top: clamp(24px, 5vh, 56px); display: flex; flex-direction: column; gap: 14px; }
+.onboarding__title { font-size: var(--fs-xl); font-stretch: 115%; text-wrap: balance; }
+.onboarding__lead { color: var(--ink-2); font-size: var(--fs-lg); max-width: 70ch; margin: 0; text-wrap: pretty; }
+
+/* Fil d'étapes : pastilles numérotées reliées par un trait ; faites (coche), en cours (halo), à venir (grisées). */
+.stepper { list-style: none; margin: 18px 0 6px; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); counter-reset: none; }
+.stepper__step { position: relative; display: flex; justify-content: center; }
+.stepper__step + .stepper__step::before { content: ""; position: absolute; top: 17px; right: calc(50% + 22px); left: calc(-50% + 22px);
+  height: 2px; border-radius: 2px; background: var(--line-strong); }
+.stepper__step.is-done + .stepper__step::before, .stepper__step.is-done + .stepper__step.is-current::before { background: var(--accent); }
+.stepper__btn { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 4px; border: 0; background: none; color: var(--ink-2);
+  font: inherit; cursor: pointer; text-align: center; }
+.stepper__btn:disabled { cursor: default; color: var(--ink-3); }
+.stepper__dot { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; font-weight: 800;
+  border: 2px solid var(--line-strong); background: var(--panel); transition: box-shadow .2s ease, border-color .2s ease; }
+.stepper__label { display: flex; flex-direction: column; font-size: var(--fs-sm); font-weight: 650; line-height: 1.25; }
+.stepper__label small { font-weight: 500; color: var(--ink-3); }
+.is-done .stepper__dot { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.is-current .stepper__dot { border-color: var(--accent); color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent); }
+.is-current .stepper__btn { color: var(--ink); }
+.stepper__btn:not(:disabled):hover .stepper__dot { border-color: var(--accent); }
+@media (max-width: 640px) {
+  .stepper__label { display: none; }
+  .is-current .stepper__label { display: flex; position: absolute; top: 44px; white-space: nowrap; }
+  .stepper { margin-bottom: 28px; }
+}
+
+.onboarding__panel { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+.onboarding__count { margin: 0; color: var(--accent); font-weight: 700; font-size: var(--fs-sm); letter-spacing: .02em; text-transform: uppercase; }
+.onboarding__intro { margin: 0; color: var(--ink-2); max-width: 75ch; }
+.onboarding__panel > .block { margin: 0; }
+.onboarding__nav { display: flex; align-items: center; gap: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+.onboarding__next { margin-left: auto; }
+.onboarding__progress { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--ink); }
+.onboarding__ai-head { display: flex; flex-direction: column; gap: 6px; }
+.onboarding__ai-head h2 { margin: 0; }
+.onboarding__ai-head p { margin: 0; max-width: 75ch; }
+.onboarding__skip { align-self: flex-start; }
+.onboarding__done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 36px 20px;
+  border: 1px solid var(--line); border-radius: var(--r-shell); background: var(--panel); }
+.onboarding__done h2 { margin: 0; font-size: var(--fs-xl); }
+.onboarding__done p { margin: 0; max-width: 60ch; }
+.onboarding__done-icon { color: var(--ok); filter: drop-shadow(0 0 14px color-mix(in srgb, var(--ok) 40%, transparent)); }
+.onboarding__summary { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.onboarding__summary li { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.onboarding__summary svg { color: var(--ok); }
+.onboarding__summary li.is-off { color: var(--ink-2); font-weight: 500; }
+.onboarding__dash { width: 16px; text-align: center; }
+.onboarding__open { align-self: center; margin-top: 8px; }

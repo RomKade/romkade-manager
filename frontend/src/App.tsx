@@ -17,6 +17,7 @@ import { Empty } from "./components/ui";
 import { AccountPage } from "./pages/Account";
 import { DashboardPage } from "./pages/Dashboard";
 import { LibraryPage } from "./pages/Library";
+import { OnboardingPage } from "./pages/Onboarding";
 import { BluetoothPage } from "./pages/Bluetooth";
 import { ControllersPage } from "./pages/Controllers";
 import { PlaytimePage } from "./pages/Playtime";
@@ -88,6 +89,8 @@ function Layout() {
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Installation du premier lancement : page à part, sans le cadre de l'application. */}
+      <Route path="bienvenue" element={<OnboardingPage />} />
       <Route element={<Layout />}>
         <Route index element={<DashboardPage />} />
         <Route path="bibliotheque" element={<LibraryPage />} />

@@ -1,6 +1,6 @@
 import { ArrowRight, Box, CheckCircle2, Gamepad2, HardDriveUpload, Play, RefreshCw, Star } from "lucide-react";
 import { Fragment, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 import {
   isActive, useCaps, useDeviceStatus, useFavorites, useLaunchGame, useNowPlaying, usePlatforms, usePlayState, useRecentGames, useRecentPlayed, useSettings,
@@ -17,6 +17,7 @@ import { StorageBar } from "../components/StorageBar";
 import { Empty, ErrorNotice, errorMessage, Spinner } from "../components/ui";
 import { locale, useT } from "../i18n";
 import { ago, count, gb } from "../lib/format";
+import { onboardingDone } from "./Onboarding";
 import { LimitGauge, useDuration } from "./Playtime";
 import { ConnectionForm, HostKeyPanel, TestPanel } from "./Settings";
 
@@ -104,6 +105,8 @@ export function DashboardPage() {
   if (status.isPending) return <div className="page"><Spinner label={t("common.loading")} /></div>;
   if (status.isError) return <div className="page"><ErrorNotice error={status.error} /></div>;
   const s = status.data;
+  // Premier lancement : l'installation guidée, sur sa propre page, tant qu'elle n'est ni terminée ni remise à plus tard.
+  if (!s.synced && !onboardingDone()) return <Navigate to="/bienvenue" replace />;
   const run = s.last_run;
   const online = device.data?.connected;
   const nowId = nowPlaying.data?.playing ? nowPlaying.data.game?.id : undefined;
