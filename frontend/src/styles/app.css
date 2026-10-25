@@ -1667,8 +1667,10 @@ kbd {
 .onboarding__count { margin: 0; color: var(--accent); font-weight: 700; font-size: var(--fs-sm); letter-spacing: .02em; text-transform: uppercase; }
 .onboarding__intro { margin: 0; color: var(--ink-2); max-width: 75ch; }
 .onboarding__panel > .block { margin: 0; }
-.onboarding__nav { display: flex; align-items: center; gap: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
-.onboarding__next { margin-left: auto; }
+.onboarding__nav { display: flex; align-items: center; gap: 12px; min-height: 58px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.onboarding__nav .onboarding__count { order: 1; margin: 0 auto; }  /* au centre, entre Retour et Continuer */
+.onboarding__nav .button:not(.onboarding__next) { order: 0; }
+.onboarding__nav .onboarding__next { order: 2; margin-left: 0; }
 .onboarding__progress { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--ink); }
 .onboarding__ai-head { display: flex; flex-direction: column; gap: 6px; }
 .onboarding__ai-head h2 { margin: 0; }

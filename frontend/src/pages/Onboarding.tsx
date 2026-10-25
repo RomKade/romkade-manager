@@ -98,7 +98,18 @@ export function OnboardingPage() {
 
         <section className="onboarding__panel" aria-live="polite">
           {current < STEPS.length && (
-            <p className="onboarding__count">{t("onboarding.stepOf", { n: current + 1, total: STEPS.length })}</p>
+            // Au-dessus de l'étape : Retour, « Étape n sur 5 » et Continuer visibles sans faire défiler.
+            <div className="onboarding__nav">
+              <p className="onboarding__count">{t("onboarding.stepOf", { n: current + 1, total: STEPS.length })}</p>
+              {current > 0 && (
+                <button type="button" className="button" onClick={() => go(current - 1)}><ChevronLeft size={16} aria-hidden /> {t("onboarding.back")}</button>
+              )}
+              {done[current] && (
+                <button type="button" className="button button--primary onboarding__next" onClick={() => go(current + 1)}>
+                  {t("onboarding.next")} <ChevronRight size={16} aria-hidden />
+                </button>
+              )}
+            </div>
           )}
           {current === 0 && <><p className="onboarding__intro">{t("onboarding.console.intro")}</p>
             <ConnectionForm initial={s} hasPassword={s.has_password} /></>}
@@ -111,18 +122,6 @@ export function OnboardingPage() {
           {current === STEPS.length && <DoneStep games={st.game_count} consoles={st.platform_count}
             ai={llm.data?.state === "connected"} onOpen={finish} />}
 
-          {current < STEPS.length && (
-            <div className="onboarding__nav">
-              {current > 0 && (
-                <button type="button" className="button" onClick={() => go(current - 1)}><ChevronLeft size={16} aria-hidden /> {t("onboarding.back")}</button>
-              )}
-              {done[current] && (
-                <button type="button" className="button button--primary onboarding__next" onClick={() => go(current + 1)}>
-                  {t("onboarding.next")} <ChevronRight size={16} aria-hidden />
-                </button>
-              )}
-            </div>
-          )}
         </section>
       </main>
     </div>
