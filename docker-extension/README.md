@@ -1,31 +1,33 @@
-# Extension Docker Desktop
+# Docker Desktop extension
 
-ROMKADE Manager s'installe depuis Docker Desktop, sans terminal : **Extensions > ROMKADE > Installer**.
-Docker Desktop démarre alors les mêmes services que le [compose.yaml](../compose.yaml) de la racine (le Manager et
-Typesense), et l'onglet **ROMKADE** ouvre le Manager dans le navigateur (`http://localhost:8765`).
+ROMKADE Manager installs from Docker Desktop, without a terminal: **Extensions > ROMKADE > Install**.
+Docker Desktop then starts the same services as the root [compose.yaml](../compose.yaml) (the Manager and
+Typesense), and the **ROMKADE** tab opens the Manager in the browser (`http://localhost:8765`).
 
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `metadata.json` | déclare l'onglet ROMKADE et les services à démarrer |
-| `docker-compose.yaml` | les services, démarrés par Docker Desktop à l'installation et arrêtés à la désinstallation |
-| `ui/index.html` | l'onglet : état du Manager, bouton d'ouverture, premières étapes |
-| `Dockerfile` | l'image de l'extension (aucun programme, seulement ces fichiers) et ses étiquettes pour le Marketplace |
+| `metadata.json` | declares the ROMKADE tab and the services to start |
+| `docker-compose.yaml` | the services, started by Docker Desktop on install and stopped on uninstall |
+| `ui/index.html` | the tab: Manager status, open button, first steps |
+| `Dockerfile` | the extension image (no program, only these files) and its Marketplace labels |
 
-## Essayer en local
+## Try it locally
 
-Docker Desktop > Settings > Extensions : cocher « Enable Docker Extensions ».
+Docker Desktop > Settings > Extensions: check "Enable Docker Extensions", and uncheck "Allow only extensions
+distributed through the Docker Marketplace" while the extension is not published.
 
 ```sh
-./build.sh                # construit et installe, Manager sur le port 8765
-./build.sh --port 8766    # à côté d'un Manager déjà lancé sur 8765
-docker extension rm romkade/romkade-manager-extension   # désinstalle
+./build.sh                # build and install, Manager on port 8765
+./build.sh --port 8766    # next to a Manager already running on 8765
+./build.sh --manager-image romkade-manager:main   # with a Manager built locally instead of the latest release
+docker extension rm romkade/romkade-manager-extension   # uninstall
 ```
 
-Les données (catalogue, réglages, secrets) vivent dans les volumes de l'extension, distincts de ceux d'une
-installation par `docker compose`.
+The data (catalogue, settings, secrets) lives in the extension's own volumes, separate from a `docker compose`
+install. **Uninstalling the extension deletes them.**
 
-## Publier dans le Marketplace
+## Publish to the Marketplace
 
-`docker extension validate` liste ce qui manque : une version semver (`0.1.0`, pas `dev`) et une image
-multi-architecture (`docker buildx build --platform=linux/amd64,linux/arm64 --push`) sur Docker Hub, puis la
-demande de publication auprès de Docker.
+`docker extension validate` lists what is missing: a semver tag (`0.1.0`, not `dev`) and a multi-arch image
+(`docker buildx build --platform=linux/amd64,linux/arm64 --push`) on Docker Hub, then the publication request to
+Docker.
