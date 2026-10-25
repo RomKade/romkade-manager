@@ -66,7 +66,7 @@
     const state = document.getElementById("state");
     const button = document.getElementById("open");
     button.addEventListener("click", () => open(url));
-    document.getElementById("guide").addEventListener("click", (e) => { e.preventDefault(); open("https://github.com/RomKade/romkade-manager#install-with-docker-macos-windows-linux"); });
+    document.getElementById("guide").addEventListener("click", (e) => { e.preventDefault(); open("https://romkade.com/en/installation/"); });
 
     // Le premier démarrage télécharge les images : on attend que le Manager réponde.
     let since = Date.now();
