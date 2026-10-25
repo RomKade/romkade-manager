@@ -1,0 +1,55 @@
+# Extension Docker Desktop de ROMKADE Manager sur ghcr.io/romkade/romkade-manager-extension (amd64 + arm64 :
+# Docker Desktop pour Windows, macOS Intel et Apple Silicon, Linux).
+#   push sur main (dossier docker-extension) : « edge », qui lance le Manager « edge » (dernier état de main)
+#   tag vX.Y.Z : « X.Y.Z » et « latest », qui lancent le Manager de la même version
+# Installer : docker extension install ghcr.io/romkade/romkade-manager-extension:edge
+name: Extension Docker Desktop
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+    paths: ["docker-extension/**", ".github/workflows/docker-extension.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version du Manager lancé par l'extension
+        id: v
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            echo "manager=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "manager=edge" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Fichiers de l'image
+        run: docker-extension/build.sh --context ext --manager-image ghcr.io/romkade/romkade-manager:${{ steps.v.outputs.manager }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-extension
+          tags: |
+            type=edge,branch=main
+            type=semver,pattern={{version}}
+          flavor: latest=auto
+      - uses: docker/build-push-action@v6
+        with:
+          context: ext
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          # Les étiquettes de l'extension (titre, description, icône…) viennent de son Dockerfile.

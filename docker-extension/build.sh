@@ -6,6 +6,7 @@
 #   ./build.sh --no-install    construit seulement
 #   ./build.sh --manager-image romkade-manager:main
 #                              un Manager construit en local, au lieu de la dernière version publiée
+#   ./build.sh --context DIR   prépare seulement les fichiers de l'image dans DIR (publication par GitHub Actions)
 #
 # Docker Desktop > Settings > Extensions > « Enable Docker Extensions » doit être coché.
 set -e
@@ -18,18 +19,23 @@ while [ $# -gt 0 ]; do
     --port) PORT="$2"; shift 2 ;;
     --no-install) INSTALL=0; shift ;;
     --manager-image) MANAGER="$2"; shift 2 ;;
+    --context) CONTEXT="$2"; shift 2 ;;
     *) echo "option inconnue : $1"; exit 1 ;;
   esac
 done
 
-BUILD="$(mktemp -d)"
-trap 'rm -rf "$BUILD"' EXIT
+if [ -n "$CONTEXT" ]; then
+  BUILD="$CONTEXT"; mkdir -p "$BUILD"
+else
+  BUILD="$(mktemp -d)"; trap 'rm -rf "$BUILD"' EXIT
+fi
 cp -R "$HERE/Dockerfile" "$HERE/metadata.json" "$HERE/romkade.png" "$HERE/ui" "$BUILD/"
 cp "$HERE/romkade.png" "$BUILD/ui/romkade.png"
 sed -e "s/127.0.0.1:8765:8765/127.0.0.1:$PORT:8765/" \
     -e "s#ghcr.io/romkade/romkade-manager:latest#${MANAGER:-ghcr.io/romkade/romkade-manager:latest}#" \
     "$HERE/docker-compose.yaml" > "$BUILD/docker-compose.yaml"
 printf 'window.ROMKADE_PORT = %s;\n' "$PORT" > "$BUILD/ui/config.js"
+[ -z "$CONTEXT" ] || { echo "fichiers de l'image prêts : $BUILD"; exit 0; }
 
 docker build -t "$TAG" "$BUILD"
 [ "$INSTALL" = 1 ] || exit 0

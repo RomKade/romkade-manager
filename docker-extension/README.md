@@ -11,6 +11,19 @@ Typesense), and the **ROMKADE** tab opens the Manager in the browser (`http://lo
 | `ui/index.html` | the tab: Manager status, open button, first steps |
 | `Dockerfile` | the extension image (no program, only these files) and its Marketplace labels |
 
+## Install the latest build (before Marketplace publication)
+
+Docker Desktop > Settings > Extensions: check "Enable Docker Extensions" and uncheck "Allow only extensions
+distributed through the Docker Marketplace". Then, in a terminal (macOS, Windows or Linux):
+
+```sh
+docker extension install ghcr.io/romkade/romkade-manager-extension:edge
+```
+
+The [Extension Docker Desktop](../.github/workflows/docker-extension.yml) workflow publishes it for Intel/AMD and
+ARM: `edge` on every change to this folder on `main` (it runs the Manager `edge` image), `X.Y.Z` and `latest` on
+every release tag (the Manager of the same version).
+
 ## Try it locally
 
 Docker Desktop > Settings > Extensions: check "Enable Docker Extensions", and uncheck "Allow only extensions
