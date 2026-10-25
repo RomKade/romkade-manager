@@ -86,6 +86,7 @@ class GoogleHome:
         self._syncs: dict[str, asyncio.Task] = {}     # demande de synchronisation en attente, par compte
         self._reported: dict[str, float] = {}         # dernier « en ligne » dit à Google, par console
         self._tasks: set[asyncio.Task] = set()
+        self._power: dict[str, bool] = {}             # « allumée » pour Google : éteinte = jeu quitté par OnOff
 
     @property
     def ready(self) -> bool:
@@ -201,11 +202,11 @@ class GoogleHome:
             "name": {"name": "Console", "defaultNames": ["Console ROMKADE"],
                      "nicknames": list(dict.fromkeys(["Console", "ma console", "jeu", "le jeu", "jeu vidéo",
                                                      "console rétro", "retro console", c.label]))},
-            "willReportState": False,
+            "willReportState": True,
             "deviceInfo": {"manufacturer": "ROMKADE", "model": info.get("model") or "console",
                            "swVersion": str(info.get("agent_version") or "")},
             "attributes": {"availableApplications": self.apps(c), "transportControlSupportedCommands": ["STOP"],
-                           "supportActivityState": False, "supportPlaybackState": False,
+                           "supportActivityState": True, "supportPlaybackState": True,
                            "volumeMaxLevel": 100, "volumeCanMuteAndUnmute": True, "levelStepSize": 10},
         }
 
@@ -241,11 +242,43 @@ class GoogleHome:
         if c.account_id and self.homegraph.ready and self.store.google_linked(c.account_id):
             self._spawn(self.homegraph.report_state(c.account_id, {c.id: states}))
 
+    async def state(self, c: Console) -> dict:
+        """État complet de la console pour Google (QUERY, Report State), lu en direct sur la console."""
+        if not self.relay.online(c.id):
+            return {"online": False}
+        try:
+            st = await self.relay.call(c.id, "status", None, 8)
+        except (ConsoleOffline, CommandTimeout, CommandFailed):
+            return {"online": False}
+        playing = bool(st.get("playing"))
+        on = playing or self._power.get(c.id, True)
+        out = {"online": True, "on": on, "currentApplication": "", "activityState": "ACTIVE" if on else "STANDBY",
+               "playbackState": "PLAYING" if playing else "STOPPED"}
+        if playing and st.get("platform_dir") and st.get("relative_path"):
+            row = self.store.game_by_path(c.id, st["platform_dir"], st["relative_path"])
+            if row is not None:
+                out["currentApplication"] = f"g{row['id']}"
+        vol = st.get("volume") or {}
+        if vol.get("percent") is not None:
+            out["currentVolume"] = int(vol["percent"])
+            out["isMuted"] = bool(vol.get("muted"))
+        return out
+
+    def report_now(self, c: Console) -> None:
+        """État complet signalé à Google (après une commande, à la connexion de la console)."""
+        if not (c.account_id and self.homegraph.ready and self.store.google_linked(c.account_id)):
+            return
+
+        async def go():
+            await self.homegraph.report_state(c.account_id, {c.id: await self.state(c)})
+
+        self._spawn(go())
+
     def console_seen(self, c: Console) -> None:
-        """L'app ROMKADE s'est (re)connectée : « en ligne », dit à Google au plus toutes les 10 minutes."""
+        """L'app ROMKADE s'est (re)connectée : état dit à Google, au plus toutes les 10 minutes."""
         if time.time() - self._reported.get(c.id, 0) > ONLINE_REPORT_EVERY:
             self._reported[c.id] = time.time()
-            self.report(c, {"online": True, "on": True})
+            self.report(c, {"online": True, "on": self._power.get(c.id, True)})
 
     def _game(self, c: Console, params: dict):
         key = str(params.get("newApplication") or "")
@@ -266,14 +299,21 @@ class GoogleHome:
                 return {"status": "ERROR", "errorCode": "noAvailableApp"}
             await self.relay.call(c.id, "launch", {"platform_dir": row["platform_dir"],
                                                    "relative_path": row["relative_path"], "slot": None}, 60)
-            return {"status": "SUCCESS", "states": {"online": True, "on": True, "currentApplication": f"g{row['id']}"}}
+            self._power[c.id] = True
+            return {"status": "SUCCESS", "states": {"online": True, "on": True, "currentApplication": f"g{row['id']}",
+                                                    "activityState": "ACTIVE", "playbackState": "PLAYING"}}
         if name == "OnOff":
-            if not params.get("on"):
+            on = bool(params.get("on"))
+            if not on:
                 await self.relay.call(c.id, "quit", None, 45)
-            return {"status": "SUCCESS", "states": {"online": True, "on": bool(params.get("on"))}}
+            self._power[c.id] = on
+            states = {"online": True, "on": on, "activityState": "ACTIVE" if on else "STANDBY"}
+            if not on:
+                states.update(playbackState="STOPPED", currentApplication="")
+            return {"status": "SUCCESS", "states": states}
         if name == "mediaStop":
             await self.relay.call(c.id, "quit", None, 45)
-            return {"status": "SUCCESS", "states": {"online": True}}
+            return {"status": "SUCCESS", "states": {"online": True, "playbackState": "STOPPED", "currentApplication": ""}}
         if name in ("setVolume", "volumeRelative", "mute"):
             if name == "mute":
                 p = {"percent": None, "muted": bool(params.get("mute"))}
@@ -293,8 +333,8 @@ class GoogleHome:
     async def execute(self, c: Console, command: str, params: dict) -> dict:
         try:
             r = await self._execute_one(c, command, params)
-            if r.get("status") == "SUCCESS" and r.get("states"):
-                self.report(c, r["states"])
+            if r.get("status") == "SUCCESS":
+                self.report_now(c)  # état complet relu sur la console (Report State)
             return r
         except ConsoleOffline:
             return {"status": "OFFLINE", "errorCode": "deviceOffline"}
@@ -332,9 +372,7 @@ class GoogleHome:
                     if c is None:
                         devices[d.get("id")] = {"status": "ERROR", "errorCode": "deviceNotFound"}
                         continue
-                    online = self.relay.online(c.id)
-                    devices[c.id] = {"status": "SUCCESS", "online": online, "on": online, "isMuted": False,
-                                     "currentApplication": ""}
+                    devices[c.id] = {"status": "SUCCESS", **await self.state(c)}
                 return JSONResponse({"requestId": request_id, "payload": {"devices": devices}})
             if intent == "action.devices.EXECUTE":
                 results = []

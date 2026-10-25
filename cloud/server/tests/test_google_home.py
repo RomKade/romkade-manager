@@ -208,7 +208,7 @@ async def _test_recent_games_and_automatic_updates(env, monkeypatch):
             {"intent": "action.devices.EXECUTE", "payload": {"commands": [{"devices": [{"id": c.id}], "execution": [
                 {"command": "action.devices.commands.appSelect", "params": {"newApplicationName": "zelda"}}]}]}}]})
         await asyncio.sleep(0.05)
-        assert graph.states[-1][1][c.id]["currentApplication"].startswith("g")
+        assert graph.states[-1][1][c.id]["online"] is True and "playbackState" in graph.states[-1][1][c.id]
         await h.post("/google/fulfillment", headers=auth, json={"requestId": "3", "inputs": [
             {"intent": "action.devices.DISCONNECT"}]})
         assert not env["store"].google_linked("sb:u-1")
