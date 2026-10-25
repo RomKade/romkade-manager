@@ -573,7 +573,7 @@ describe("Installation du premier lancement", () => {
     expect(within(steps).getByRole("button", { name: /Son identité/ })).toHaveAttribute("aria-current", "step");
     expect(within(steps).getByRole("button", { name: /Ta bibliothèque/ })).toBeDisabled();
     expect(screen.getByText("Étape 2 sur 5")).toBeInTheDocument();
-    const panel = (await screen.findByRole("heading", { name: /Identité de la console/ })).closest("section")!;
+    const panel = (await screen.findByText(/Approuve l'identité de ta console/)).closest<HTMLElement>(".onboarding__card")!;
     expect(await within(panel).findByText("SHA256:abc")).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: "Approuver cette clé" }));
     expect(await screen.findByText("Étape 3 sur 5")).toBeInTheDocument();

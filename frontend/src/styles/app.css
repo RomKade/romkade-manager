@@ -1636,7 +1636,7 @@ kbd {
 .onboarding__logo { width: 190px; height: auto; filter: drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 30%, transparent)); }
 .onboarding__top-actions { display: flex; align-items: center; gap: 18px; }
 .onboarding__main { max-width: 920px; margin: 0 auto; padding-top: clamp(24px, 5vh, 56px); display: flex; flex-direction: column; gap: 14px; }
-.onboarding__title { font-size: var(--fs-xl); font-stretch: 115%; text-wrap: balance; }
+.onboarding__title { font-size: clamp(1.7rem, 1rem + 1.8vw, 2.6rem); font-stretch: 115%; text-wrap: balance; }
 .onboarding__lead { color: var(--ink-2); font-size: var(--fs-lg); max-width: 70ch; margin: 0; text-wrap: pretty; }
 
 /* Fil d'étapes : pastilles numérotées reliées par un trait ; faites (coche), en cours (halo), à venir (grisées). */
@@ -1650,8 +1650,8 @@ kbd {
 .stepper__btn:disabled { cursor: default; color: var(--ink-3); }
 .stepper__dot { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; font-weight: 800;
   border: 2px solid var(--line-strong); background: var(--panel); transition: box-shadow .2s ease, border-color .2s ease; }
-.stepper__label { display: flex; flex-direction: column; font-size: var(--fs-sm); font-weight: 650; line-height: 1.25; }
-.stepper__label small { font-weight: 500; color: var(--ink-3); }
+.stepper__label { display: block; font-size: var(--fs-sm); font-weight: 650; line-height: 1.25; }
+.stepper__label small { font-size: inherit; font-weight: 500; color: var(--ink-3); }  /* « Duke · facultatif » sur une ligne */
 .is-done .stepper__dot { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
 .is-current .stepper__dot { border-color: var(--accent); color: var(--accent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent); }
@@ -1665,17 +1665,40 @@ kbd {
 
 .onboarding__panel { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
 .onboarding__count { margin: 0; color: var(--accent); font-weight: 700; font-size: var(--fs-sm); letter-spacing: .02em; text-transform: uppercase; }
-.onboarding__intro { margin: 0; color: var(--ink-2); max-width: 75ch; }
-.onboarding__panel > .block { margin: 0; }
-.onboarding__nav { display: flex; align-items: center; gap: 12px; min-height: 58px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.onboarding__nav .onboarding__count { order: 1; margin: 0 auto; }  /* au centre, entre Retour et Continuer */
-.onboarding__nav .button:not(.onboarding__next) { order: 0; }
-.onboarding__nav .onboarding__next { order: 2; margin-left: 0; }
+.onboarding__card { display: flex; flex-direction: column; gap: 14px; padding: clamp(20px, 3vw, 32px); border: 1px solid var(--line);
+  border-radius: var(--r-shell); background: var(--panel); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 6%, transparent); }
+.onboarding__card > h2 { margin: 0; font-size: var(--fs-xl); }
+.onboarding__desc { margin: 0; color: var(--ink-2); max-width: 75ch; }
+.onboarding__ok { display: flex; align-items: center; gap: 16px; padding: 4px 0; }
+.onboarding__ok > svg { flex: none; color: var(--ok); }
+.onboarding__ok-title { margin: 0; color: var(--ok); font-weight: 700; font-size: var(--fs-lg); }
+.onboarding__ok-sub { margin: 2px 0 0; color: var(--ink-2); }
+/* Panneaux repris de Paramètres : sans leur cadre ni leur titre, la carte de l'étape les porte (sauf l'assistant IA). */
+.onboarding__embed:empty { display: none; }
+.onboarding__embed > .block { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.onboarding__embed:not(.onboarding__embed--ai) > .block > h2,
+.onboarding__embed:not(.onboarding__embed--ai) > .block > .block__lead,
+.onboarding__embed:not(.onboarding__embed--ai) > .block > .block__head > h2 { display: none; }
+.onboarding__embed--ai { display: flex; flex-direction: column; gap: 18px; }
+.onboarding__embed--ai > .block + .block { padding-top: 18px; border-top: 1px solid var(--line); }
+.onboarding__library { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.onboarding__why { border-top: 1px solid var(--line); padding-top: 14px; }
+.onboarding__why summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 650; list-style: none; }
+.onboarding__why summary::-webkit-details-marker { display: none; }
+.onboarding__why summary::after { content: ""; width: 9px; height: 9px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-3px); transition: transform .2s ease; margin-right: 6px; }
+.onboarding__why[open] summary::after { transform: rotate(225deg) translateY(-3px); }
+.onboarding__why p { margin: 10px 0 0; color: var(--ink-2); max-width: 75ch; }
+/* Sous la carte, collée en bas de l'écran quand l'étape est plus haute que la fenêtre : Retour et Continuer toujours visibles. */
+.onboarding__nav { position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: 18px 0 14px; }
+/* Fond flou plutôt que coloré : invisible sur le quadrillage, il ne se voit que quand l'étape défile dessous. */
+.onboarding__nav::before { content: ""; position: absolute; inset: 0 -16px; z-index: -1; pointer-events: none;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  mask-image: linear-gradient(to bottom, transparent, #000 45%); -webkit-mask-image: linear-gradient(to bottom, transparent, #000 45%); }
+.onboarding__forward { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
+.onboarding__hint { margin: 0; color: var(--ink-2); font-size: var(--fs-sm); text-align: right; }
 .onboarding__progress { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--ink); }
-.onboarding__ai-head { display: flex; flex-direction: column; gap: 6px; }
-.onboarding__ai-head h2 { margin: 0; }
-.onboarding__ai-head p { margin: 0; max-width: 75ch; }
-.onboarding__skip { align-self: flex-start; }
 .onboarding__done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 36px 20px;
   border: 1px solid var(--line); border-radius: var(--r-shell); background: var(--panel); }
 .onboarding__done h2 { margin: 0; font-size: var(--fs-xl); }

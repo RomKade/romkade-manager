@@ -87,7 +87,7 @@ export function OnboardingPage() {
                     <span className="stepper__dot" aria-hidden>{state === "done" ? <Check size={15} /> : i + 1}</span>
                     <span className="stepper__label">
                       {t(`onboarding.step.${key}`)}
-                      {key === "ai" && <small>{t("onboarding.optional")}</small>}
+                      {key === "ai" && <small> · {t("onboarding.optional")}</small>}
                     </span>
                   </button>
                 </li>
@@ -96,33 +96,58 @@ export function OnboardingPage() {
           </ol>
         </nav>
 
-        <section className="onboarding__panel" aria-live="polite">
-          {current < STEPS.length && (
-            // Au-dessus de l'étape : Retour, « Étape n sur 5 » et Continuer visibles sans faire défiler.
-            <div className="onboarding__nav">
-              <p className="onboarding__count">{t("onboarding.stepOf", { n: current + 1, total: STEPS.length })}</p>
-              {current > 0 && (
-                <button type="button" className="button" onClick={() => go(current - 1)}><ChevronLeft size={16} aria-hidden /> {t("onboarding.back")}</button>
-              )}
+        {current < STEPS.length ? (
+          <section className="onboarding__panel" aria-labelledby="ob-card-h">
+            <p className="onboarding__count">{t("onboarding.stepOf", { n: current + 1, total: STEPS.length })}</p>
+            {/* Une carte par étape : titre, phrase, état « fait », action, puis « À quoi sert cette étape ? » à déplier. */}
+            <div className="onboarding__card" aria-live="polite">
+              <h2 id="ob-card-h">{t(`onboarding.card.${STEPS[current]}.title`)}</h2>
+              <p className="onboarding__desc">{t(`onboarding.card.${STEPS[current]}.desc`)}</p>
               {done[current] && (
-                <button type="button" className="button button--primary onboarding__next" onClick={() => go(current + 1)}>
-                  {t("onboarding.next")} <ChevronRight size={16} aria-hidden />
-                </button>
+                <div className="onboarding__ok" role="status">
+                  <CheckCircle2 size={40} aria-hidden />
+                  <div>
+                    <p className="onboarding__ok-title">{t(`onboarding.ok.${STEPS[current]}`)}</p>
+                    <p className="onboarding__ok-sub">{current === 3
+                      ? t("onboarding.library.done", { games: st.game_count, consoles: st.platform_count })
+                      : t("onboarding.okNext")}</p>
+                  </div>
+                </div>
               )}
+              <div className={`onboarding__embed ${current === 4 ? "onboarding__embed--ai" : ""}`}>
+                {current === 0 && <ConnectionForm initial={s} hasPassword={s.has_password} />}
+                {current === 1 && <HostKeyPanel trusted={s.host_key_trusted} host={s.host} />}
+                {current === 2 && !done[2] && <TestPanel auto />}
+                {current === 3 && !done[3] && <LibraryStep />}
+                {current === 4 && <LlmPanel />}
+              </div>
+              <details className="onboarding__why">
+                <summary>{t("onboarding.why")}</summary>
+                <p>{t(`onboarding.${STEPS[current]}.intro`)}</p>
+              </details>
             </div>
-          )}
-          {current === 0 && <><p className="onboarding__intro">{t("onboarding.console.intro")}</p>
-            <ConnectionForm initial={s} hasPassword={s.has_password} /></>}
-          {current === 1 && <><p className="onboarding__intro">{t("onboarding.identity.intro")}</p>
-            <HostKeyPanel trusted={s.host_key_trusted} host={s.host} /></>}
-          {current === 2 && <><p className="onboarding__intro">{t("onboarding.test.intro")}</p>
-            {done[2] ? <p className="ok-text"><CheckCircle2 size={16} aria-hidden /> {t("onboarding.test.ok")}</p> : <TestPanel auto />}</>}
-          {current === 3 && <LibraryStep />}
-          {current === 4 && <AiStep ready={llm.data?.state === "connected"} onSkip={() => { setAiSkipped(true); setPicked(null); }} />}
-          {current === STEPS.length && <DoneStep games={st.game_count} consoles={st.platform_count}
-            ai={llm.data?.state === "connected"} onOpen={finish} />}
 
-        </section>
+            {/* Sous la carte, collée en bas de l'écran quand l'étape est longue : toujours visible. */}
+            <div className="onboarding__nav">
+              {current > 0 ? (
+                <button type="button" className="button" onClick={() => go(current - 1)}><ChevronLeft size={16} aria-hidden /> {t("onboarding.back")}</button>
+              ) : <span />}
+              <div className="onboarding__forward">
+                {done[current] ? (
+                  <button type="button" className="button button--primary" onClick={() => go(current + 1)}>
+                    {t("onboarding.next")} <ChevronRight size={16} aria-hidden />
+                  </button>
+                ) : STEPS[current] === "ai" ? (
+                  <button type="button" className="button" onClick={() => { setAiSkipped(true); setPicked(null); }}>{t("onboarding.ai.skip")}</button>
+                ) : null}
+                <p className="onboarding__hint">{t("onboarding.nextHint", {
+                  step: current + 1 < STEPS.length ? t(`onboarding.step.${STEPS[current + 1]}`) : t("onboarding.step.done") })}</p>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <DoneStep games={st.game_count} consoles={st.platform_count} ai={llm.data?.state === "connected"} onOpen={finish} />
+        )}
       </main>
     </div>
   );
@@ -136,12 +161,8 @@ function LibraryStep() {
   const run = status.last_run;
   const failed = run?.status === "failed" && !status.sync_running;
   return (
-    <div className="block">
-      <h2>{t("onboarding.library.title")}</h2>
-      <p className="muted block__lead">{t("onboarding.library.intro")}</p>
-      {status.synced ? (
-        <p className="ok-text"><CheckCircle2 size={16} aria-hidden /> {t("onboarding.library.done", { games: status.game_count, consoles: status.platform_count })}</p>
-      ) : status.sync_running || start.isPending ? (
+    <div className="onboarding__library">
+      {status.sync_running || start.isPending ? (
         <p className="onboarding__progress" role="status">
           <Loader2 size={16} aria-hidden className="spin" />
           {run && run.platforms_total ? t("onboarding.library.running", { done: run.platforms_done, total: run.platforms_total }) : t("onboarding.library.starting")}
@@ -156,22 +177,6 @@ function LibraryStep() {
       )}
       {start.isError && <ErrorNotice error={start.error} />}
     </div>
-  );
-}
-
-/** Étape 5, facultative : brancher une IA pour Duke (même panneau que Paramètres > Assistant IA). */
-function AiStep({ ready, onSkip }: { ready: boolean; onSkip: () => void }) {
-  const t = useT();
-  return (
-    <>
-      <div className="onboarding__ai-head">
-        <h2>{t("onboarding.ai.title")}</h2>
-        <p className="muted">{t("onboarding.ai.intro")}</p>
-        {ready && <p className="ok-text"><CheckCircle2 size={16} aria-hidden /> {t("onboarding.ai.ready")}</p>}
-      </div>
-      <LlmPanel />
-      {!ready && <button type="button" className="button onboarding__skip" onClick={onSkip}>{t("onboarding.ai.skip")}</button>}
-    </>
   );
 }
 
