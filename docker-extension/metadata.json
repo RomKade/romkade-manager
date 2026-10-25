@@ -1,0 +1,13 @@
+{
+  "icon": "romkade.png",
+  "vm": {
+    "composefile": "docker-compose.yaml"
+  },
+  "ui": {
+    "dashboard-tab": {
+      "title": "ROMKADE",
+      "root": "/ui",
+      "src": "index.html"
+    }
+  }
+}

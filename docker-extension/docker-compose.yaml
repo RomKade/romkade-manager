@@ -1,0 +1,31 @@
+# ROMKADE Manager dans Docker Desktop (onglet Extensions) : les mêmes services que compose.yaml à la racine,
+# démarrés par Docker Desktop à l'installation de l'extension et arrêtés à sa désinstallation.
+#
+# L'interface reste ouverte au seul ordinateur (127.0.0.1). Le port 8765 est remplacé à la construction
+# par ./build.sh --port, pour essayer l'extension à côté d'un Manager déjà lancé.
+services:
+  romkade:
+    image: ghcr.io/romkade/romkade-manager:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      AGM_TYPESENSE_URL: http://typesense:8108
+      AGM_TYPESENSE_KEY: romkade-local-search
+    volumes:
+      - romkade-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - typesense
+
+  typesense:
+    image: typesense/typesense:27.1
+    restart: unless-stopped
+    command: ["--data-dir", "/data", "--api-key", "romkade-local-search"]
+    volumes:
+      - typesense-data:/data
+
+volumes:
+  romkade-data:
+  typesense-data:
