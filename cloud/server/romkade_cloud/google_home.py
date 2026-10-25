@@ -342,7 +342,8 @@ class GoogleHome:
                 p = {"percent": max(0, min(100, int(params.get("volumeLevel", 50)))), "muted": False}
             else:
                 st = await self.relay.call(c.id, "status", None, 20)
-                now = (st.get("volume") or {}).get("percent") or 50
+                now = (st.get("volume") or {}).get("percent")
+                now = 50 if now is None else int(now)  # 0 est un volume, pas une absence de volume
                 # volumeRelativeLevel : écart de volume demandé ; sinon relativeSteps crans de levelStepSize (10).
                 delta = params.get("volumeRelativeLevel")
                 delta = int(delta) if delta is not None else 10 * int(params.get("relativeSteps", 1))

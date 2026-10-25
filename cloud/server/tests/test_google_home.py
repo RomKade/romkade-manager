@@ -33,7 +33,7 @@ class FakeAuth:
 class FakeRelay(Relay):
     def __init__(self, online=True):
         super().__init__()
-        self.calls, self.up = [], online
+        self.calls, self.up, self.volume = [], online, 40
 
     def online(self, console_id):
         return self.up
@@ -42,7 +42,7 @@ class FakeRelay(Relay):
         if not self.up:
             raise ConsoleOffline("offline", "endormie")
         self.calls.append((action, params))
-        return {"volume": {"percent": 40}} if action == "status" else {"result": "ok"}
+        return {"volume": {"percent": self.volume}} if action == "status" else {"result": "ok"}
 
 
 @pytest.fixture
@@ -152,6 +152,10 @@ async def _test_sync_query_execute(env):
 
         await h.post("/google/fulfillment", headers=auth, json=execute("OnOff", {"on": False}))
         assert env["relay"].calls[-1] == ("quit", None)
+        env["relay"].volume = 0                                                        # son à 0 : 0 + 80 = 80
+        await h.post("/google/fulfillment", headers=auth, json=execute("volumeRelative", {"volumeRelativeLevel": 80}))
+        assert env["relay"].calls[-1] == ("volume", {"percent": 80, "muted": False})
+        env["relay"].volume = 40
         rel = (await h.post("/google/fulfillment", headers=auth, json=execute(
             "volumeRelative", {"relativeSteps": 80, "volumeRelativeLevel": 30}))).json()
         assert env["relay"].calls[-1] == ("volume", {"percent": 70, "muted": False})       # 40 + 30, pas 40 + 800
