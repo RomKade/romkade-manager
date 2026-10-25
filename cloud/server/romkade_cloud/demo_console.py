@@ -145,4 +145,5 @@ def main() -> None:
         while True:
             time.sleep(3600)
     server = os.environ.get("ROMKADE_DEMO_SERVER", "http://romkade-cloud:8787")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # pas une ligne par attente d'ordre (toutes les 25 s)
     asyncio.run(DemoConsole(server, secret).run())
