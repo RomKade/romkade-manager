@@ -411,10 +411,12 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         await asyncio.to_thread(rebuild_catalogs, store)
         if cheat_db.index() is None and os.environ.get("ROMKADE_FETCH_CHEATS", "1") == "1":
             asyncio.get_running_loop().create_task(_fetch_cheats())
+        watcher = asyncio.get_running_loop().create_task(google.watch_online())  # Google Home : en ligne / hors ligne
         try:
             async with inner_lifespan(a) as state:
                 yield state
         finally:
+            watcher.cancel()
             await analytics.close()
 
     app.router.lifespan_context = lifespan

@@ -322,6 +322,9 @@ class Store:
             else:
                 self._db.execute("DELETE FROM google_links WHERE account_id = ?", (account_id,))
 
+    def google_accounts(self) -> list[str]:
+        return [r[0] for r in self._db.execute("SELECT account_id FROM google_links")]
+
     def google_linked(self, account_id: str) -> bool:
         return self._db.execute("SELECT 1 FROM google_links WHERE account_id = ?", (account_id,)).fetchone() is not None
 

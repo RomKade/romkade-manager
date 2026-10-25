@@ -269,3 +269,23 @@ async def _test_homegraph_signs_with_the_service_account():
     assert await graph.report_state("sb:u-1", {"c1": {"online": True}})
     assert [r.url.path for r in seen] == ["/token", "/v1/devices:requestSync", "/v1/devices:reportStateAndNotification"]
     assert not HomeGraph().ready
+
+
+def test_offline_and_back_online_are_reported(env):
+    asyncio.run(_test_offline_and_back_online_are_reported(env))
+
+
+async def _test_offline_and_back_online_are_reported(env):
+    google = env["app"].app.app.state.google
+    graph = google.homegraph = FakeHomeGraph()
+    env["store"].set_google_link("sb:u-1", True)
+    c = env["console"]
+    task = asyncio.create_task(google.watch_online(every=0.02))
+    await asyncio.sleep(0.05)
+    env["relay"].up = False                       # console en veille
+    await asyncio.sleep(0.08)
+    assert graph.states[-1][1][c.id] == {"online": False}
+    env["relay"].up = True                        # console revenue
+    await asyncio.sleep(0.08)
+    assert graph.states[-1][1][c.id]["online"] is True
+    task.cancel()

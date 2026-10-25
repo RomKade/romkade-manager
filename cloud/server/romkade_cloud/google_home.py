@@ -275,6 +275,26 @@ class GoogleHome:
 
         self._spawn(go())
 
+    async def watch_online(self, every: float = 10) -> None:
+        """Consoles des comptes reliés à Google : une console qui se déconnecte (veille, Wi-Fi coupé) ou revient est
+        signalée aussitôt à Google (Report State), sans attendre qu'il interroge."""
+        known: dict[str, bool] = {}
+        while True:
+            try:
+                for account in self.store.google_accounts():
+                    for c in self.store.consoles_of(account):
+                        now, before = self.relay.online(c.id), known.get(c.id)
+                        known[c.id] = now
+                        if before is not None and now != before:
+                            log.info("Google Home : console %s %s", c.id, "en ligne" if now else "hors ligne")
+                            if now:
+                                self.report_now(c)
+                            else:
+                                self.report(c, {"online": False})
+            except Exception as exc:  # noqa: BLE001 — la surveillance ne s'arrête jamais
+                log.warning("Google Home : surveillance en ligne / hors ligne : %s", exc)
+            await asyncio.sleep(every)
+
     def console_seen(self, c: Console) -> None:
         """L'app ROMKADE s'est (re)connectée : état dit à Google, au plus toutes les 10 minutes."""
         if time.time() - self._reported.get(c.id, 0) > ONLINE_REPORT_EVERY:
