@@ -93,6 +93,59 @@ async def test_sessions_alerts_and_stats(app_factory):
         assert (await c.put("/api/play/settings", json={"alert_minutes": 1})).status_code == 422
 
 
+async def test_break_screen_pauses_game_until_resumed(app_factory):
+    class Console(FakeConsole):
+        alive = "up"
+
+        async def __call__(self, client, command, timeout=20):
+            self.commands.append(command)
+            if command == pt.BREAK_ALIVE:
+                return 0, self.alive + "\n"
+            if "romkade-break.py" in command:
+                return 0, "started\n"
+            return 0, "menu=1\n"
+
+    console = Console()
+    app = app_factory()
+    app.state.device_runner = console
+    tr = app.state.tracker
+    app.state.play_settings.save(pt.PlaySettings(alert_enabled=True, alert_minutes=60, alert_scope="session",
+                                                 repeat_minutes=30, console_message=True))
+    t = T0
+    while t <= T0 + timedelta(minutes=60):
+        await tr.observe(playing(MARIO), t)
+        t += timedelta(seconds=30)
+    launch = next(c for c in console.commands if "romkade-break.py" in c)
+    assert "pidof retroarch" in launch and "a fait 1 h 00 que tu joues" in launch and "SHOW_MSG" in launch
+    assert tr.on_break and tr.pending_alerts()[0]["console_pause"]
+    # Jeu figé : le temps de pause ne compte pas et ne déclenche pas d'autre alerte.
+    seen = tr.current["last_seen"]
+    for i in range(1, 80):
+        await tr.observe(playing(MARIO), t + timedelta(seconds=30 * i))
+    assert tr.current["last_seen"] == seen and len(tr.alerts) == 1
+    # A sur la console : l'écran est fermé, l'alerte est lue.
+    console.alive = "down"
+    await tr._check_break()
+    assert not tr.on_break and tr.pending_alerts() == []
+
+    # Reprise depuis le Manager : la pause est levée sur la console.
+    tr.on_break = True
+    tr.alerts.append({"id": 2, "created_at": t, "minutes": 90, "scope": "session", "game_title": "Mario",
+                      "acknowledged": False, "console_pause": True})
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        assert (await c.get("/api/play/state")).json()["alerts"][0]["console_pause"] is True
+        assert (await c.post("/api/play/alerts/2/ack")).status_code == 204
+    assert console.commands[-1] == pt.BREAK_RESUME and not tr.on_break
+
+
+def test_break_command_is_valid_shell():
+    import subprocess
+    cmd = pt.break_command("retroarch", {"title": "Ça fait 1 h que tu joues", "game": "Zelda: A Link's \"Past\""},
+                           ["/mnt/mmc/romkade/assets"], pt.show_msg_command("pause"))
+    assert subprocess.run(["bash", "-n", "-c", cmd]).returncode == 0
+    assert "kill -CONT" in cmd
+
+
 async def test_day_scope_counts_all_sessions(app_factory):
     app = app_factory()
     app.state.device_runner = FakeConsole()

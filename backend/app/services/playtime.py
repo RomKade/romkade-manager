@@ -9,7 +9,9 @@ Deux sources :
   aussi les parties lancées depuis le menu de la console. Leur date vient de l'horloge de la console.
 
 L'alerte compte la session en cours ou la journée (réglage), et peut s'afficher sur l'écran de la console
-pendant le jeu (commande réseau SHOW_MSG de RetroArch).
+pendant le jeu : en plein écran, jeu figé jusqu'à ce que le joueur appuie sur A (app/device/break_screen.py,
+firmware d'origine), sinon en message de RetroArch (commande réseau SHOW_MSG). Le temps passé sur l'écran de
+pause ne compte pas comme du jeu.
 """
 
 import asyncio
@@ -17,6 +19,7 @@ import json
 import logging
 import os
 import re
+import shlex
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -34,6 +37,30 @@ log = logging.getLogger("agm.playtime")
 POLL_SECONDS = 30
 GAP_SECONDS = 150          # au-delà, une absence coupe la session (console éteinte, jeu quitté)
 STATUS_FRESH_SECONDS = 20  # l'état mis en cache par le suivi sert aussi à « jeu en cours »
+BREAK_SCRIPT = (Path(__file__).resolve().parents[1] / "device" / "break_screen.py").read_text()
+BREAK_PID = "/tmp/romkade-break.pid"
+BREAK_ALIVE = f"p=$(cat {BREAK_PID} 2>/dev/null) && kill -0 \"$p\" 2>/dev/null && echo up || echo down"
+BREAK_RESUME = f"p=$(cat {BREAK_PID} 2>/dev/null) && kill -TERM \"$p\" 2>/dev/null; true"
+
+
+def show_msg_command(text: str) -> str:
+    msg = re.sub(r"[^A-Za-z0-9 :!.,'-]", "", text)
+    return f"bash -c 'echo -n \"SHOW_MSG {msg}\" > /dev/udp/127.0.0.1/55355'"
+
+
+def break_command(process: str | None, texts: dict, font_dirs: list[str], fallback: str) -> str:
+    """Écran de pause plein écran (détaché : la commande rend la main tout de suite). Écrit « started », « busy »
+    (déjà affiché) ou « message » (pas de python3 avec Pillow : message de RetroArch à la place). Quoi qu'il arrive
+    au script, le jeu est relancé (SIGCONT) quand il se termine."""
+    game = f"$(pidof {shlex.quote(process)} | awk '{{print $1}}')" if process else ""
+    run = (f"python3 /tmp/romkade-break.py \"$GAME\" {shlex.quote(json.dumps(texts))} "
+           + " ".join(shlex.quote(d) for d in font_dirs) + "; [ -n \"$GAME\" ] && kill -CONT \"$GAME\"")
+    # Textes en JSON ASCII (\u00e7…) : l'argument passe quelle que soit la locale de la console.
+    return (f"( {BREAK_ALIVE} ) | grep -q up && {{ echo busy; exit 0; }}; "
+            f"python3 -c 'import PIL' 2>/dev/null || {{ {fallback}; echo message; exit 0; }}; "
+            f"printf %s {shlex.quote(BREAK_SCRIPT)} > /tmp/romkade-break.py && GAME={game} && export GAME && "
+            f"(setsid nohup bash -c {shlex.quote(run)} </dev/null >/tmp/romkade-break.log 2>&1 &); "
+            f"for i in $(seq 1 20); do [ -f {BREAK_PID} ] && break; sleep 0.1; done; echo started")
 
 
 class PlaySettings(BaseModel):
@@ -92,6 +119,7 @@ class PlayTracker:
         self.last_status_at: datetime | None = None
         self.alerts: list[dict] = []
         self._alerted: set[str] = set()
+        self.on_break = False               # écran de pause affiché sur la console : le jeu est figé
         self._task: asyncio.Task | None = None
 
     # ---------- boucle ----------
@@ -126,6 +154,7 @@ class PlayTracker:
             status = await launcher.status(self.run(), self.client_factory(), self.profile())
         except errors.AppError:
             status = None  # console injoignable : rien n'est en cours, à notre connaissance
+        await self._check_break()
         await self.observe(status, now)
         return status
 
@@ -144,6 +173,8 @@ class PlayTracker:
     async def observe(self, status: dict | None, now: datetime) -> None:
         if status is not None:
             self.last_status, self.last_status_at = status, now
+        if self.on_break:
+            return  # jeu figé par l'écran de pause : ce temps-là ne compte pas (après une vraie pause, nouvelle partie)
         # status None : console injoignable. La partie en cours n'est coupée qu'après GAP_SECONDS sans nouvelles.
         rom = status["rom_path"] if status and status.get("playing") else None
         cur = self.current
@@ -175,7 +206,8 @@ class PlayTracker:
                               process=process, started_at=now, ended_at=now)
             s.add(row)
             s.flush()
-            return {"id": row.id, "rom_path": rom, "started_at": now, "last_seen": now, "title": title}
+            return {"id": row.id, "rom_path": rom, "started_at": now, "last_seen": now, "title": title,
+                    "process": process}
 
     def _touch(self, session_id: int, now: datetime) -> None:
         with self.sessions.begin() as s:
@@ -214,22 +246,66 @@ class PlayTracker:
                  "game_title": self.current["title"], "acknowledged": False}
         self.alerts.append(alert)
         p = self.profile()
-        if cfg.console_message and (p is None or p.capabilities()["on_screen_message"]):
-            text = (f"Game Manager : {fmt_minutes(elapsed)} de jeu "
-                    f"{'pour cette partie' if cfg.alert_scope == 'session' else 'aujourd hui'}. Pense a faire une pause !")
-            msg = re.sub(r"[^A-Za-z0-9 :!.,'-]", "", text)
-            try:
-                await self.run()(self.client_factory(), f"bash -c 'echo -n \"SHOW_MSG {msg}\" > /dev/udp/127.0.0.1/55355'")
-            except errors.AppError:
-                pass
+        if not cfg.console_message:
+            return
+        caps = p.capabilities() if p else None
+        fallback = show_msg_command(
+            f"ROMKADE : {fmt_minutes(elapsed)} de jeu "
+            f"{'pour cette partie' if cfg.alert_scope == 'session' else 'aujourd hui'}. Pense a faire une pause !")
+        try:
+            if caps is None or caps["break_screen"]:
+                texts = {
+                    "kicker": "PAUSE",
+                    "title": (f"Ça fait {fmt_minutes(elapsed)} que tu joues" if cfg.alert_scope == "session"
+                              else f"{fmt_minutes(elapsed)} de jeu aujourd'hui"),
+                    "game": self.current["title"],
+                    "body": "Le jeu est en pause. Lève les yeux de l'écran, étire-toi, bois un verre d'eau.",
+                    "resume": "Reprendre la partie",
+                    "foot": "ROMKADE Manager · alerte de temps de jeu",
+                }
+                root = self.roms_root().rstrip("/")
+                fonts = [root.rsplit("/", 1)[0] + "/romkade/assets", "/mnt/vendor/res/font", "/usr/share/fonts/truetype"]
+                _, out = await self.run()(self.client_factory(),
+                                          break_command(self.current.get("process"), texts, fonts,
+                                                        fallback if caps is None or caps["on_screen_message"] else "true"))
+                if out.strip().endswith(("started", "busy")):
+                    alert["console_pause"] = self.on_break = True
+            elif caps["on_screen_message"]:
+                await self.run()(self.client_factory(), fallback)
+        except errors.AppError:
+            pass
+
+    async def _check_break(self) -> None:
+        """Écran de pause fermé sur la console (touche A) : ses alertes sont lues, la partie reprend."""
+        if not self.on_break:
+            return
+        try:
+            _, out = await self.run()(self.client_factory(), BREAK_ALIVE)
+        except errors.AppError:
+            return  # console injoignable : on ne sait pas
+        if out.strip().endswith("down"):
+            self._end_break()
+
+    def _end_break(self) -> None:
+        self.on_break = False
+        for a in self.alerts:
+            if a.get("console_pause"):
+                a["acknowledged"] = True
 
     def pending_alerts(self) -> list[dict]:
         return [a for a in self.alerts if not a["acknowledged"]]
 
-    def acknowledge(self, alert_id: int) -> None:
+    async def acknowledge(self, alert_id: int) -> None:
+        """Alerte lue dans le Manager. Si elle a mis le jeu en pause sur la console, la partie reprend."""
         for a in self.alerts:
             if a["id"] == alert_id:
                 a["acknowledged"] = True
+                if a.get("console_pause") and self.on_break:
+                    try:
+                        await self.run()(self.client_factory(), BREAK_RESUME)
+                    except errors.AppError:
+                        pass
+                    self._end_break()
 
 
 # ---------- statistiques ----------

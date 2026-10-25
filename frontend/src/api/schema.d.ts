@@ -1934,6 +1934,11 @@ export interface components {
             scope: string;
             /** Game Title */
             game_title: string;
+            /**
+             * Console Pause
+             * @default false
+             */
+            console_pause: boolean;
         };
         /** AssistantIn */
         AssistantIn: {
@@ -2110,6 +2115,11 @@ export interface components {
              * @default false
              */
             screenshot: boolean;
+            /**
+             * Break Screen
+             * @default false
+             */
+            break_screen: boolean;
         };
         /** CatalogPlatformOut */
         CatalogPlatformOut: {

@@ -26,6 +26,7 @@ class CapabilitiesOut(BaseModel):
     on_screen_message: bool
     clock: bool
     screenshot: bool = False
+    break_screen: bool = False
 
 
 class SystemProfileOut(BaseModel):
