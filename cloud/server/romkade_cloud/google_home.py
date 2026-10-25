@@ -323,7 +323,10 @@ class GoogleHome:
             else:
                 st = await self.relay.call(c.id, "status", None, 20)
                 now = (st.get("volume") or {}).get("percent") or 50
-                p = {"percent": max(0, min(100, now + 10 * int(params.get("relativeSteps", 1)))), "muted": False}
+                # volumeRelativeLevel : écart de volume demandé ; sinon relativeSteps crans de levelStepSize (10).
+                delta = params.get("volumeRelativeLevel")
+                delta = int(delta) if delta is not None else 10 * int(params.get("relativeSteps", 1))
+                p = {"percent": max(0, min(100, now + delta)), "muted": False}
             await self.relay.call(c.id, "volume", p, 30)
             states = {"online": True, "isMuted": bool(p["muted"])}
             if p["percent"] is not None:

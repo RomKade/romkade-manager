@@ -152,6 +152,10 @@ async def _test_sync_query_execute(env):
 
         await h.post("/google/fulfillment", headers=auth, json=execute("OnOff", {"on": False}))
         assert env["relay"].calls[-1] == ("quit", None)
+        rel = (await h.post("/google/fulfillment", headers=auth, json=execute(
+            "volumeRelative", {"relativeSteps": 80, "volumeRelativeLevel": 30}))).json()
+        assert env["relay"].calls[-1] == ("volume", {"percent": 70, "muted": False})       # 40 + 30, pas 40 + 800
+        assert rel["payload"]["commands"][0]["status"] == "SUCCESS"
         vol = (await h.post("/google/fulfillment", headers=auth, json=execute("volumeRelative", {"relativeSteps": -2}))).json()
         assert env["relay"].calls[-1] == ("volume", {"percent": 20, "muted": False})
         assert vol["payload"]["commands"][0]["states"]["currentVolume"] == 20
