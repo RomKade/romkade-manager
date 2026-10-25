@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, ExternalLink, Gamepad2, Send, Sparkles, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Gamepad2, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
@@ -257,8 +257,12 @@ function Message({ m, game, onOpenGame, onSettle }: {
               {g.image_url || g.boxart_url
                 ? <Cover game={{ title: g.title, image_url: g.image_url ?? null, boxart_url: g.boxart_url ?? null,
                     platform: { directory: g.code ?? "" } as Game["platform"] }} className="assistant__cover" />
-                : <Gamepad2 size={12} aria-hidden />}
-              <span className="assistant__game-text">{g.title} <em>{g.platform}</em></span>
+                : <span className="assistant__cover assistant__cover--none"><Gamepad2 size={16} aria-hidden /></span>}
+              <span className="assistant__game-text">
+                <span className="assistant__game-title">{g.title}</span>
+                <span className="assistant__game-meta">{g.platform}{g.year ? ` · ${g.year}` : ""}</span>
+              </span>
+              {onOpenGame && <ChevronRight size={16} aria-hidden className="assistant__game-go" />}
             </button>
           ))}
         </span>

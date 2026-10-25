@@ -291,7 +291,7 @@ export const useSystems = () => useQuery({ queryKey: ["systems"], queryFn: api.s
 const ALL_CAPS: Capabilities = {
   launch: true, resume_slot: true, quit: true, save_state: true, now_playing: true, saves: true,
   retroarch_logs: true, bluetooth: true, bluetooth_audio: true, players: true, volume: true, on_screen_message: true, clock: true,
-  screenshot: true,
+  screenshot: true, break_screen: true,
 };
 /** Fonctions disponibles. Tant que le système n'est pas connu, tout reste affiché (le serveur refuse proprement). */
 export const useCaps = (): Capabilities => useSystem().data?.capabilities ?? ALL_CAPS;

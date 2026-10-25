@@ -33,8 +33,7 @@ const TABS = [
   { slug: "temps-de-jeu", label: "settings.tab.playtime", icon: Hourglass },
   { slug: "ia", label: "settings.tab.ai", icon: Bot },
   { slug: "pilotage", label: "settings.tab.remote", icon: Radio },
-  { slug: "connaissances", label: "settings.tab.knowledge", icon: BookOpenText },
-  { slug: "videos", label: "settings.tab.videos", icon: Video },
+  { slug: "catalogue", label: "settings.tab.catalog", icon: BookOpenText },
   { slug: "a-propos", label: "legal.about.title", icon: Info },
 ] as const;
 
@@ -46,8 +45,9 @@ export function SettingsPage() {
   const remote = useCloudConsoles();  // voyant de l'onglet Pilotage à distance
   const settings = useSettings();
   const { tab: raw = "" } = useParams();
-  // Anciennes adresses : Sources et crédits, Contenu IA (devenu Connaissances).
-  const tab = raw === "credits" ? "a-propos" : raw === "descriptions" ? "connaissances" : raw;
+  // Anciennes adresses : Sources et crédits ; Contenu IA, Connaissances et Vidéos (réunis dans Catalogue).
+  const OLD: Record<string, string> = { credits: "a-propos", descriptions: "catalogue", connaissances: "catalogue", videos: "catalogue" };
+  const tab = OLD[raw] ?? raw;
   const current = TABS.find((x) => x.slug === tab) ? tab : "";
   if (settings.isPending) return <div className="page"><Spinner label={t("common.loading")} /></div>;
   if (settings.isError) return <div className="page"><ErrorNotice error={settings.error} /></div>;
@@ -93,7 +93,6 @@ export function SettingsPage() {
         </>
       )}
       {current === "temps-de-jeu" && <PlaytimePanel />}
-      {current === "videos" && <YouTubePanel />}
       {current === "ia" && (
         <>
           <p className="muted settings__intro">{t("settings.ai.intro")}</p>
@@ -102,7 +101,7 @@ export function SettingsPage() {
         </>
       )}
       {current === "pilotage" && <RemoteControl />}
-      {current === "connaissances" && <><KnowledgePanel /><CheatsPanel /><DescriptionsPanel /></>}
+      {current === "catalogue" && <><KnowledgePanel /><CheatsPanel /><DescriptionsPanel /><YouTubePanel /></>}
       {current === "a-propos" && <><AboutPanel /><AnalyticsPanel /><CreditsPanel /></>}
     </div>
   );
@@ -550,7 +549,7 @@ const hasError = (code: string) => getLang() !== "fr" && has(`common.error.${cod
 /**
  * Paramètres > Assistant, en tête : ce que fait l'assistant de jeu (la bulle), avant l'IA qui le fait fonctionner
  * (LlmPanel) et les autres usages de cette IA (descriptions, commandes). Les connaissances qu'il lit sont récupérées
- * sans IA : onglet Connaissances.
+ * sans IA : onglet Catalogue.
  */
 /**
  * Descriptions des jeux en français, anglais et espagnol, rédigées ou traduites par Claude : clé d'API Anthropic
@@ -743,6 +742,7 @@ function YouTubePanel() {
 /** Limite de temps de jeu : l'alerte s'affiche dans Game Manager et, si coché, sur l'écran de la console. */
 function PlaytimePanel() {
   const t = useT();
+  const caps = useCaps();
   const q = usePlaySettings();
   const save = useSavePlaySettings();
   const [form, setForm] = useState<PlaySettings | null>(null);
@@ -796,7 +796,7 @@ function PlaytimePanel() {
         </div>
         <label className="toggle-inline toggle-inline--block">
           <input type="checkbox" checked={form.console_message} onChange={(e) => set("console_message", e.target.checked)} />
-          {t("settings.playtime.onConsole")}
+          {t(caps.break_screen ? "settings.playtime.onConsoleBreak" : "settings.playtime.onConsole")}
         </label>
       </fieldset>
       <div className="form__actions">

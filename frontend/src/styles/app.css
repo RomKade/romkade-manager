@@ -1442,16 +1442,26 @@ kbd {
   border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); }
 .assistant__msg--error { align-self: flex-start; color: var(--err); border: 1px solid color-mix(in srgb, var(--err) 45%, var(--line)); }
 .assistant__typing { color: var(--ink-3); font-style: italic; }
-.assistant__games, .assistant__sources { display: flex; flex-wrap: wrap; gap: 4px 8px; white-space: normal; }
-.assistant__game { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 6px; cursor: pointer;
-  border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink); font: inherit; font-size: var(--fs-xs); font-weight: 700; }
-.assistant__game em { font-style: normal; color: var(--accent-2); font-weight: 600; }
-/* Jaquette miniature du jeu cité : pour reconnaître un jeu sans ouvrir sa fiche */
-.assistant__game:has(.assistant__cover) { padding: 3px 9px 3px 3px; gap: 8px; }
-.assistant__cover.cover { width: 34px; height: 46px; flex: none; border-radius: 4px; }
+.assistant__sources { display: flex; flex-wrap: wrap; gap: 4px 8px; white-space: normal; }
+/* Jeux cités : une liste de lignes de même largeur (jaquette, titre, console et année), qui ouvrent la fiche */
+.assistant__msg--bot:has(.assistant__games) { width: 90%; }
+.assistant__games { display: flex; flex-direction: column; gap: 4px; white-space: normal; }
+.assistant__game { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 4px 8px 4px 4px;
+  border-radius: 8px; border: 1px solid transparent; background: color-mix(in srgb, var(--panel-2) 70%, transparent);
+  color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color 120ms, background 120ms; }
+.assistant__game:hover:not(:disabled), .assistant__game:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--panel-2); }
+.assistant__game:disabled { cursor: default; }
+.assistant__cover.cover, .assistant__cover--none { width: 32px; height: 44px; flex: none; border-radius: 4px; }
+.assistant__cover--none { display: grid; place-items: center; background: var(--panel); color: var(--ink-3); border: 1px solid var(--line); }
 .assistant__cover .cover__initials { font-size: 11px; }
 .assistant__cover .cover__platform { display: none; }
-.assistant__game-text { text-align: left; }
+.assistant__game-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.assistant__game-title { font-size: var(--fs-sm); font-weight: 700; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.assistant__game-meta { font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.assistant__game-go { flex: none; color: var(--ink-3); transition: color 120ms, transform 120ms; }
+.assistant__game:hover:not(:disabled) .assistant__game-go { color: var(--accent); transform: translateX(2px); }
 .assistant__sources a { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--ink-3); }
 .assistant__foot { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
 .assistant__form { display: flex; gap: 6px; }
