@@ -83,6 +83,7 @@ class GoogleHome:
         self.client_id, self.client_secret, self.supabase_client_id = client_id, client_secret, supabase_client_id
         self.transport = transport
         self.homegraph = homegraph or HomeGraph()
+        self.homegraph.on_unlinked = lambda account: self.store.set_google_link(account, False)
         self._syncs: dict[str, asyncio.Task] = {}     # demande de synchronisation en attente, par compte
         self._reported: dict[str, float] = {}         # dernier « en ligne » dit à Google, par console
         self._tasks: set[asyncio.Task] = set()

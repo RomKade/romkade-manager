@@ -33,6 +33,7 @@ class HomeGraph:
                 log.warning("Home Graph : clé de compte de service illisible, désactivé")
         self.transport = transport
         self._token: tuple[str, float] | None = None
+        self.on_unlinked = None  # appelé avec le compte quand Google ne le connaît plus (liaison retirée)
 
     @property
     def ready(self) -> bool:
@@ -54,12 +55,17 @@ class HomeGraph:
         return self._token[0]
 
     async def _post(self, path: str, body: dict) -> bool:
+        """True si Google accepte. Compte inconnu de Google (404) : on_unlinked(compte), puis False."""
         if not self.ready:
             return False
         try:
             async with httpx.AsyncClient(timeout=15, transport=self.transport) as http:
                 token = await self._access_token(http)
                 r = await http.post(f"{API}:{path}", json=body, headers={"Authorization": f"Bearer {token}"})
+            if r.status_code == 404 and self.on_unlinked and body.get("agentUserId"):
+                log.info("Home Graph : compte %s plus relié à Google, on n'envoie plus rien", body["agentUserId"])
+                self.on_unlinked(body["agentUserId"])
+                return False
             if r.status_code >= 400:
                 log.warning("Home Graph %s refusé (%s) : %s", path, r.status_code, r.text[:200])
                 return False

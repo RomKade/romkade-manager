@@ -274,6 +274,19 @@ async def _test_homegraph_signs_with_the_service_account():
     assert [r.url.path for r in seen] == ["/token", "/v1/devices:requestSync", "/v1/devices:reportStateAndNotification"]
     assert not HomeGraph().ready
 
+    # Liaison retirée côté Google : 404 -> le compte n'est plus considéré comme relié.
+    gone = []
+
+    def unlinked(request: httpx.Request):
+        if request.url.host == "oauth2.googleapis.com":
+            return httpx.Response(200, json={"access_token": "g-token", "expires_in": 3600})
+        return httpx.Response(404, json={"error": {"message": "Third-party user cannot be found."}})
+
+    graph = HomeGraph(base64.b64encode(json.dumps(account).encode()).decode(), httpx.MockTransport(unlinked))
+    graph.on_unlinked = gone.append
+    assert not await graph.report_state("sb:ancien", {"c1": {"online": True}})
+    assert gone == ["sb:ancien"]
+
 
 def test_offline_and_back_online_are_reported(env):
     asyncio.run(_test_offline_and_back_online_are_reported(env))
