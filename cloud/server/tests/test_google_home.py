@@ -125,7 +125,7 @@ async def _test_sync_query_execute(env):
             "requestId": "1", "inputs": [{"intent": "action.devices.SYNC"}]})).json()
         assert sync["payload"]["agentUserId"] == "sb:u-1"
         dev = sync["payload"]["devices"][0]
-        assert dev["id"] == c.id and dev["type"] == "action.devices.types.GAME_CONSOLE"
+        assert dev["id"] == c.id and dev["type"] == "action.devices.types.STREAMING_BOX"
         assert dev["name"]["name"] == "Console" and "RG35XX" in dev["name"]["nicknames"]
         zelda = next(a for a in dev["attributes"]["availableApplications"]
                      if "Zelda" in a["names"][0]["name_synonym"][-1])

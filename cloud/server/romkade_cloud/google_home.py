@@ -1,7 +1,7 @@
 """Google Home : « Hey Google, ouvre Zelda sur la RG35XX ». © 2026 ROMKADE, tous droits réservés.
 
 Intégration « cloud-to-cloud » de Google Home (developers.home.google.com/cloud-to-cloud) : chaque console reliée
-au compte ROMKADE devient un appareil de type console de jeux (GAME_CONSOLE) dans l'app Google Home. Ses jeux sont
+au compte ROMKADE devient un appareil de type boîtier multimédia (STREAMING_BOX) dans l'app Google Home. Ses jeux sont
 les « applications » de l'appareil (trait AppSelector) : favoris, puis jeux joués récemment, puis jeux connus ; un nom prononcé qui
 n'est pas dans la liste est cherché dans tout le catalogue. On/Off et Stop quittent le jeu, Volume règle le son.
 En français, Google transmet aussi un nom de jeu hors de la liste (« ouvre Tetris sur la console ») : il est cherché
@@ -193,7 +193,10 @@ class GoogleHome:
     def device(self, c: Console) -> dict:
         info = c.info
         return {
-            "id": c.id, "type": "action.devices.types.GAME_CONSOLE", "traits": TRAITS,
+            # Boîtier multimédia : ses fonctions obligatoires sont exactement celles de la console (ouvrir un jeu, état,
+            # marche/arrêt, stop, volume). Le type console de jeux (GAME_CONSOLE) exige en plus GameSelector, que la
+            # Test Suite réclame mais que Google ne documente pas.
+            "id": c.id, "type": "action.devices.types.STREAMING_BOX", "traits": TRAITS,
             # Nom facile à dire et bien reconnu (« ouvre Zelda sur la console ») ; « jeu » pour « arrête le jeu » ; le nom ROMKADE de la console reste un surnom.
             "name": {"name": "Console", "defaultNames": ["Console ROMKADE"],
                      "nicknames": list(dict.fromkeys(["Console", "ma console", "jeu", "le jeu", "jeu vidéo",
