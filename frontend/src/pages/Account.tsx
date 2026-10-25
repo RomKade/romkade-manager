@@ -1,6 +1,6 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppWindow, ArrowRight, Bot, Check, CheckCircle2, Cloud, Copy, Gamepad2, KeyRound, LogOut, Mail, PlugZap, ShieldCheck, UserRound } from "lucide-react";
+import { AppWindow, ArrowRight, Bot, Check, CheckCircle2, Cloud, Copy, Gamepad2, KeyRound, Link2, LogOut, Mail, PlugZap, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, NavLink, useParams } from "react-router-dom";
 
@@ -84,10 +84,12 @@ function AddToAssistant() {
   };
   return (
     <Block icon={<PlugZap size={18} aria-hidden />} title={t("account.remote.add.title")} lead={t("account.remote.add.lead")}>
-      <div className="account__inline">
-        <input readOnly value={CLOUD_URL} aria-label={t("account.remote.add.url")} onFocus={(e) => e.currentTarget.select()} />
-        <button type="button" className="button" onClick={copy}>
-          {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />} {copied ? t("account.remote.add.copied") : t("account.remote.add.copy")}
+      {/* Adresse du connecteur : un seul encart, lien et bouton « Copier » dedans. */}
+      <div className={`copy-link ${copied ? "is-copied" : ""}`}>
+        <Link2 size={18} aria-hidden className="copy-link__icon" />
+        <input className="copy-link__url" readOnly value={CLOUD_URL} aria-label={t("account.remote.add.url")} onFocus={(e) => e.currentTarget.select()} />
+        <button type="button" className="button button--small copy-link__btn" onClick={copy}>
+          {copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? t("account.remote.add.copied") : t("account.remote.add.copy")}
         </button>
       </div>
       <div className="remote__howto">
