@@ -40,13 +40,18 @@ Every game on your card, sorted by console, with its box art, summary, trailer a
 - **Add games by drag and drop**, over Wi-Fi, straight into the right folder, checked before anything is copied.
 - **Playtime**: how long you play each game, with optional reminders.
 
-## Duke, the AI assistant that knows your games
+## Duke, the AI assistant that knows your games and runs your console
 
 <p align="center"><img src="docs/readme/duke-en.webp" alt="Duke answers about the library and launches a game" width="720"></p>
 
-Ask Duke anything about your collection: “A two-player game?”, “How do I beat this level?”. It searches your library,
-suggests games and acts on the console when you click: launch a game, change the volume.
+Talk to Duke like a friend who knows your whole collection, and who has the console in hand. Every action on the
+console waits for your click.
 
+- **It knows your games.** “A two-player game in my library?”, “Compare these two.” On the game you're playing: the
+  controls, the goals, and help through a tough spot, a hint first, the full solution only if you ask.
+- **It runs your console.** Launch a game, quit it, save your progress, turn the volume up, down or off, take a
+  screenshot.
+- **It sees your screen.** Take a screenshot and ask Duke about it: it looks at the image to help you.
 - **Local or online, your choice.** Run the AI on your own computer (Ollama, LM Studio): nothing leaves your home. Or
   plug in an online model with your own key.
 - **From anywhere, with ChatGPT, Claude or Google Home.** Link your console to your ROMKADE account and ask “Launch
