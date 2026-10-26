@@ -160,12 +160,11 @@ authentication.
 >    - "Find Tobu Tobu Girl" then "Tell me about it, do I have a save?" (search_games, game_details)
 >    - "My favorite games" (favorite_games)
 >    - "Launch Tobu Tobu Girl" (launch_game), then "What's playing?" (console_status)
->    - "Save my game" (save_state, asks for confirmation), "Set the volume to 30 %" (set_volume)
+>    - "Save my game" (save_state, asks for confirmation), "Set the volume to 60 %" (set_volume)
 >    - "Quit the game" (quit_game, asks for confirmation)
->    - "Cheat codes for Alter Ego" (get_cheats) may return no code: homebrew games are rarely in the
->      libretro cheat database, that is expected.
-> 4. pair_console needs a 6-character code shown on a real console; with the demo account, "Pair my console with
->    code ABC123" returns the expected "Unknown or expired code" error.
+>    - "Cheat codes for Alter Ego" (get_cheats): 4 codes from the libretro cheat database.
+> 4. pair_console needs a 6-character code shown on a real console. With the demo account, "Pair my console with
+>    code ABC123" returns an expected error: the account already has its one console (the demo console).
 
 Confirmer : chaque outil appelé dans Claude comme connecteur personnalisé.
 
