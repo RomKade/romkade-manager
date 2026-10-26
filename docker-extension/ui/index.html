@@ -41,6 +41,12 @@
     ol { margin: 24px 0 0; padding: 16px 0 0 20px; border-top: 1px solid var(--line); text-align: left; color: var(--muted); }
     li { margin: 6px 0; }
     a { color: var(--accent); }
+    .problem { display: none; margin: 8px 0 0; padding: 14px 16px; border: 1px solid var(--wait); border-radius: 10px; text-align: left; }
+    .problem p { margin: 0 0 6px; color: var(--ink); }
+    .problem code { font-size: 13px; }
+    .has-problem .problem { display: block; }
+    .has-problem .dot { background: #d64545; }
+    .note { margin-top: 16px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -50,12 +56,19 @@
     <p>Your retro handheld, managed from your computer.</p>
     <div class="state" role="status"><span class="dot"></span><span id="state">Starting…</span></div>
     <div><button id="open" disabled>Open ROMKADE Manager</button></div>
+    <!-- Le Manager de l'extension ne démarre pas : port 8765 déjà pris (ancienne installation, Manager lancé depuis les sources…). -->
+    <div class="problem" id="problem" role="alert">
+      <p id="problem-text"></p>
+      <button id="fix"></button>
+    </div>
     <ol>
       <li>Create your ROMKADE account in the Manager.</li>
       <li>Turn the console on, on the same Wi-Fi as this computer: the Manager finds it and guides you through connecting it.</li>
       <li>To talk to it, add the ROMKADE connector in ChatGPT or Claude.</li>
     </ol>
     <p><a href="#" id="guide">Installation guide</a></p>
+    <p class="note">Uninstalling this extension deletes ROMKADE Manager's data on this computer (library, settings, copies of
+      saves). Your games and saves on the console are not affected.</p>
   </main>
   <script src="config.js"></script>
   <script>
@@ -68,21 +81,61 @@
     button.addEventListener("click", () => open(url));
     document.getElementById("guide").addEventListener("click", (e) => { e.preventDefault(); open("https://romkade.com/en/installation/"); });
 
-    // Le premier démarrage télécharge les images : on attend que le Manager réponde.
-    let since = Date.now();
+    // État du Manager de l'extension, lu dans Docker Desktop (window.ddClient) : son conteneur tourne-t-il ?
+    // S'il ne démarre pas, c'est presque toujours le port 8765 déjà pris : par une ancienne installation de ROMKADE
+    // Manager faite avec docker compose (projet « romkade »), qu'on propose d'arrêter, ou par un autre programme.
+    const problem = document.getElementById("problem");
+    const problemText = document.getElementById("problem-text");
+    const fix = document.getElementById("fix");
+    const label = (c, k) => (c.Labels || {})[k] || "";
+    let action = null;
+    fix.addEventListener("click", async () => {
+      if (!action) return;
+      fix.disabled = true;
+      try { await action(); } catch { /* l'état est relu juste après */ }
+      fix.disabled = false;
+      check();
+    });
+
+    async function containers() {
+      if (!window.ddClient) return null;
+      try { return await window.ddClient.docker.listContainers({ all: true }); } catch { return null; }
+    }
+    async function answers() {
+      try { await fetch(`${url}/api/health`, { mode: "no-cors", cache: "no-store" }); return true; } catch { return false; }
+    }
+    function show(kind, text, buttonText, act) {
+      app.classList.toggle("ready", kind === "ready");
+      app.classList.toggle("has-problem", kind === "problem");
+      button.disabled = kind !== "ready";
+      state.textContent = { ready: "Ready", problem: "ROMKADE Manager can't start", wait: text }[kind];
+      if (kind === "problem") { problemText.innerHTML = text; fix.textContent = buttonText; action = act; } else { action = null; }
+    }
+
+    const since = Date.now();
     async function check() {
-      try {
-        await fetch(`${url}/api/health`, { mode: "no-cors", cache: "no-store" });
-        app.classList.add("ready");
-        state.textContent = "Ready";
-        button.disabled = false;
-      } catch {
-        app.classList.remove("ready");
-        button.disabled = true;
-        state.textContent = Date.now() - since > 15000
-          ? "Starting… the first launch downloads ROMKADE (a few minutes)"
-          : "Starting…";
+      const all = await containers();
+      const ours = all && all.find((c) => label(c, "com.docker.compose.project").includes("romkade-manager-extension")
+        && (c.Image || "").includes("romkade-manager") && !(c.Image || "").includes("extension"));
+      const up = await answers();
+      if (!ours || ours.State === "running") {
+        if (up) return show("ready");
+        return show("wait", Date.now() - since > 15000 ? "Starting… the first launch downloads ROMKADE (a few minutes)" : "Starting…");
       }
+      const start = () => window.ddClient.docker.cli.exec("start", [ours.Id]);
+      const old = all.filter((c) => label(c, "com.docker.compose.project") === "romkade" && c.State === "running");
+      if (old.length) {
+        return show("problem",
+          "An older ROMKADE Manager, installed with <code>docker compose</code>, is already running on port 8765. "
+          + "Stop it to use this one. Its data stays on this computer, in its own Docker volume.",
+          "Stop the old one and start this one",
+          async () => { await window.ddClient.docker.cli.exec("stop", old.map((c) => c.Id)); await start(); });
+      }
+      if (!up) return show("problem", "ROMKADE Manager is stopped.", "Start it", start);
+      return show("problem",
+        "Port 8765 is already used by another program on this computer. If you run ROMKADE Manager from its source code, "
+        + "stop it (<code>Ctrl+C</code> in its terminal), then try again.",
+        "Try again", start);
     }
     check();
     setInterval(check, 3000);
