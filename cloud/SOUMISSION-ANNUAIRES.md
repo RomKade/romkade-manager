@@ -6,7 +6,7 @@ ChatGPT, et le connecte en un clic, sans copier d'adresse. Un seul serveur sert 
 
 Dossier de soumission à Claude (fiche, captures, icône) : `docs/annuaire-claude/`.
 
-**Claude : soumis le 2026-10-26, en cours d'examen.** ChatGPT : à préparer.
+**Claude : soumis le 2026-10-26, en cours d'examen.** ChatGPT : dossier `docs/annuaire-chatgpt/` (paquet ZIP prêt).
 
 État au 2026-10-24. ✅ fait · ⚠️ à reprendre · ❌ manque.
 
