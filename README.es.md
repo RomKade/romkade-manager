@@ -42,13 +42,19 @@ biblioteca:
 - **Añadir juegos arrastrando y soltando**, por Wi-Fi, directamente en la carpeta correcta, comprobados antes de copiar nada.
 - **El tiempo de juego**: cuánto juegas a cada juego, con avisos si quieres.
 
-## Duke, el asistente IA que conoce tus juegos
+## Duke, el asistente IA que conoce tus juegos y controla tu consola
 
 <p align="center"><img src="docs/readme/duke-es.webp" alt="Duke responde sobre la biblioteca y abre un juego" width="720"></p>
 
-Pregunta a Duke lo que quieras sobre tu colección: «¿Un juego para dos?», «¿Cómo paso este nivel?». Busca en tu
-biblioteca, propone juegos y actúa en la consola cuando haces clic: abrir un juego, ajustar el volumen.
+Habla con Duke como con un amigo que conoce toda tu colección y que tiene la consola en la mano. Cada acción en la
+consola espera tu clic.
 
+- **Conoce tus juegos.** «¿Un juego para dos en mi biblioteca?», «Compara estos dos.» En el juego en marcha: los
+  controles, los objetivos y ayuda para superar una parte difícil, primero una pista, la solución completa solo si la
+  pides.
+- **Controla tu consola.** Abrir un juego, salir, guardar tu partida, subir, bajar o quitar el sonido, hacer una
+  captura de pantalla.
+- **Ve tu pantalla.** Haz una captura y pregúntale: mira la imagen para ayudarte.
 - **Local o en línea, tú eliges.** Ejecuta la IA en tu propio ordenador (Ollama, LM Studio): nada sale de tu casa. O
   conecta un modelo en línea con tu propia clave.
 - **Desde cualquier sitio, con ChatGPT, Claude o Google Home.** Conecta tu consola a tu cuenta ROMKADE y pide «Abre
