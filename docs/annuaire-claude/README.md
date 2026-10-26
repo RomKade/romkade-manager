@@ -154,6 +154,8 @@ authentication.
 > 2. The account has a demo console that is always online (a virtual console with 8 homebrew games that their authors
 >    distribute for free, no commercial games). No hardware is needed.
 > 3. Try, in order:
+>    - "Which consoles do I have?" (list_consoles)
+>    - "Rename my console to ROMKADE Demo" (rename_console; please keep this name)
 >    - "What's on my console?" (library_overview)
 >    - "Find Tobu Tobu Girl" then "Tell me about it, do I have a save?" (search_games, game_details)
 >    - "My favorite games" (favorite_games)
