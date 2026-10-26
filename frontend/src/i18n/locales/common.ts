@@ -129,7 +129,7 @@ const messages: Messages = {
     "region.Australie": "Australie",
     "region.Chine": "Chine",
 
-    "hint.backend_unreachable": "Relance le serveur avec la commande uvicorn indiquée dans le README.",
+    "hint.backend_unreachable": "Relance le serveur avec la commande uvicorn indiquée dans docs/reference.fr.md.",
     "hint.device_unreachable": "Vérifie que la console est allumée, en Wi-Fi, et que son adresse IP n'a pas changé (Paramètres).",
     "hint.device_asleep": "Appuie brièvement sur le bouton marche de la console pour la réveiller : la connexion revient toute seule en quelques secondes.",
     "hint.local_network_blocked": "La console répond, mais macOS interdit au serveur de joindre le réseau local. Ouvre Réglages Système > Confidentialité et sécurité > Réseau local, active l'application qui a lancé le serveur (Terminal, iTerm, VS Code…), puis relance le serveur (Ctrl+C puis ./run.sh).",
@@ -335,7 +335,7 @@ const messages: Messages = {
     "error.backup_not_found": "Copy not found",
     "error.backup_file_not_found": "File missing from this copy",
 
-    "hint.backend_unreachable": "Restart the server with the uvicorn command given in the README.",
+    "hint.backend_unreachable": "Restart the server with the uvicorn command given in docs/reference.md.",
     "hint.device_unreachable": "Check that the console is on, on Wi-Fi, and that its IP address has not changed (Settings).",
     "hint.device_asleep": "Briefly press the console's power button to wake it up: the connection comes back by itself within a few seconds.",
     "hint.local_network_blocked": "The console answers, but macOS forbids the server to reach the local network. Open System Settings > Privacy & Security > Local Network, enable the app that started the server (Terminal, iTerm, VS Code…), then restart the server (Ctrl+C then ./run.sh).",
@@ -543,7 +543,7 @@ const messages: Messages = {
     "error.backup_not_found": "Copia no encontrada",
     "error.backup_file_not_found": "Archivo ausente de esta copia",
 
-    "hint.backend_unreachable": "Reinicia el servidor con el comando uvicorn indicado en el README.",
+    "hint.backend_unreachable": "Reinicia el servidor con el comando uvicorn indicado en docs/reference.es.md.",
     "hint.device_unreachable": "Comprueba que la consola está encendida, con Wi-Fi, y que su dirección IP no ha cambiado (Ajustes).",
     "hint.device_asleep": "Pulsa brevemente el botón de encendido de la consola para despertarla: la conexión vuelve sola en unos segundos.",
     "hint.local_network_blocked": "La consola responde, pero macOS prohíbe al servidor acceder a la red local. Abre Ajustes del Sistema > Privacidad y seguridad > Red local, activa la aplicación que lanzó el servidor (Terminal, iTerm, VS Code…) y reinicia el servidor (Ctrl+C y luego ./run.sh).",
