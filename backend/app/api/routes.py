@@ -55,7 +55,7 @@ def _storage_out(s: Storage) -> StorageOut:
 
 @router.get("/health", tags=["system"])
 async def health() -> dict:
-    return {"status": "ok", "read_only": False, "writes": "transfers_only", "version": "0.4.0"}
+    return {"status": "ok", "read_only": False, "writes": "transfers_only", "version": "0.5.0"}
 
 
 @router.get("/settings", response_model=SettingsOut, tags=["settings"])

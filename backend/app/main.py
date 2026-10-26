@@ -68,7 +68,7 @@ def create_app(
 
     app = FastAPI(
         title="ROMKADE Manager",
-        version="0.4.0",
+        version="0.5.0",
         lifespan=lifespan,
         description="Catalogue local et transferts vers une Anbernic RG35XX Pro.",
     )
