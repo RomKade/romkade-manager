@@ -110,6 +110,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/device/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Device Discover
+         * @description Cherche la console sur le réseau local (nom de firmware connu, sinon port SSH des réseaux domestiques courants),
+         *     pour la proposer à l'utilisateur qui confirme. Aucune authentification tentée. `scan` force le parcours complet.
+         */
+        post: operations["device_discover_api_device_discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/device/diagnose": {
         parameters: {
             query?: never;
@@ -1667,6 +1688,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/screenshots/{name}/caption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Caption Screenshot
+         * @description Post pour les réseaux sur une capture, rédigé par le modèle réglé : faits du jeu et passages de référence
+         *     (petit RAG), plus la capture si le modèle lit les images. Rien n'est publié ni enregistré.
+         */
+        post: operations["caption_screenshot_api_games__game_id__screenshots__name__caption_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/play/settings": {
         parameters: {
             query?: never;
@@ -1910,6 +1952,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cloud/agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agent Status
+         * @description Agent ROMKADE installé sur la console, et vers quel cloud (jamais le secret).
+         */
+        get: operations["agent_status_api_cloud_agent_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Unlink
+         * @description Arrête l'agent et efface son secret : la console n'est plus pilotable depuis le cloud.
+         */
+        delete: operations["unlink_api_cloud_agent_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cloud/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Link
+         * @description Relie la console au compte ROMKADE connecté : enregistrement dans le cloud, puis installation de l'agent.
+         */
+        post: operations["link_api_cloud_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phone Status */
+        get: operations["phone_status_api_phone_get"];
+        put?: never;
+        post?: never;
+        /** Phone Disconnect */
+        delete: operations["phone_disconnect_api_phone_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/phone/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phone Pair */
+        post: operations["phone_pair_api_phone_pair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2120,6 +2241,32 @@ export interface components {
              * @default false
              */
             break_screen: boolean;
+        };
+        /** CaptionIn */
+        CaptionIn: {
+            /**
+             * Lang
+             * @default fr
+             * @enum {string}
+             */
+            lang: "fr" | "en" | "es";
+            /**
+             * Tone
+             * @default nostalgic
+             * @enum {string}
+             */
+            tone: "nostalgic" | "fun" | "challenge" | "story";
+            /** Previous */
+            previous?: string[];
+        };
+        /** CaptionOut */
+        CaptionOut: {
+            /** Text */
+            text: string;
+            /** Model */
+            model: string;
+            /** Saw Image */
+            saw_image: boolean;
         };
         /** CatalogPlatformOut */
         CatalogPlatformOut: {
@@ -2408,7 +2555,7 @@ export interface components {
         DeviceSettings: {
             /**
              * Host
-             * @default 192.168.86.242
+             * @default
              */
             host: string;
             /**
@@ -2479,6 +2626,24 @@ export interface components {
             code?: string | null;
             /** Message */
             message?: string | null;
+        };
+        /** DiscoverOut */
+        DiscoverOut: {
+            /** Consoles */
+            consoles: components["schemas"]["DiscoveredConsoleOut"][];
+            /** Scanned */
+            scanned: boolean;
+        };
+        /** DiscoveredConsoleOut */
+        DiscoveredConsoleOut: {
+            /** Host */
+            host: string;
+            /** Name */
+            name: string | null;
+            /** Banner */
+            banner: string;
+            /** Likely */
+            likely: boolean;
         };
         /** DraftOut */
         DraftOut: {
@@ -2976,6 +3141,11 @@ export interface components {
             /** Slot */
             slot?: string | null;
         };
+        /** LinkIn */
+        LinkIn: {
+            /** Name */
+            name?: string | null;
+        };
         /** LlmKeyIn */
         LlmKeyIn: {
             /** Provider */
@@ -3052,6 +3222,17 @@ export interface components {
             offset: number;
             /** Limit */
             limit: number;
+        };
+        /** PairOut */
+        PairOut: {
+            /** Url */
+            url: string;
+            /** Qr */
+            qr: string;
+            /** Expires In */
+            expires_in: number;
+            /** Devices */
+            devices: number;
         };
         /** PasswordIn */
         PasswordIn: {
@@ -3495,7 +3676,7 @@ export interface components {
         SettingsOut: {
             /**
              * Host
-             * @default 192.168.86.242
+             * @default
              */
             host: string;
             /**
@@ -3595,6 +3776,15 @@ export interface components {
              * @default false
              */
             confirm_overwrite: boolean;
+        };
+        /** StatusOut */
+        StatusOut: {
+            /** Devices */
+            devices: number;
+            /** Listening */
+            listening: boolean;
+            /** Available */
+            available: boolean;
         };
         /** StorageOut */
         StorageOut: {
@@ -4018,6 +4208,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConnectionTestOut"];
+                };
+            };
+        };
+    };
+    device_discover_api_device_discover_post: {
+        parameters: {
+            query?: {
+                scan?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoverOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6770,6 +6991,42 @@ export interface operations {
             };
         };
     };
+    caption_screenshot_api_games__game_id__screenshots__name__caption_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_settings_api_play_settings_get: {
         parameters: {
             query?: never;
@@ -7109,6 +7366,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_status_api_cloud_agent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    unlink_api_cloud_agent_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    link_api_cloud_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LinkIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phone_status_api_phone_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+        };
+    };
+    phone_disconnect_api_phone_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+        };
+    };
+    phone_pair_api_phone_pair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairOut"];
                 };
             };
         };

@@ -105,6 +105,22 @@ async def test_missing_password(app_factory):
     assert r.json()["error"]["code"] == "credentials_missing"
 
 
+async def test_no_console_yet(app_factory):
+    """Installation neuve : aucune adresse par défaut, la console est à indiquer (jamais celle d'un autre)."""
+    from app.config import DeviceSettings
+    assert DeviceSettings().host == ""
+    app = app_factory()
+    s = app.state.settings_store.load()
+    app.state.settings_store.save(DeviceSettings(**{**s.model_dump(), "host": ""}))
+    async with await _client(app) as c:
+        status = (await c.get("/api/device/status")).json()
+        key = await c.get("/api/device/host-key")
+        diag = await c.post("/api/device/diagnose")
+    assert status["connected"] is False and status["error"]["code"] == "console_not_configured"
+    assert key.status_code == 409 and key.json()["error"]["code"] == "console_not_configured"
+    assert diag.json()["error"]["code"] == "console_not_configured"
+
+
 async def test_unreachable(app_factory, ssh_server):
     app = app_factory()
     from app.config import DeviceSettings

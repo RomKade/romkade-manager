@@ -33,7 +33,7 @@ class FakeAuth:
 class FakeRelay(Relay):
     def __init__(self, online=True):
         super().__init__()
-        self.calls, self.up = [], online
+        self.calls, self.up, self.volume = [], online, 40
 
     def online(self, console_id):
         return self.up
@@ -42,7 +42,7 @@ class FakeRelay(Relay):
         if not self.up:
             raise ConsoleOffline("offline", "endormie")
         self.calls.append((action, params))
-        return {"volume": {"percent": 40}} if action == "status" else {"result": "ok"}
+        return {"volume": {"percent": self.volume}} if action == "status" else {"result": "ok"}
 
 
 @pytest.fixture
@@ -126,14 +126,16 @@ async def _test_sync_query_execute(env):
         assert sync["payload"]["agentUserId"] == "sb:u-1"
         dev = sync["payload"]["devices"][0]
         assert dev["id"] == c.id and dev["type"] == "action.devices.types.STREAMING_BOX"
-        assert dev["name"]["name"] == "Console" and "RG35XX" in dev["name"]["nicknames"]
+        assert dev["name"]["name"] == "RG35XX" and "Console" in dev["name"]["nicknames"]
         zelda = next(a for a in dev["attributes"]["availableApplications"]
                      if "Zelda" in a["names"][0]["name_synonym"][-1])
         assert "Zelda" in zelda["names"][0]["name_synonym"]
 
+        assert dev["attributes"]["availableApplications"][0]["key"] == "menu"   # console sur son menu
         query = (await h.post("/google/fulfillment", headers=auth, json={"requestId": "2", "inputs": [
             {"intent": "action.devices.QUERY", "payload": {"devices": [{"id": c.id}, {"id": "nope"}]}}]})).json()
         assert query["payload"]["devices"][c.id]["online"] is True
+        assert query["payload"]["devices"][c.id]["currentApplication"] == "menu"   # toujours une app de la liste
         assert query["payload"]["devices"]["nope"]["errorCode"] == "deviceNotFound"
 
         def execute(command, params):
@@ -152,6 +154,14 @@ async def _test_sync_query_execute(env):
 
         await h.post("/google/fulfillment", headers=auth, json=execute("OnOff", {"on": False}))
         assert env["relay"].calls[-1] == ("quit", None)
+        env["relay"].volume = 0                                                        # son à 0 : 0 + 80 = 80
+        await h.post("/google/fulfillment", headers=auth, json=execute("volumeRelative", {"volumeRelativeLevel": 80}))
+        assert env["relay"].calls[-1] == ("volume", {"percent": 80, "muted": False})
+        env["relay"].volume = 40
+        rel = (await h.post("/google/fulfillment", headers=auth, json=execute(
+            "volumeRelative", {"relativeSteps": 80, "volumeRelativeLevel": 30}))).json()
+        assert env["relay"].calls[-1] == ("volume", {"percent": 70, "muted": False})       # 40 + 30, pas 40 + 800
+        assert rel["payload"]["commands"][0]["status"] == "SUCCESS"
         vol = (await h.post("/google/fulfillment", headers=auth, json=execute("volumeRelative", {"relativeSteps": -2}))).json()
         assert env["relay"].calls[-1] == ("volume", {"percent": 20, "muted": False})
         assert vol["payload"]["commands"][0]["states"]["currentVolume"] == 20
@@ -198,7 +208,7 @@ async def _test_recent_games_and_automatic_updates(env, monkeypatch):
         sync = (await h.post("/google/fulfillment", headers=auth, json={
             "requestId": "1", "inputs": [{"intent": "action.devices.SYNC"}]})).json()
         apps = sync["payload"]["devices"][0]["attributes"]["availableApplications"]
-        assert "Sonic The Hedgehog" in apps[0]["names"][0]["name_synonym"]        # joué récemment : en tête
+        assert "Sonic The Hedgehog" in apps[1]["names"][0]["name_synonym"]        # joué récemment : juste après le menu
         # Relié : un favori ajouté -> Google redemande la liste ; un jeu lancé -> état signalé.
         await h.post("/agent/favorites", json={"favorites": [["NES", "Legend of Zelda, The (USA).nes"]]},
                      headers={"authorization": f"Bearer {env['secret']}"})
@@ -265,3 +275,36 @@ async def _test_homegraph_signs_with_the_service_account():
     assert await graph.report_state("sb:u-1", {"c1": {"online": True}})
     assert [r.url.path for r in seen] == ["/token", "/v1/devices:requestSync", "/v1/devices:reportStateAndNotification"]
     assert not HomeGraph().ready
+
+    # Liaison retirée côté Google : 404 -> le compte n'est plus considéré comme relié.
+    gone = []
+
+    def unlinked(request: httpx.Request):
+        if request.url.host == "oauth2.googleapis.com":
+            return httpx.Response(200, json={"access_token": "g-token", "expires_in": 3600})
+        return httpx.Response(404, json={"error": {"message": "Third-party user cannot be found."}})
+
+    graph = HomeGraph(base64.b64encode(json.dumps(account).encode()).decode(), httpx.MockTransport(unlinked))
+    graph.on_unlinked = gone.append
+    assert not await graph.report_state("sb:ancien", {"c1": {"online": True}})
+    assert gone == ["sb:ancien"]
+
+
+def test_offline_and_back_online_are_reported(env):
+    asyncio.run(_test_offline_and_back_online_are_reported(env))
+
+
+async def _test_offline_and_back_online_are_reported(env):
+    google = env["app"].app.app.state.google
+    graph = google.homegraph = FakeHomeGraph()
+    env["store"].set_google_link("sb:u-1", True)
+    c = env["console"]
+    task = asyncio.create_task(google.watch_online(every=0.02))
+    await asyncio.sleep(0.05)
+    env["relay"].up = False                       # console en veille
+    await asyncio.sleep(0.08)
+    assert graph.states[-1][1][c.id] == {"online": False}
+    env["relay"].up = True                        # console revenue
+    await asyncio.sleep(0.08)
+    assert graph.states[-1][1][c.id]["online"] is True
+    task.cancel()

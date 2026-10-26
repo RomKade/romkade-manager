@@ -208,6 +208,10 @@
 .account__row > .button { flex: none; }
 .account__grow { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; }
 .account__actions { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+/* Code, champs puis boutons : chacun son espace (formulaires en plusieurs étapes : e-mail, mot de passe, suppression) */
+.account__form { display: flex; flex-direction: column; gap: 22px; }
+.account__form > .button { align-self: flex-start; }
+.account__form .account__actions { margin-top: 6px; gap: 12px; }
 .account__status { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 700; }
 .account__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .account__list li { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
@@ -270,3 +274,15 @@
 .account__new { color: var(--accent); }
 .account__badge--soon { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
 .remote__say { margin: 6px 0 0; color: var(--accent); font-weight: 600; }
+
+/* Adresse à copier (connecteur ROMKADE) : un encart unique, l'adresse en clair et le bouton « Copier » dedans. */
+.copy-link { display: flex; align-items: center; gap: 10px; max-width: 520px; padding: 5px 5px 5px 14px; border: 1px solid var(--line-strong);
+  border-radius: var(--r-control); background: var(--panel-2); transition: border-color .2s ease, box-shadow .2s ease; }
+.copy-link:focus-within, .copy-link.is-copied { border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 22%, transparent); }
+.copy-link__icon { flex: none; color: var(--accent); }
+.copy-link__url { flex: 1; min-width: 0; padding: 6px 0; border: 0; background: none; color: var(--ink); font: 600 var(--fs-md) var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  letter-spacing: .01em; text-overflow: ellipsis; }
+.copy-link__url:focus { outline: none; }
+.copy-link__btn { flex: none; }
+.copy-link.is-copied .copy-link__btn { color: var(--ok); border-color: var(--ok); }

@@ -22,6 +22,7 @@ log = logging.getLogger("romkade.demo")
 
 VERSION = "demo-1"
 POLL_WAIT = 25
+PLAY_FLAG = "/tmp/romkade-demo-play"  # fichier créé à la main (docker exec … touch) : un jeu démarre, sans la voix
 # Homebrews gratuits (dossier de plateforme, fichier, taille) : de quoi chercher, lancer et régler à la voix.
 GAMES = [
     ["GB", "Tobu Tobu Girl (World).gb", 262144],
@@ -108,6 +109,11 @@ class DemoConsole:
         await self.call(http, "POST", "/agent/favorites", {"favorites": FAVORITES})
         log.info("console de démonstration en ligne (%s jeux)", len(GAMES))
         while True:
+            if os.path.exists(PLAY_FLAG):  # « lance un jeu » pour la Test Suite (TransportControl), sans assistant
+                os.remove(PLAY_FLAG)
+                self.handle("launch", {"platform_dir": GAMES[-1][0], "relative_path": GAMES[-1][1]})
+                await self.call(http, "POST", "/agent/recent", {"recent": self.recent})
+                log.info("jeu lancé à la main : %s", GAMES[-1][1])
             r = await self.call(http, "GET", f"/agent/poll?wait={POLL_WAIT}", timeout=POLL_WAIT + 15)
             cmd = r.get("command")
             if r.get("resync"):

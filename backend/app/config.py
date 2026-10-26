@@ -37,7 +37,8 @@ def data_dir() -> Path:
 
 
 class DeviceSettings(BaseModel):
-    host: str = Field("192.168.86.242", min_length=1, max_length=253)
+    # Vide tant que l'utilisateur n'a pas indiqué sa console (Tableau de bord ou Paramètres > Connexion).
+    host: str = Field("", max_length=253)
     port: int = Field(22, ge=1, le=65535)
     username: str = Field("root", min_length=1, max_length=64)
     auth_method: Literal["password", "key"] = "password"
@@ -57,7 +58,8 @@ class DeviceSettings(BaseModel):
     @field_validator("host")
     @classmethod
     def _host(cls, v: str) -> str:
-        if not re.fullmatch(r"[A-Za-z0-9.\-:\[\]]+", v):
+        v = v.strip()
+        if v and not re.fullmatch(r"[A-Za-z0-9.\-:\[\]]+", v):
             raise ValueError("hôte invalide")
         return v
 

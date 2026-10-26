@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, BookOpenText, Radio, BookOpen, Bot, Check, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
+import { Activity, BookOpenText, Radio, BookOpen, Bot, Check, Gamepad2, Info, Play, Volume2, CalendarClock, ExternalLink, CheckCircle2, Cpu, Hourglass, KeyRound, Loader2, MinusCircle, Plug, Languages, RefreshCw, Search, ShieldCheck, Sparkles, Video, XCircle } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 
@@ -141,7 +141,7 @@ function ConnectionSteps({ settings }: { settings: Settings }) {
 }
 
 /** Étape 1 : la console. Le choix d'authentification affiche son propre champ (mot de passe ou clé SSH). */
-function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; hasPassword: boolean }) {
+export function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; hasPassword: boolean }) {
   const t = useT();
   const qc = useQueryClient();
   const [form, setForm] = useState<DeviceSettings>(initial);
@@ -176,6 +176,7 @@ function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; has
       <div className="form__grid">
         <Field id="host" label={t("settings.conn.host")} error={errs.host} hint={t("settings.conn.hostHint")}>
           <input id="host" value={form.host} onChange={(e) => set("host", e.target.value)} autoComplete="off" spellCheck={false} />
+          <ConsoleFinder auto={!initial.host} current={form.host} onPick={(host) => set("host", host)} />
         </Field>
         <Field id="port" label={t("settings.conn.port")} error={errs.port}>
           <input id="port" type="number" min={1} max={65535} value={form.port} onChange={(e) => set("port", Number(e.target.value))} />
@@ -223,6 +224,48 @@ function ConnectionForm({ initial, hasPassword }: { initial: DeviceSettings; has
       </div>
       {save.isError && !Object.keys(errs).length && <ErrorNotice error={save.error} />}
     </form>
+  );
+}
+
+/**
+ * Retrouve la console sur le réseau (nom de son firmware, sinon les réseaux domestiques courants) et la propose :
+ * « C'est ma console » reprend son adresse, que l'utilisateur confirme en enregistrant avec le mot de passe. Lancé
+ * tout seul tant qu'aucune adresse n'est indiquée ; « Chercher sur tout le réseau » parcourt ensuite chaque adresse.
+ */
+function ConsoleFinder({ auto, current, onPick }: { auto: boolean; current: string; onPick: (host: string) => void }) {
+  const t = useT();
+  const find = useMutation({ mutationFn: (scan: boolean) => api.discover(scan) });
+  useEffect(() => {
+    if (auto) find.mutate(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto]);
+  const found = find.data?.consoles ?? [];
+  return (
+    <div className="finder" aria-live="polite">
+      {find.isPending ? (
+        <p className="muted"><Loader2 size={14} aria-hidden className="spin" /> {t(find.variables ? "settings.find.scanning" : "settings.find.searching")}</p>
+      ) : find.isError ? (
+        <ErrorNotice error={find.error} />
+      ) : find.data && (found.length === 0 ? <p className="muted">{t("settings.find.none")}</p> : (
+        <ul className="finder__list">
+          {found.map((c) => (
+            <li key={c.host} className={c.likely ? "is-likely" : ""}>
+              <span>{t(c.likely ? "settings.find.console" : "settings.find.other")} <strong>{c.name ? `${c.name} · ${c.host}` : c.host}</strong></span>
+              {current === c.host ? (
+                <span className="ok-text"><CheckCircle2 size={14} aria-hidden /> {t("settings.find.chosen")}</span>
+              ) : (
+                <button type="button" className="button button--small" onClick={() => onPick(c.host)}>{t("settings.find.use")}</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ))}
+      {!find.isPending && (
+        <button type="button" className="link-button" onClick={() => find.mutate(!!find.data)}>
+          <Search size={14} aria-hidden /> {t(find.data ? "settings.find.again" : "settings.find.start")}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -371,7 +414,7 @@ function Field({ id, label, hint, error, wide, children }: { id: string; label: 
 
 /** Identité de la console (clé SSH). Pas encore approuvée (nouvelle console, nouvelle adresse) : l'empreinte est lue
  * tout de suite, il ne reste qu'à la comparer et à l'approuver ; « Paramètres#hk » (lien des erreurs) y amène. */
-function HostKeyPanel({ trusted, host }: { trusted: boolean; host: string }) {
+export function HostKeyPanel({ trusted, host }: { trusted: boolean; host: string }) {
   const t = useT();
   const qc = useQueryClient();
   const [key, setKey] = useState<HostKey | null>(null);
@@ -493,13 +536,20 @@ function gap(seconds: number): string {
   return t("settings.clock.unit.s", { count: seconds });
 }
 
-/** Diagnostic de la connexion, étape par étape (POST /api/device/diagnose). */
-function TestPanel() {
+/**
+ * Diagnostic de la connexion, étape par étape (POST /api/device/diagnose). `auto` le lance dès l'affichage : dernière
+ * étape de la mise en route sur le tableau de bord.
+ */
+export function TestPanel({ auto = false }: { auto?: boolean }) {
   const t = useT();
   const test = useMutation({ mutationFn: api.diagnose });
   const r = test.data;
   const qc = useQueryClient();
   const run = () => test.mutate(undefined, { onSuccess: () => qc.invalidateQueries({ queryKey: ["device-status"] }) });
+  useEffect(() => {
+    if (auto) run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto]);
   return (
     <section className="block" aria-labelledby="test-h">
       <div className="block__head">

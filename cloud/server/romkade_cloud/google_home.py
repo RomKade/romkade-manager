@@ -49,6 +49,7 @@ MAX_APPS = 120            # titres déclarés (favoris d'abord, un seul par titr
                           # et refuse les autres jeux, alors qu'un nom hors liste court lui est transmis tel quel
 TRAITS = ["action.devices.traits.AppSelector", "action.devices.traits.MediaState", "action.devices.traits.OnOff",
           "action.devices.traits.TransportControl", "action.devices.traits.Volume"]
+MENU = "menu"             # « application » de la console sur son menu (aucun jeu lancé)
 LANGS = ("fr", "en")      # langues des noms déclarés (les titres de jeux ne se traduisent pas)
 SYNC_DELAY = 20           # secondes : plusieurs changements de liste rapprochés -> une seule demande à Google
 ONLINE_REPORT_EVERY = 600 # secondes : état « en ligne » redit à Google au plus toutes les 10 minutes
@@ -83,6 +84,7 @@ class GoogleHome:
         self.client_id, self.client_secret, self.supabase_client_id = client_id, client_secret, supabase_client_id
         self.transport = transport
         self.homegraph = homegraph or HomeGraph()
+        self.homegraph.on_unlinked = lambda account: self.store.set_google_link(account, False)
         self._syncs: dict[str, asyncio.Task] = {}     # demande de synchronisation en attente, par compte
         self._reported: dict[str, float] = {}         # dernier « en ligne » dit à Google, par console
         self._tasks: set[asyncio.Task] = set()
@@ -172,8 +174,10 @@ class GoogleHome:
         (« 1942 » en quatre versions : une entrée). Google ne lance que ce qu'il reconnaît dans cette liste."""
         favorites, _ = self.store.favorites(c.id, MAX_APPS)
         recent, _ = self.store.recent(c.id, MAX_APPS)
+        menu = {"key": MENU, "names": [{"lang": "fr", "name_synonym": ["Menu", "menu de la console", "accueil"]},
+                                       {"lang": "en", "name_synonym": ["Menu", "Home screen"]}]}
         library, _ = self.store.search([c.id], [], None, 100_000)
-        out, seen = [], set()
+        out, seen = [menu], set()
         # Jeux connus (avec une fiche) avant les autres, au cas où la liste serait tronquée.
         for r in [*favorites, *recent, *sorted(library, key=lambda r: (not (r["description"] or r["year"]), r["title"].lower()))]:
             key = normalize_title(r["title"])
@@ -199,7 +203,8 @@ class GoogleHome:
             # Test Suite réclame mais que Google ne documente pas.
             "id": c.id, "type": "action.devices.types.STREAMING_BOX", "traits": TRAITS,
             # Nom facile à dire et bien reconnu (« ouvre Zelda sur la console ») ; « jeu » pour « arrête le jeu » ; le nom ROMKADE de la console reste un surnom.
-            "name": {"name": "Console", "defaultNames": ["Console ROMKADE"],
+            # Nom choisi dans ROMKADE s'il y en a un (renommer la console le change chez Google), sinon « Console ».
+            "name": {"name": c.name or "Console", "defaultNames": ["Console ROMKADE"],
                      "nicknames": list(dict.fromkeys(["Console", "ma console", "jeu", "le jeu", "jeu vidéo",
                                                      "console rétro", "retro console", c.label]))},
             "willReportState": True,
@@ -252,7 +257,7 @@ class GoogleHome:
             return {"online": False}
         playing = bool(st.get("playing"))
         on = playing or self._power.get(c.id, True)
-        out = {"online": True, "on": on, "currentApplication": "", "activityState": "ACTIVE" if on else "STANDBY",
+        out = {"online": True, "on": on, "currentApplication": MENU, "activityState": "ACTIVE" if on else "STANDBY",
                "playbackState": "PLAYING" if playing else "STOPPED"}
         if playing and st.get("platform_dir") and st.get("relative_path"):
             row = self.store.game_by_path(c.id, st["platform_dir"], st["relative_path"])
@@ -274,6 +279,26 @@ class GoogleHome:
 
         self._spawn(go())
 
+    async def watch_online(self, every: float = 10) -> None:
+        """Consoles des comptes reliés à Google : une console qui se déconnecte (veille, Wi-Fi coupé) ou revient est
+        signalée aussitôt à Google (Report State), sans attendre qu'il interroge."""
+        known: dict[str, bool] = {}
+        while True:
+            try:
+                for account in self.store.google_accounts():
+                    for c in self.store.consoles_of(account):
+                        now, before = self.relay.online(c.id), known.get(c.id)
+                        known[c.id] = now
+                        if before is not None and now != before:
+                            log.info("Google Home : console %s %s", c.id, "en ligne" if now else "hors ligne")
+                            if now:
+                                self.report_now(c)
+                            else:
+                                self.report(c, {"online": False})
+            except Exception as exc:  # noqa: BLE001 — la surveillance ne s'arrête jamais
+                log.warning("Google Home : surveillance en ligne / hors ligne : %s", exc)
+            await asyncio.sleep(every)
+
     def console_seen(self, c: Console) -> None:
         """L'app ROMKADE s'est (re)connectée : état dit à Google, au plus toutes les 10 minutes."""
         if time.time() - self._reported.get(c.id, 0) > ONLINE_REPORT_EVERY:
@@ -293,6 +318,10 @@ class GoogleHome:
 
     async def _execute_one(self, c: Console, command: str, params: dict) -> dict:
         name = command.rsplit(".", 1)[-1]
+        if name in ("appSelect", "appSearch", "appInstall") and MENU in (
+                str(params.get("newApplication") or "").lower(), str(params.get("newApplicationName") or "").lower()):
+            await self.relay.call(c.id, "quit", None, 45)  # « ouvre le menu » : retour au menu de la console
+            return {"status": "SUCCESS", "states": {"online": True, "currentApplication": MENU, "playbackState": "STOPPED"}}
         if name in ("appSelect", "appSearch", "appInstall"):
             row = self._game(c, params)
             if row is None:
@@ -309,11 +338,11 @@ class GoogleHome:
             self._power[c.id] = on
             states = {"online": True, "on": on, "activityState": "ACTIVE" if on else "STANDBY"}
             if not on:
-                states.update(playbackState="STOPPED", currentApplication="")
+                states.update(playbackState="STOPPED", currentApplication=MENU)
             return {"status": "SUCCESS", "states": states}
         if name == "mediaStop":
             await self.relay.call(c.id, "quit", None, 45)
-            return {"status": "SUCCESS", "states": {"online": True, "playbackState": "STOPPED", "currentApplication": ""}}
+            return {"status": "SUCCESS", "states": {"online": True, "playbackState": "STOPPED", "currentApplication": MENU}}
         if name in ("setVolume", "volumeRelative", "mute"):
             if name == "mute":
                 p = {"percent": None, "muted": bool(params.get("mute"))}
@@ -321,8 +350,12 @@ class GoogleHome:
                 p = {"percent": max(0, min(100, int(params.get("volumeLevel", 50)))), "muted": False}
             else:
                 st = await self.relay.call(c.id, "status", None, 20)
-                now = (st.get("volume") or {}).get("percent") or 50
-                p = {"percent": max(0, min(100, now + 10 * int(params.get("relativeSteps", 1)))), "muted": False}
+                now = (st.get("volume") or {}).get("percent")
+                now = 50 if now is None else int(now)  # 0 est un volume, pas une absence de volume
+                # volumeRelativeLevel : écart de volume demandé ; sinon relativeSteps crans de levelStepSize (10).
+                delta = params.get("volumeRelativeLevel")
+                delta = int(delta) if delta is not None else 10 * int(params.get("relativeSteps", 1))
+                p = {"percent": max(0, min(100, now + delta)), "muted": False}
             await self.relay.call(c.id, "volume", p, 30)
             states = {"online": True, "isMuted": bool(p["muted"])}
             if p["percent"] is not None:

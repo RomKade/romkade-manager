@@ -1,6 +1,6 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
-import { AppWindow, ArrowRight, Bot, Check, CheckCircle2, Cloud, Copy, Gamepad2, KeyRound, LogOut, Mail, PlugZap, ShieldCheck, UserRound } from "lucide-react";
+import { AppWindow, ArrowRight, Bot, Check, CheckCircle2, Cloud, Copy, Gamepad2, KeyRound, Link2, LogOut, Mail, PlugZap, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, NavLink, useParams } from "react-router-dom";
 
@@ -84,10 +84,12 @@ function AddToAssistant() {
   };
   return (
     <Block icon={<PlugZap size={18} aria-hidden />} title={t("account.remote.add.title")} lead={t("account.remote.add.lead")}>
-      <div className="account__inline">
-        <input readOnly value={CLOUD_URL} aria-label={t("account.remote.add.url")} onFocus={(e) => e.currentTarget.select()} />
-        <button type="button" className="button" onClick={copy}>
-          {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />} {copied ? t("account.remote.add.copied") : t("account.remote.add.copy")}
+      {/* Adresse du connecteur : un seul encart, lien et bouton « Copier » dedans. */}
+      <div className={`copy-link ${copied ? "is-copied" : ""}`}>
+        <Link2 size={18} aria-hidden className="copy-link__icon" />
+        <input className="copy-link__url" readOnly value={CLOUD_URL} aria-label={t("account.remote.add.url")} onFocus={(e) => e.currentTarget.select()} />
+        <button type="button" className="button button--small copy-link__btn" onClick={copy}>
+          {copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? t("account.remote.add.copied") : t("account.remote.add.copy")}
         </button>
       </div>
       <div className="remote__howto">
@@ -192,7 +194,7 @@ function EmailChange() {
           </div>
         </form>
       ) : (
-        <form onSubmit={(e: FormEvent) => { e.preventDefault();
+        <form className="account__form" onSubmit={(e: FormEvent) => { e.preventDefault();
           a.run(async () => { const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: "email_change" }); fail(error);
             setSent(false); setCode(""); setEmail(""); return t("account.email.done"); }); }}>
           <CodeInput id="acc-email-code" value={code} onChange={setCode} compact />
@@ -221,7 +223,7 @@ function PasswordChange() {
           const { error } = await supabase.auth.reauthenticate(); fail(error); setSent(true);
           return t("account.password.sent", { email: session?.user.email ?? "" }); })}>{t("account.sendCode")}</button>
       ) : (
-        <form onSubmit={(e: FormEvent) => { e.preventDefault();
+        <form className="account__form" onSubmit={(e: FormEvent) => { e.preventDefault();
           a.run(async () => { const { error } = await supabase.auth.updateUser({ password, nonce: code }); fail(error);
             setSent(false); setCode(""); setPassword(""); return t("account.password.done"); }); }}>
           <CodeInput id="acc-pw-code" value={code} onChange={setCode} compact />
@@ -460,7 +462,7 @@ function DeleteAccount() {
   const email = session?.user.email ?? "";
   return (
     <Block title={t("account.danger.title")} lead={t("account.danger.lead")} danger>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault();
+      <form className="account__form" onSubmit={(e: FormEvent) => { e.preventDefault();
         a.run(async () => { await cloud.deleteAccount(); await supabase.auth.signOut(); }); }}>
         <div className="field">
           <label htmlFor="acc-delete">{t("account.danger.type")}</label>

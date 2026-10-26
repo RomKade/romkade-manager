@@ -304,6 +304,7 @@ beforeEach(() => {
   cheatsReady = false;
   installedCheat = null;
   localStorage.removeItem("agm-recent-searches");
+  localStorage.removeItem("romkade-onboarding-done");
   localStorage.removeItem("romkade-assistant-name");
   localStorage.removeItem("romkade-assistant-hidden");
   systemCaps = null;
@@ -554,6 +555,92 @@ describe("Nouvelle console : clé à approuver", () => {
     const { ErrorNotice } = await import("../components/ui");
     render(<MemoryRouter><ErrorNotice error={new ApiError(409, "host_key_unknown", "La clé de cette console n'est pas encore approuvée")} /></MemoryRouter>);
     expect(screen.getByRole("link", { name: "Vérifier et approuver la clé de la console" })).toHaveAttribute("href", "/parametres#hk");
+  });
+});
+
+describe("Installation du premier lancement", () => {
+  it("l'accueil y mène tant que la bibliothèque n'a jamais été lue : page à part, étapes numérotées, de la clé au test", async () => {
+    hostKeyTrusted = false;
+    deviceOnline = false;
+    const base = mockFetch();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).startsWith("/api/catalog/status")
+      ? new Response(JSON.stringify({ ...status, synced: false }), { headers: { "Content-Type": "application/json" } })
+      : base(input, init)));
+    renderAt("/");
+    expect(await screen.findByRole("heading", { name: "Installation de ROMKADE Manager" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Tableau de bord/ })).toBeNull();  // ni barre latérale ni bandeaux
+    const steps = screen.getByRole("navigation", { name: "Étapes de l'installation" });
+    expect(within(steps).getByRole("button", { name: /Son identité/ })).toHaveAttribute("aria-current", "step");
+    expect(within(steps).getByRole("button", { name: /Ta bibliothèque/ })).toBeDisabled();
+    expect(screen.getByText("Étape 2 sur 6")).toBeInTheDocument();
+    const panel = (await screen.findByText(/Approuve l'identité de ta console/)).closest<HTMLElement>(".onboarding__card")!;
+    expect(await within(panel).findByText("SHA256:abc")).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Approuver cette clé" }));
+    expect(await screen.findByText("Étape 3 sur 6")).toBeInTheDocument();
+    await waitFor(() => expect(calls).toContain("/api/device/diagnose"));
+  });
+
+  it("cherche la console tout seul, la propose, et reprend son adresse quand on confirme", async () => {
+    deviceOnline = false;
+    const base = mockFetch();
+    const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/catalog/status")) return json({ ...status, synced: false });
+      if (url === "/api/settings") return json({ host: "", port: 22, username: "root", auth_method: "password", key_path: null,
+        roms_root: "/mnt/mmc/Roms", connect_timeout: 8, system: "auto", has_password: false, host_key_trusted: false });
+      if (url.startsWith("/api/device/discover")) {
+        calls.push(url);
+        return json({ scanned: false, consoles: [
+          { host: "192.168.86.242", name: "anbernic", banner: "SSH-2.0-OpenSSH_8.9p1", likely: true },
+          { host: "192.168.86.240", name: "mac.lan", banner: "SSH-2.0-OpenSSH_10.2", likely: false },
+        ] });
+      }
+      return base(input, init);
+    }));
+    renderAt("/bienvenue");
+    expect(await screen.findByText("Étape 1 sur 6")).toBeInTheDocument();
+    const found = (await screen.findByText("anbernic · 192.168.86.242")).closest("li")!;
+    expect(screen.getByText("mac.lan · 192.168.86.240")).toBeInTheDocument();
+    await userEvent.click(within(found).getByRole("button", { name: "C'est ma console" }));
+    expect(screen.getByLabelText("Adresse IP ou nom")).toHaveValue("192.168.86.242");
+    expect(within(found).getByText(/Adresse reprise/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Chercher sur tout le réseau" }));
+    await waitFor(() => expect(calls).toContain("/api/device/discover?scan=true"));
+  });
+
+  it("console connectée : lecture de la bibliothèque, puis Duke IA et le pilotage depuis ChatGPT ou Claude, facultatifs (« Plus tard »), puis l'écran final", async () => {
+    const base = mockFetch();
+    let synced = false;
+    const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("/api/catalog/status")) return json({ ...status, synced });
+      if (url === "/api/catalog/sync" && init?.method === "POST") { calls.push(url); synced = true; return json({ id: 7, status: "running" }, ); }
+      return base(input, init);
+    }));
+    renderAt("/bienvenue");
+    expect(await screen.findByText("Étape 4 sur 6")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Lire la bibliothèque" }));
+    await waitFor(() => expect(calls).toContain("/api/catalog/sync"));
+    expect(await screen.findByText("Étape 5 sur 6", {}, { timeout: 3000 })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Plus tard" }));
+    expect(await screen.findByText("Étape 6 sur 6")).toBeInTheDocument();  // ChatGPT, Claude, Google Home : facultatif aussi
+    await userEvent.click(screen.getByRole("button", { name: "Plus tard" }));
+    expect(await screen.findByRole("heading", { name: "Tout est prêt" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Ouvrir ROMKADE Manager" }));
+    expect(localStorage.getItem("romkade-onboarding-done")).toBe("1");
+  });
+
+  it("« Terminer plus tard » mène au tableau de bord, qui n'y renvoie plus", async () => {
+    deviceOnline = false;
+    const base = mockFetch();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).startsWith("/api/catalog/status")
+      ? new Response(JSON.stringify({ ...status, synced: false }), { headers: { "Content-Type": "application/json" } })
+      : base(input, init)));
+    renderAt("/bienvenue");
+    await userEvent.click(await screen.findByRole("button", { name: "Terminer plus tard" }));
+    expect(await screen.findByRole("heading", { name: "Connecte ta console" })).toBeInTheDocument();
   });
 });
 

@@ -9,12 +9,12 @@ from fastapi import APIRouter, Query, Request
 
 from app import errors
 from app.config import DeviceSettings
-from app.device import diagnose
+from app.device import diagnose, discover
 from app.device.paths import platform_dir_name_ok
 from app.device.remote_fs import ReadOnlyRemoteFS, Storage
 from app.device.ssh_client import DeviceClient, HostKeyStore, fetch_host_key, fingerprint
 from app.schemas import (
-    DiagnoseOut,
+    DiagnoseOut, DiscoverOut,
     ConnectionTestOut, FilesPageOut, HostKeyOut, InventoryOut, Page, PasswordIn,
     PlatformOut, SettingsOut, StorageOut, TrustHostKeyIn,
 )
@@ -123,6 +123,13 @@ async def test_connection(request: Request) -> ConnectionTestOut:
     return ConnectionTestOut(connected=True, host=s.host, port=s.port, username=s.username, sftp=True,
                              roms_root=s.roms_root, roms_root_exists=exists, platform_dir_count=count,
                              storage=storage, latency_ms=round((time.perf_counter() - t0) * 1000, 1))
+
+
+@router.post("/device/discover", response_model=DiscoverOut, tags=["device"])
+async def device_discover(scan: bool = False) -> dict:
+    """Cherche la console sur le réseau local (nom de firmware connu, sinon port SSH des réseaux domestiques courants),
+    pour la proposer à l'utilisateur qui confirme. Aucune authentification tentée. `scan` force le parcours complet."""
+    return await discover.discover(scan)
 
 
 @router.post("/device/diagnose", response_model=DiagnoseOut, tags=["device"])

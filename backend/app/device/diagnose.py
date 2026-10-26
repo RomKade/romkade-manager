@@ -64,6 +64,8 @@ def _step(id_: str, status: str, ms: float | None = None, detail: str | None = N
 
 async def diagnose(settings: DeviceSettings, credentials: CredentialStore, host_keys: HostKeyStore) -> dict:
     s = settings
+    if not s.host:
+        raise errors.console_not_configured()
     steps: list[dict] = []
     failed = False
 

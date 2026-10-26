@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -47,15 +47,15 @@
   <main id="app">
     <img src="romkade.png" alt="">
     <h1>ROMKADE Manager</h1>
-    <p>Votre console rétro, pilotée depuis l'ordinateur.</p>
-    <div class="state" role="status"><span class="dot"></span><span id="state">Démarrage…</span></div>
-    <div><button id="open" disabled>Ouvrir ROMKADE Manager</button></div>
+    <p>Your retro handheld, managed from your computer.</p>
+    <div class="state" role="status"><span class="dot"></span><span id="state">Starting…</span></div>
+    <div><button id="open" disabled>Open ROMKADE Manager</button></div>
     <ol>
-      <li>Créez votre compte ROMKADE dans le Manager.</li>
-      <li>Allumez la console sur le même Wi-Fi que cet ordinateur, puis reliez-la depuis <strong>Mon compte</strong>.</li>
-      <li>Pour lui parler, ajoutez le connecteur ROMKADE dans ChatGPT ou Claude.</li>
+      <li>Create your ROMKADE account in the Manager.</li>
+      <li>Turn the console on, on the same Wi-Fi as this computer: the Manager finds it and guides you through connecting it.</li>
+      <li>To talk to it, add the ROMKADE connector in ChatGPT or Claude.</li>
     </ol>
-    <p><a href="#" id="guide">Guide d'installation</a></p>
+    <p><a href="#" id="guide">Installation guide</a></p>
   </main>
   <script src="config.js"></script>
   <script>
@@ -66,7 +66,7 @@
     const state = document.getElementById("state");
     const button = document.getElementById("open");
     button.addEventListener("click", () => open(url));
-    document.getElementById("guide").addEventListener("click", (e) => { e.preventDefault(); open("https://romkade.com/installation/"); });
+    document.getElementById("guide").addEventListener("click", (e) => { e.preventDefault(); open("https://romkade.com/en/installation/"); });
 
     // Le premier démarrage télécharge les images : on attend que le Manager réponde.
     let since = Date.now();
@@ -74,14 +74,14 @@
       try {
         await fetch(`${url}/api/health`, { mode: "no-cors", cache: "no-store" });
         app.classList.add("ready");
-        state.textContent = "Prêt";
+        state.textContent = "Ready";
         button.disabled = false;
       } catch {
         app.classList.remove("ready");
         button.disabled = true;
         state.textContent = Date.now() - since > 15000
-          ? "Démarrage… le premier lancement télécharge ROMKADE (quelques minutes)"
-          : "Démarrage…";
+          ? "Starting… the first launch downloads ROMKADE (a few minutes)"
+          : "Starting…";
       }
     }
     check();
