@@ -53,18 +53,20 @@ dans ta bibliothèque, propose des jeux et agit sur la console quand tu cliques 
 - **De partout, avec ChatGPT, Claude ou Google Home.** Relie ta console à ton compte ROMKADE et demande « Lance
   Tetris » depuis ton téléphone ou ton ordinateur.
 
-## À deux sur la télé, chacun sa manette
+## La bonne manette pour chaque joueur, en un clic
 
 <p align="center"><img src="docs/readme/controllers-fr.webp" alt="Choisir la manette de chaque joueur" width="720"></p>
 
-Branche la console sur ta télé et joue en grand, à deux, chacun avec sa manette (Bluetooth ou USB). Depuis ton
-ordinateur, choisis qui joue avec laquelle : le réglage s'applique à tes jeux.
+Associe tes manettes Bluetooth depuis ton ordinateur, vois toutes celles branchées sur la console et donnes-en une à
+chaque joueur. ROMKADE Manager applique ton choix à tes jeux : branche la console sur ta télé et joue à deux sur grand
+écran, sans fouiller dans les menus de la console.
 
-## Le son du jeu sur ton enceinte Bluetooth
+## Connecte ta console à ton enceinte Bluetooth
 
 <p align="center"><img src="docs/readme/bluetooth-fr.webp" alt="Le son du jeu envoyé sur une enceinte Bluetooth" width="720"></p>
 
-Associe une enceinte Bluetooth à la console depuis ton ordinateur, et joue avec le son à pleine puissance.
+ROMKADE Manager cherche les appareils Bluetooth autour de la console. Choisis ton enceinte ou ton casque : la console
+s'y connecte et le son du jeu sort à pleine puissance. Un clic renvoie le son vers la console.
 
 ## Démarrer en 3 étapes
 

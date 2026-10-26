@@ -54,18 +54,20 @@ biblioteca, propone juegos y actúa en la consola cuando haces clic: abrir un ju
 - **Desde cualquier sitio, con ChatGPT, Claude o Google Home.** Conecta tu consola a tu cuenta ROMKADE y pide «Abre
   Tetris» desde tu móvil o tu ordenador.
 
-## A dos en la tele, cada uno con su mando
+## El mando adecuado para cada jugador, en un clic
 
 <p align="center"><img src="docs/readme/controllers-es.webp" alt="Elegir el mando de cada jugador" width="720"></p>
 
-Conecta la consola a tu tele y juega en grande, a dos, cada uno con su mando (Bluetooth o USB). Desde tu ordenador,
-elige quién juega con cuál: el ajuste se aplica a tus juegos.
+Empareja tus mandos Bluetooth desde tu ordenador, ve todos los conectados a la consola y da uno a cada jugador.
+ROMKADE Manager aplica tu elección a tus juegos: conecta la consola a tu tele y juega a dos en pantalla grande, sin
+rebuscar en los menús de la consola.
 
-## El sonido del juego en tu altavoz Bluetooth
+## Conecta tu consola a tu altavoz Bluetooth
 
 <p align="center"><img src="docs/readme/bluetooth-es.webp" alt="El sonido del juego enviado a un altavoz Bluetooth" width="720"></p>
 
-Empareja un altavoz Bluetooth con la consola desde tu ordenador, y juega con el sonido a tope.
+ROMKADE Manager busca los dispositivos Bluetooth alrededor de la consola. Elige tu altavoz o tus auriculares: la
+consola se conecta y el sonido del juego sale a tope. Un clic devuelve el sonido a la consola.
 
 ## Empieza en 3 pasos
 
