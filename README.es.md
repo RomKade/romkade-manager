@@ -54,12 +54,12 @@ biblioteca, propone juegos y actúa en la consola cuando haces clic: abrir un ju
 - **Desde cualquier sitio, con ChatGPT, Claude o Google Home.** Conecta tu consola a tu cuenta ROMKADE y pide «Abre
   Tetris» desde tu móvil o tu ordenador.
 
-## Tus mandos, configurados en un clic
+## A dos en la tele, cada uno con su mando
 
 <p align="center"><img src="docs/readme/controllers-es.webp" alt="Elegir el mando de cada jugador" width="720"></p>
 
-Conecta o empareja tus mandos y elige quién juega con cuál, jugador 1 y jugador 2, desde tu ordenador. El ajuste se
-aplica a tus juegos.
+Conecta la consola a tu tele y juega en grande, a dos, cada uno con su mando (Bluetooth o USB). Desde tu ordenador,
+elige quién juega con cuál: el ajuste se aplica a tus juegos.
 
 ## El sonido del juego en tu altavoz Bluetooth
 
