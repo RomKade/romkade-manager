@@ -53,12 +53,12 @@ dans ta bibliothèque, propose des jeux et agit sur la console quand tu cliques 
 - **De partout, avec ChatGPT, Claude ou Google Home.** Relie ta console à ton compte ROMKADE et demande « Lance
   Tetris » depuis ton téléphone ou ton ordinateur.
 
-## Tes manettes, réglées en un clic
+## À deux sur la télé, chacun sa manette
 
 <p align="center"><img src="docs/readme/controllers-fr.webp" alt="Choisir la manette de chaque joueur" width="720"></p>
 
-Branche ou associe tes manettes, puis choisis qui joue avec laquelle, joueur 1 et joueur 2, depuis ton ordinateur.
-Le réglage s'applique à tes jeux.
+Branche la console sur ta télé et joue en grand, à deux, chacun avec sa manette (Bluetooth ou USB). Depuis ton
+ordinateur, choisis qui joue avec laquelle : le réglage s'applique à tes jeux.
 
 ## Le son du jeu sur ton enceinte Bluetooth
 

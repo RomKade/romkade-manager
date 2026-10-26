@@ -52,12 +52,12 @@ suggests games and acts on the console when you click: launch a game, change the
 - **From anywhere, with ChatGPT, Claude or Google Home.** Link your console to your ROMKADE account and ask “Launch
   Tetris” from your phone or your computer.
 
-## Your controllers, set up in a click
+## Two players on the TV, each with their controller
 
 <p align="center"><img src="docs/readme/controllers-en.webp" alt="Choose which controller each player uses" width="720"></p>
 
-Plug in or pair your controllers, then choose who plays with which one, Player 1 and Player 2, from your computer.
-The setting is applied to your games.
+Plug the console into your TV and play on the big screen, two players, each with their own controller (Bluetooth or USB).
+From your computer, choose who plays with which one: the setting is applied to your games.
 
 ## Game sound on your Bluetooth speaker
 
