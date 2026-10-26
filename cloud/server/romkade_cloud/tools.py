@@ -57,7 +57,7 @@ INSTRUCTIONS = """ROMKADE connects the user's retro handheld console (Anbernicâ€
 - Only the games already on the user's console are known here. Never help find or download ROMs.
 Reply in the user's language."""
 
-READ = ToolAnnotations(read_only_hint=True, open_world_hint=False)
+READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
 ACT = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
 SETTING = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 
@@ -386,7 +386,8 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         console on."""
         return view(await now_playing(pick(account_of(ctx), console)))
 
-    @ui_tool(title="Launch a game", annotations=ACT)
+    @ui_tool(title="Launch a game", annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True,
+                                                                 idempotent_hint=False, open_world_hint=False))
     async def launch_game(game_id: int, ctx: Context, resume: bool = False) -> CallToolResult:
         """Starts a game on the console. A game already running is closed first (RetroArch writes its in-game
         save; progress since the last save point is lost). `resume`: continue from the automatic save state when

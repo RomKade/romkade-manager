@@ -166,11 +166,12 @@ def test_pairing_catalog_cheats_and_play(env):
                 assert ui.mime_type == "text/html;profile=mcp-app" and "ui/initialize" in ui.text
                 assert "__ROMKADE_BASE__" not in ui.text and "Tous droits réservés" in ui.text
 
-                # Annuaires d'apps : chaque outil a un titre et dit s'il lit seulement ou s'il modifie.
+                # Annuaires d'apps : chaque outil a un titre et les trois indicateurs explicites (exigés par ChatGPT).
                 for tool in (await mcp.list_tools()).tools:
                     a = tool.annotations
                     assert tool.title and tool.title.isascii() and len(tool.name) <= 64
-                    assert a.read_only_hint is True or (a.read_only_hint is False and a.destructive_hint is not None)
+                    assert all(isinstance(h, bool) for h in (a.read_only_hint, a.destructive_hint, a.open_world_hint))
+                    assert not (a.read_only_hint and a.destructive_hint)
                 assert error_code(await mcp.call_tool("search_games", {"query": "sonic"})) == "no_console"
                 assert error_code(await mcp.call_tool("pair_console", {"code": "ZZZZZZ"})) == "bad_code"
                 paired = data(await mcp.call_tool("pair_console", {"code": first["pairing_code"].lower(),
@@ -282,6 +283,24 @@ class FakeAuth:
 
     def verify(self, token):
         return {"sub": "u-123", "email": "joueur@example.com", "role": "authenticated"} if token == "bon-jeton" else None
+
+
+def test_openai_domain_challenge(env, monkeypatch):
+    store, _ = env
+
+    async def scenario():
+        base, server, task = await serving(store, Relay())
+        try:
+            async with httpx.AsyncClient() as h:
+                assert (await h.get(f"{base}/.well-known/openai-apps-challenge")).status_code == 404
+                monkeypatch.setenv("ROMKADE_OPENAI_CHALLENGE", "tok-123\n")
+                r = await h.get(f"{base}/.well-known/openai-apps-challenge")
+                assert r.status_code == 200 and r.text == "tok-123"
+        finally:
+            server.should_exit = True
+            await task
+
+    asyncio.run(scenario())
 
 
 def test_oauth_accounts(env):

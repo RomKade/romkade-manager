@@ -10,6 +10,8 @@
     /agent/favorites         l'agent envoie les favoris de la console (posés sur la carte par le Manager)
     /agent/poll, /result     ordres pour la console et leurs résultats (voir relay.py)
     /.well-known/oauth-protected-resource   serveur d'autorisation de ce serveur MCP (Supabase Auth)
+    /.well-known/openai-apps-challenge      jeton de vérification du domaine pour l'annuaire de ChatGPT
+                             (ROMKADE_OPENAI_CHALLENGE ; 404 sans lui)
     /api/me/…                API du compte pour ROMKADE Manager (jeton de session Supabase) : consoles reliées,
                              liaison d'une console sans code, suppression du compte
     /oauth/consent           ancienne adresse de la page de connexion -> https://romkade.com/authentification/
@@ -34,7 +36,7 @@ from pathlib import Path
 
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
@@ -262,6 +264,10 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     async def health(_: Request) -> Response:
         return JSONResponse({"ok": True})
 
+    async def openai_challenge(_: Request) -> Response:
+        token = os.environ.get("ROMKADE_OPENAI_CHALLENGE", "").strip()
+        return PlainTextResponse(token) if token else PlainTextResponse("Not found", status_code=404)
+
     # ---------- comptes ROMKADE (OAuth) ----------
     async def protected_resource(_: Request) -> Response:
         """RFC 9728 : quel serveur d'autorisation délivre les jetons de ce serveur MCP."""
@@ -390,6 +396,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/google/callback", google.oauth_callback, methods=["GET"]),
         Route("/google/token", google.token, methods=["POST"]),
         Route("/google/fulfillment", google.fulfillment, methods=["POST"]),
+        Route("/.well-known/openai-apps-challenge", openai_challenge),
         Route("/.well-known/oauth-protected-resource", protected_resource),
         Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
         Route("/.well-known/oauth-authorization-server", authorization_server),
