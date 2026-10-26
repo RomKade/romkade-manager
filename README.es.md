@@ -5,52 +5,69 @@
 <h3 align="center">Tu consola retro, por fin ordenada.<br>Contrólala desde tu ordenador, y pide a ChatGPT o Claude que empiece la partida.</h3>
 
 <p align="center">
-  <b><a href="https://romkade.com/es/">romkade.com</a></b> &nbsp;·&nbsp; <a href="README.md">English</a> · <a href="README.fr.md">Français</a> · <b>Español</b>
+  <b><a href="https://romkade.com/es/">romkade.com</a></b> &nbsp;·&nbsp; <b><a href="https://romkade.com/es/compatibilidad/">¿Es compatible mi consola?</a></b>
+  <br><a href="README.md">English</a> · <a href="README.fr.md">Français</a> · <b>Español</b>
 </p>
 
 <p align="center">
   <a href="https://romkade.com/video/hero-es.mp4"><img src="docs/readme/presentation-es.jpg" alt="Ver el vídeo de presentación" width="760"></a>
-  <br><sub>▶ Ver la presentación en 50 segundos</sub>
+  <br><sub>Ver la presentación en 50 segundos</sub>
 </p>
 
----
+**ROMKADE Manager** convierte tu consola retro portátil en una consola que controlas desde tu ordenador. Toda tu
+tarjeta microSD se convierte en una bonita biblioteca de juegos, **Duke**, tu asistente IA, conoce cada uno de ellos, e
+incluso puedes hablar con tu consola desde ChatGPT, Claude o Google Home. Sin cable y sin sacar la tarjeta: todo va por
+Wi-Fi.
 
-**ROMKADE Manager** convierte tu consola retro portátil (Anbernic, Miyoo, TrimUI…) en una consola que controlas desde
-tu ordenador. Toda tu tarjeta microSD se convierte en una bonita biblioteca con carátulas y fichas de juego, y **Duke**,
-tu asistente IA, conoce cada uno de tus juegos. Sin cable y sin sacar la tarjeta: todo va por Wi-Fi.
-
-## ✨ Lo que puedes hacer
-
-- 📚 **Ver toda tu colección.** Cada juego de la tarjeta, con carátula, resumen, tráiler y género. La búsqueda lo encuentra aunque escribas mal.
-- 🤖 **Preguntar a Duke.** «¿Un juego para dos?», «¿Cómo paso este nivel?»: el asistente IA conoce tu biblioteca y abre los juegos por ti.
-- 💬 **Hablar con tu consola desde ChatGPT, Claude o Google Home.** «Abre Tetris», «Pon el volumen al 40 %», desde tu móvil o tu ordenador.
-- 🎮 **Jugar desde tu ordenador.** Abrir un juego, salir, continuar desde una partida guardada, ajustar el volumen.
-- ➕ **Añadir juegos arrastrando y soltando.** Por Wi-Fi, directamente en la carpeta correcta, comprobados antes de copiar nada.
-- 💾 **Proteger tus partidas guardadas.** Todas copiadas en tu ordenador en un clic, y restauradas cuando las necesites.
-- 🕹️ **Mandos y sonido Bluetooth.** Elige quién juega con qué mando y envía el sonido a un altavoz Bluetooth.
-- ⏳ **Tiempo de juego.** Cuánto tiempo juegas, con avisos si quieres.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/readme/assistant-duke.webp" alt="Duke, el asistente IA"><p align="center"><sub>Duke conoce tus juegos</sub></p></td>
-    <td width="50%"><img src="docs/readme/bibliotheque-consoles.webp" alt="La biblioteca, por consola"><p align="center"><sub>Tu biblioteca, consola a consola</sub></p></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/readme/manettes.webp" alt="Mandos"><p align="center"><sub>Quién juega con qué mando</sub></p></td>
-    <td width="50%"><img src="docs/readme/bluetooth-enceinte.webp" alt="Altavoz Bluetooth"><p align="center"><sub>El sonido del juego en un altavoz</sub></p></td>
-  </tr>
-</table>
-
-## 🎮 Compatible con tu consola
+## ¿Es compatible tu consola?
 
 | | Consolas y sistemas |
 |---|---|
-| ✅ **Verificadas** | Anbernic RG35XX (Pro, Plus, H, SP, 2024), RG28XX, RG34XX, RG40XX, RG CubeXX con Stock OS Mod · Miyoo Mini y Mini Plus con Onion OS |
-| 🧪 **Experimentales** | Knulli, Batocera, ROCKNIX, muOS, ArkOS, spruce, MinUI / NextUI, Android con RetroArch |
+| **Verificadas** | Anbernic RG35XX (Pro, Plus, H, SP, 2024), RG28XX, RG34XX, RG40XX, RG CubeXX con Stock OS Mod · Miyoo Mini y Mini Plus con Onion OS |
+| **Experimentales** | Knulli, Batocera, ROCKNIX, muOS, ArkOS, spruce, MinUI / NextUI, Android con RetroArch |
 
-Basta con que tu consola esté en la misma red Wi-Fi que tu ordenador.
+Encuentra tu modelo exacto y lo que funciona en él: **[romkade.com/es/compatibilidad](https://romkade.com/es/compatibilidad/)**.
 
-## 🚀 Empieza en 3 pasos
+## Toda tu biblioteca retro, de un vistazo
+
+<p align="center"><img src="docs/readme/library-es.webp" alt="La biblioteca de ROMKADE Manager, consola a consola" width="720"></p>
+
+Cada juego de tu tarjeta, ordenado por consola, con su carátula, su resumen, su tráiler y su género. Alrededor de la
+biblioteca:
+
+- **La búsqueda**, que encuentra un juego, una consola o un género, aunque escribas mal.
+- **Los favoritos**, para tener tus mejores juegos a un clic.
+- **Las partidas guardadas**, copiadas en tu ordenador en un clic, restauradas cuando las necesites, y las partidas retomadas donde las dejaste.
+- **Las capturas de pantalla** tomadas durante el juego, guardadas con cada juego.
+- **Añadir juegos arrastrando y soltando**, por Wi-Fi, directamente en la carpeta correcta, comprobados antes de copiar nada.
+- **El tiempo de juego**: cuánto juegas a cada juego, con avisos si quieres.
+
+## Duke, el asistente IA que conoce tus juegos
+
+<p align="center"><img src="docs/readme/duke-es.webp" alt="Duke responde sobre la biblioteca y abre un juego" width="720"></p>
+
+Pregunta a Duke lo que quieras sobre tu colección: «¿Un juego para dos?», «¿Cómo paso este nivel?». Busca en tu
+biblioteca, propone juegos y actúa en la consola cuando haces clic: abrir un juego, ajustar el volumen.
+
+- **Local o en línea, tú eliges.** Ejecuta la IA en tu propio ordenador (Ollama, LM Studio): nada sale de tu casa. O
+  conecta un modelo en línea con tu propia clave.
+- **Desde cualquier sitio, con ChatGPT, Claude o Google Home.** Conecta tu consola a tu cuenta ROMKADE y pide «Abre
+  Tetris» desde tu móvil o tu ordenador.
+
+## Tus mandos, configurados en un clic
+
+<p align="center"><img src="docs/readme/controllers-es.webp" alt="Elegir el mando de cada jugador" width="720"></p>
+
+Conecta o empareja tus mandos y elige quién juega con cuál, jugador 1 y jugador 2, desde tu ordenador. El ajuste se
+aplica a tus juegos.
+
+## El sonido del juego en tu altavoz Bluetooth
+
+<p align="center"><img src="docs/readme/bluetooth-es.webp" alt="El sonido del juego enviado a un altavoz Bluetooth" width="720"></p>
+
+Empareja un altavoz Bluetooth con la consola desde tu ordenador, y juega con el sonido a tope.
+
+## Empieza en 3 pasos
 
 1. **Instala Docker Desktop**, gratuito en macOS, Windows y Linux.
 2. **Inicia ROMKADE Manager.** En un terminal, en una carpeta vacía:
@@ -67,14 +84,14 @@ Basta con que tu consola esté en la misma red Wi-Fi que tu ordenador.
 Guía paso a paso, con capturas: **[romkade.com/es/instalacion](https://romkade.com/es/instalacion/)**.
 Próximamente: la instalación en un clic desde las Extensiones de Docker Desktop.
 
-## 🔒 Tus juegos, tu consola
+## Tus juegos, tu consola
 
 - **Ningún juego incluido.** ROMKADE Manager ordena los archivos que ya tienes.
 - **Tus datos se quedan en casa.** Biblioteca, partidas guardadas y ajustes viven en tu ordenador.
 - **Nada cambia sin ti.** La consola solo se modifica cuando lo pides: añadir juegos, restaurar una partida guardada, ajustes de mandos o de Bluetooth.
 - **Privado por diseño.** La interfaz solo se abre en tu ordenador, nunca en Internet.
 
-## 🛠️ Bajo el capó
+## Bajo el capó
 
 Python (FastAPI) y SQLite en el servidor, una interfaz React, Typesense para la búsqueda, todo empaquetado con Docker
 para Intel/AMD y ARM. ROMKADE Manager llega a la consola por SSH en tu red local; ROMKADE Cloud, un servidor MCP, la
