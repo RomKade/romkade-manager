@@ -89,7 +89,8 @@ s'y connecte et le son du jeu sort à pleine puissance. Un clic renvoie le son v
    tout seul sur le réseau.
 
 Guide pas à pas, avec captures : **[romkade.com/installation](https://romkade.com/installation/)**.
-Bientôt : l'installation en un clic depuis les Extensions de Docker Desktop.
+**Tu utilises Claude Code ou Codex ?** Copie le [prompt d'installation tout prêt](https://romkade.com/installation/#assistant-install) : il vérifie Docker et
+l'installe si besoin, lance ROMKADE Manager et relie ROMKADE à ton assistant, en te demandant avant chaque étape.
 
 ## Tes jeux, ta console
 

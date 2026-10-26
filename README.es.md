@@ -90,7 +90,8 @@ consola se conecta y el sonido del juego sale a tope. Un clic devuelve el sonido
    red por ti.
 
 Guía paso a paso, con capturas: **[romkade.com/es/instalacion](https://romkade.com/es/instalacion/)**.
-Próximamente: la instalación en un clic desde las Extensiones de Docker Desktop.
+**¿Usas Claude Code o Codex?** Copia el [prompt de instalación listo](https://romkade.com/es/instalacion/#assistant-install): comprueba Docker y lo instala si hace
+falta, inicia ROMKADE Manager y conecta ROMKADE a tu asistente, pidiéndote permiso antes de cada paso.
 
 ## Tus juegos, tu consola
 

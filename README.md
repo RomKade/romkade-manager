@@ -87,7 +87,8 @@ to it and the game sound comes out at full power. One click sends the sound back
    console on the network for you.
 
 Step-by-step guide with screenshots: **[romkade.com/en/installation](https://romkade.com/en/installation/)**.
-Coming soon: install in one click from Docker Desktop's Extensions.
+**Using Claude Code or Codex?** Copy the [ready-made install prompt](https://romkade.com/en/installation/#assistant-install): it checks Docker and
+installs it if needed, starts ROMKADE Manager and connects ROMKADE to your assistant, asking before each step.
 
 ## Your games, your console
 
