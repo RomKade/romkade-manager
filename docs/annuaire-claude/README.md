@@ -20,9 +20,9 @@ code est dans `cloud/server/romkade_cloud/` (outils : `tools.py`, interface : `u
 | Captures (3 à 5 PNG, ≥ 1 000 px) | ✅ 5 captures de 1 440 px, `captures/` |
 | Icône 512 × 512 | ✅ `icon-512.png` |
 | Surveillance du serveur | ✅ toutes les 10 minutes (GitHub Actions, dépôt romkade-website) |
-| Déploiement de la console de démo à 8 jeux | ⬜ à faire (`cloud/deploy/deploy.sh` depuis un dossier propre) |
-| Test du parcours des relecteurs dans Claude avec le compte de démo | ⬜ |
-| Soumission dans le portail | ⬜ |
+| Déploiement de la console de démo à 8 jeux | ✅ 2026-10-26 |
+| Test du parcours des relecteurs dans Claude avec le compte de démo | ✅ 2026-10-26, les 13 outils ; console renommée « ROMKADE Demo » |
+| Soumission dans le portail | ✅ 2026-10-26, **en cours d'examen** (suivi : claude.ai/directory/manage, e-mails à contact@romkade.com). Ne pas changer le mot de passe du compte de démo ni le nom de sa console pendant la revue. |
 
 ## Captures
 
