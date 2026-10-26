@@ -36,7 +36,7 @@ def main() -> None:
     if args.cmd == "demo-register":
         store = Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3"))
         store.ensure_account(args.account)
-        c, secret = store.register_console_for(args.account, {"model": "Console de démonstration"}, "Console de démo")
+        c, secret = store.register_console_for(args.account, {"model": "ROMKADE demo console"}, "ROMKADE Demo")
         print(f"console {c.id} rattachée à {args.account}")
         print(f"ROMKADE_DEMO_SECRET={secret}")
         return

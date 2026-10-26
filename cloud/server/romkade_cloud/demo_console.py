@@ -23,25 +23,21 @@ log = logging.getLogger("romkade.demo")
 VERSION = "demo-1"
 POLL_WAIT = 25
 PLAY_FLAG = "/tmp/romkade-demo-play"  # fichier créé à la main (docker exec … touch) : un jeu démarre, sans la voix
-# Homebrews gratuits (dossier de plateforme, fichier, taille) : de quoi chercher, lancer et régler à la voix.
+# Homebrews diffusés gratuitement par leurs auteurs, sous licence libre ou en téléchargement gratuit (dossier de
+# plateforme, fichier, taille) : aucun jeu vendu, aucune marque d'un autre éditeur (règle des annuaires d'apps sur la
+# propriété intellectuelle). Seuls les noms existent : la console de démo n'a aucun fichier de jeu.
 GAMES = [
-    ["GB", "Tobu Tobu Girl (World).gb", 262144],
-    ["GB", "Deadeus (World).gb", 1048576],
-    ["GB", "Libbet and the Magic Floor (World).gb", 262144],
-    ["GB", "Sheep It Up! (World).gb", 65536],
-    ["GB", "Dangan GB (World).gb", 131072],
-    ["GBC", "Blaster Master Zero Demake (World).gbc", 1048576],
-    ["GBC", "Gelatinous - Humanity Lost (World).gbc", 1048576],
-    ["NES", "Alter Ego (World).nes", 40976],
-    ["NES", "Blade Buster (World).nes", 524304],
-    ["NES", "Lawn Mower (World).nes", 24592],
-    ["NES", "Nova the Squirrel (World).nes", 524304],
-    ["NES", "Super Tilt Bro (World).nes", 524304],
-    ["NES", "From Below (World).nes", 65552],
-    ["MD", "Old Towers (World).md", 1048576],
-    ["MD", "Tanglewood (World).md", 4194304],
+    ["GB", "Tobu Tobu Girl (World).gb", 262144],             # Tangram Games, open source (MIT, CC BY)
+    ["GB", "Deadeus (World).gb", 1048576],                   # IZMA, gratuit
+    ["GB", "Libbet and the Magic Floor (World).gb", 262144],  # Damian Yerrick, open source (zlib)
+    ["GB", "Sheep It Up! (World).gb", 65536],                # Dr. Ludos, gratuit
+    ["NES", "Alter Ego (World).nes", 40976],                 # Shiru, freeware
+    ["NES", "Lawn Mower (World).nes", 24592],                # Shiru, freeware
+    ["NES", "Blade Buster (World).nes", 524304],             # High Level Challenge, freeware
+    ["NES", "Nova the Squirrel (World).nes", 524304],        # NovaSquirrel, open source (GPL)
+    ["NES", "Super Tilt Bro (World).nes", 524304],           # sgadrat, open source (WTFPL)
 ]
-FAVORITES = [["GB", "Tobu Tobu Girl (World).gb"], ["NES", "Alter Ego (World).nes"], ["MD", "Tanglewood (World).md"]]
+FAVORITES = [["GB", "Tobu Tobu Girl (World).gb"], ["NES", "Alter Ego (World).nes"], ["NES", "Nova the Squirrel (World).nes"]]
 
 
 class DemoConsole:
@@ -59,7 +55,7 @@ class DemoConsole:
         return r.json() if r.content else {}
 
     def info(self) -> dict:
-        return {"agent_version": VERSION, "hostname": "romkade-demo", "model": "Console de démonstration",
+        return {"agent_version": VERSION, "hostname": "romkade-demo", "model": "ROMKADE demo console",
                 "firmware": "ROMKADE (simulée)", "profile": "demo", "roms_root": "/demo/Roms",
                 "capabilities": {"launch": True, "resume_slot": True, "quit": True, "save_state": True, "volume": True}}
 
