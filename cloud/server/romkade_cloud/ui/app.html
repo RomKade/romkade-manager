@@ -355,6 +355,12 @@ function errorText(r) {
 let lang = "fr";
 const t = (k, ...a) => { const v = (TEXT[lang] || TEXT.fr)[k]; return typeof v === "function" ? v(...a) : v; };
 const genreName = (g) => g ? ((GENRE[lang] || GENRE.fr)[g] || g) : "";
+/* Régions : le catalogue les donne en français (classify.REGION_TAGS du Manager), traduites ici. */
+const REGIONS = {
+  en: { Japon: "Japan", Monde: "World", Allemagne: "Germany", Espagne: "Spain", Italie: "Italy", Corée: "Korea", Brésil: "Brazil", Asie: "Asia", Australie: "Australia", Chine: "China" },
+  es: { USA: "EE. UU.", Europe: "Europa", Japon: "Japón", Monde: "Mundo", France: "Francia", Allemagne: "Alemania", Espagne: "España", Italie: "Italia", Corée: "Corea", Brésil: "Brasil", Asie: "Asia", Australie: "Australia", Chine: "China" },
+};
+const regionName = (r) => String(r).split(", ").map((x) => (REGIONS[lang] || {})[x] || x).join(", ");
 function fmt(n) { try { return new Intl.NumberFormat(lang).format(n); } catch { return String(n); } }
 function fmtDate(iso) { try { return new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)); } catch { return String(iso).slice(0, 10); } }
 function fmtAgo(m) { if (m < 60) return `${m} min`; const h = Math.round(m / 60); if (h < 48) return `${h} h`; return `${Math.round(h / 24)} j`.replace(" j", lang === "en" ? " d" : lang === "es" ? " d" : " j"); }
@@ -522,7 +528,7 @@ function gameView(d) {
     g.genre && `<span>${esc(t("genre"))} <b>${esc(genreName(g.genre))}</b></span>`,
     g.developer && `<span>${esc(t("developer"))} <b>${esc(g.developer)}</b></span>`,
     g.publisher && g.publisher !== g.developer && `<span>${esc(t("publisher"))} <b>${esc(g.publisher)}</b></span>`,
-    g.region && `<span>${esc(t("region"))} <b>${esc(g.region)}</b></span>`,
+    g.region && `<span>${esc(t("region"))} <b>${esc(regionName(g.region))}</b></span>`,
   ].filter(Boolean).join("");
   return shell(`
     ${history.length ? `<button type="button" class="btn btn--ghost back" data-back>${icon("back")} ${esc(t("back"))}</button>` : ""}

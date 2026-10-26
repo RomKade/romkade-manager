@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8">
+<style>html,body{margin:0;background:#262624}#f{display:block;border:0;width:720px;height:400px;margin:0}</style>
+<iframe id="f" src="widget.html"></iframe>
+<script>
+const p = new URLSearchParams(location.search), f = document.getElementById("f");
+const theme = p.get("theme") || "dark";
+let result = null; fetch(p.get("r") + ".json").then((r) => r.json()).then((j) => { result = j; });
+const send = (m) => f.contentWindow.postMessage(m, "*");
+window.addEventListener("message", async (e) => {
+  const m = e.data || {};
+  if (m.method === "ui/initialize") send({ jsonrpc: "2.0", id: m.id, result: { protocolVersion: "2026-01-26", hostCapabilities: {},
+      hostInfo: { name: "harness", version: "1" }, hostContext: { theme, locale: "en-US", displayMode: "inline" } } });
+  else if (m.method === "ui/notifications/initialized") { while (!result) await new Promise((ok) => setTimeout(ok, 50));
+      send({ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: result }); window.__sent = true; }
+  else if (m.method === "ui/notifications/size-changed" && m.params?.height) f.style.height = Math.ceil(m.params.height) + "px";
+  else if (m.id != null && m.method) send({ jsonrpc: "2.0", id: m.id, result: {} });
+});
+</script>

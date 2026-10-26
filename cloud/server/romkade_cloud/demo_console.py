@@ -34,10 +34,10 @@ GAMES = [
     ["NES", "Alter Ego (World).nes", 40976],                 # Shiru, freeware
     ["NES", "Lawn Mower (World).nes", 24592],                # Shiru, freeware
     ["NES", "Blade Buster (World).nes", 524304],             # High Level Challenge, freeware
-    ["NES", "Nova the Squirrel (World).nes", 524304],        # NovaSquirrel, open source (GPL)
     ["NES", "Super Tilt Bro (World).nes", 524304],           # sgadrat, open source (WTFPL)
 ]
-FAVORITES = [["GB", "Tobu Tobu Girl (World).gb"], ["NES", "Alter Ego (World).nes"], ["NES", "Nova the Squirrel (World).nes"]]
+# Aucun de ces jeux n'a de jaquette libretro (celle de Nova the Squirrel, retiré, portait le sceau de Nintendo).
+FAVORITES = [["GB", "Tobu Tobu Girl (World).gb"], ["NES", "Alter Ego (World).nes"], ["NES", "Blade Buster (World).nes"]]
 
 
 class DemoConsole:
@@ -56,7 +56,7 @@ class DemoConsole:
 
     def info(self) -> dict:
         return {"agent_version": VERSION, "hostname": "romkade-demo", "model": "ROMKADE demo console",
-                "firmware": "ROMKADE (simulée)", "profile": "demo", "roms_root": "/demo/Roms",
+                "firmware": "simulated", "profile": "demo", "roms_root": "/demo/Roms",
                 "capabilities": {"launch": True, "resume_slot": True, "quit": True, "save_state": True, "volume": True}}
 
     # ---------- ordres (mêmes réponses que l'app ROMKADE) ----------
