@@ -165,6 +165,7 @@ def test_pairing_catalog_cheats_and_play(env):
                 ui = (await mcp.read_resource("ui://romkade/app.html")).contents[0]
                 assert ui.mime_type == "text/html;profile=mcp-app" and "ui/initialize" in ui.text
                 assert "__ROMKADE_BASE__" not in ui.text and "Tous droits réservés" in ui.text
+                assert ui.meta["ui"]["csp"]["resourceDomains"] and ui.meta["openai/widgetDomain"] == "https://romkade.com"
 
                 # Annuaires d'apps : chaque outil a un titre et les trois indicateurs explicites (exigés par ChatGPT).
                 for tool in (await mcp.list_tools()).tools:

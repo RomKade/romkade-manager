@@ -21,7 +21,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from mcp.server import MCPServer
-from mcp.server.apps import Apps, ResourceCsp
+from mcp.server.apps import APP_MIME_TYPE, Apps
+from mcp.server.mcpserver.resources import TextResource
 from mcp.server.mcpserver import Context, Icon
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
@@ -450,9 +451,17 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         html = html.replace(f"__ROMKADE_BASE__/{name}", data_uri(STATIC / name, mime))
     html = html.replace("__ROMKADE_BASE__", base).replace("__ROMKADE_VERSION__", VERSION)
     origin = "/".join(base.split("/")[:3])  # la CSP ne prend que des origines (sans le chemin /romkade)
-    csp = ResourceCsp(resource_domains=[origin], connect_domains=[origin]) if base else None
-    apps.add_html_resource(UI, html, name="romkade", title="ROMKADE", description="ROMKADE interface", csp=csp,
-                           prefers_border=False)
+    # CSP au format MCP Apps (ui.csp, lu par Claude et ChatGPT) et clés propres à ChatGPT : domaine de l'interface
+    # (exigé par la revue de l'annuaire) et liens externes ouverts sans confirmation (romkade.com). Le domaine reste
+    # hors de ui.domain : Claude l'y attend sous sa propre forme.
+    meta = {"ui": {"prefersBorder": False}}
+    if base:
+        meta["ui"]["csp"] = {"connectDomains": [origin], "resourceDomains": [origin]}
+        meta["openai/widgetCSP"] = {"connect_domains": [origin], "resource_domains": [origin],
+                                    "redirect_domains": ["https://romkade.com"]}
+        meta["openai/widgetDomain"] = "https://romkade.com"
+    apps.add_resource(TextResource(uri=UI, name="romkade", title="ROMKADE", description="ROMKADE interface",
+                                   mime_type=APP_MIME_TYPE, meta=meta, text=html))
 
     icons = [Icon(src=f"{base}/icon.png", mime_type="image/png", sizes=["512x512"])] if base else None
     return MCPServer("romkade", title="ROMKADE", instructions=INSTRUCTIONS, website_url="https://romkade.com",
