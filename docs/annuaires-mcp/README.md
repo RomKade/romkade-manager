@@ -9,7 +9,7 @@ lui-même (outils, icône) et une fiche courte.
 | Annuaire | Qui | État |
 |---|---|---|
 | Registre MCP officiel (`com.romkade/romkade`) : fiche `server.json` validée, preuve du domaine sur romkade.com | Claude | ✅ publié le 2026-10-27 (version 1.0.0, statut actif) |
-| Smithery (smithery.ai) | vous (compte Smithery) | ⬜ |
+| Smithery (smithery.ai) | — | ❌ abandonné : ajout de serveurs fermé (403 « Updating servers has been removed »), passerelle et comptes arrêtés le 2026-10-31, reste un annuaire sélectionné par Smithery |
 | Glama (glama.ai) : repris du registre officiel, puis revendiqué | vous (compte Glama) + Claude (fichier de preuve) | ⬜ |
 | awesome-remote-mcp-servers (GitHub) : proposition d'ajout | Claude, après votre accord | ⬜ |
 | Le Chat (Mistral) | à étudier | ⬜ |
@@ -37,7 +37,11 @@ s'en servent comme source.
   curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=com.romkade/romkade"
   ```
 
-## Smithery
+## Smithery (abandonné le 2026-10-27)
+
+Smithery n'accepte plus de nouveaux serveurs (https://smithery.ai/future) : le parcours ci-dessous ne marche plus. Le
+compte créé (`contact-scq8`) ne sert à rien et disparaît le 2026-10-31.
+
 
 1. Se connecter sur https://smithery.ai (compte GitHub `arnoweb`, ou l'organisation RomKade).
 2. https://smithery.ai/new : adresse `https://mcp.romkade.com`.
