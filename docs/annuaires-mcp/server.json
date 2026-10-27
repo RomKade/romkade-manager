@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.romkade/romkade",
+  "title": "ROMKADE",
+  "description": "Drive your retro handheld console: find your games, launch, save, set volume, get cheat codes.",
+  "version": "1.0.0",
+  "websiteUrl": "https://romkade.com",
+  "repository": {
+    "url": "https://github.com/RomKade/romkade-manager",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://mcp.romkade.com/icon.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.romkade.com"
+    }
+  ]
+}
