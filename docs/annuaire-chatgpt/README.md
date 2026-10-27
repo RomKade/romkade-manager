@@ -9,10 +9,11 @@ démo. OpenAI demande un paquet ZIP : manifeste, configuration MCP, icônes, cap
 | Étape | Qui | État |
 |---|---|---|
 | Paquet `romkade-chatgpt.zip` (manifeste validé par les schémas officiels) | Claude | ✅ |
-| Annotations des 13 outils complètes (`readOnlyHint`, `destructiveHint`, `openWorldHint` explicites) | Claude | ✅ dans le code, à déployer |
+| Annotations des 13 outils complètes (`readOnlyHint`, `destructiveHint`, `openWorldHint` explicites) | Claude | ✅ déployé |
 | Adresse de vérification du domaine (`/.well-known/openai-apps-challenge`) | Claude | ✅ dans le code, jeton à recevoir |
-| Test dans ChatGPT avec le compte de démo | Claude | ⬜ |
-| Vidéo de démonstration (`https://romkade.com/video/romkade-in-chatgpt.mp4`) | Claude | ⬜ |
+| Test dans ChatGPT avec le compte de démo (serveur personnalisé, OAuth) | Claude | ✅ 2026-10-27 : les 5 cas de test passent |
+| CSP et domaine de l'interface pour ChatGPT (`openai/widgetCSP`, `openai/widgetDomain`) | Claude | ✅ déployé (« CSP désactivée » en mode développeur est normal) |
+| Vidéo de démonstration (`https://romkade.com/video/romkade-in-chatgpt.mp4`) | Claude | ✅ |
 | Vérification d'identité OpenAI | vous | ⬜ |
 | Envoi du ZIP, jeton de domaine, connexion du serveur, identifiants, soumission | vous | ⬜ |
 
@@ -47,6 +48,9 @@ démo. OpenAI demande un paquet ZIP : manifeste, configuration MCP, icônes, cap
 > console.
 
 ## Points d'attention
+
+- « Importer une archive de plugin » installe le paquet dans **Codex**, pas dans ChatGPT, et sans connexion OAuth :
+  ça valide le paquet (accepté le 2026-10-27), pas le serveur. Le test se fait avec un serveur personnalisé sur chatgpt.com.
 
 - Une seule version en revue à la fois ; tout changement de la fiche demande un nouveau ZIP. Les changements des
   outils sur le serveur sont repris automatiquement par l'analyse quotidienne d'OpenAI.
