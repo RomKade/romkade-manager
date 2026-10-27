@@ -172,7 +172,10 @@ def test_pairing_catalog_cheats_and_play(env):
                     assert tool.title and tool.title.isascii() and len(tool.name) <= 64
                     assert all(isinstance(h, bool) for h in (a.read_only_hint, a.destructive_hint, a.open_world_hint))
                     assert not (a.read_only_hint and a.destructive_hint)
-                assert error_code(await mcp.call_tool("search_games", {"query": "sonic"})) == "no_console"
+                none = await mcp.call_tool("search_games", {"query": "sonic"})
+                # Pas de console : l'utilisateur repart avec le guide et le téléchargement du Manager.
+                assert error_code(none) == "no_console" and none.structured_content["help"].startswith("https://romkade.com/")
+                assert none.structured_content["download"] in none.content[0].text
                 assert error_code(await mcp.call_tool("pair_console", {"code": "ZZZZZZ"})) == "bad_code"
                 paired = data(await mcp.call_tool("pair_console", {"code": first["pairing_code"].lower(),
                                                                     "name": "Ma RG35XX"}))

@@ -271,7 +271,8 @@ const TEXT = {
     favorites: "Mes favoris", favorite: "Favori", noFavorites: "Aucun favori pour l'instant : l'étoile d'un jeu dans ROMKADE Manager l'ajoute ici.",
     inGameSave: "Sauvegarde en jeu", states: (n) => `${fmt(n)} sauvegarde${n > 1 ? "s" : ""} instantanée${n > 1 ? "s" : ""}`,
     lastSaved: (d) => `dernière le ${d}`, noSave: "Aucune sauvegarde de ce jeu sur la console",
-    savesUnchecked: "Sauvegardes visibles quand la console est allumée", savesUpdate: "Mets à jour l'app ROMKADE de la console pour voir ses sauvegardes" },
+    savesUnchecked: "Sauvegardes visibles quand la console est allumée", savesUpdate: "Mets à jour l'app ROMKADE de la console pour voir ses sauvegardes",
+    setupGuide: "Guide de mise en route", getManager: "Télécharger ROMKADE Manager" },
   en: { games: (n) => `${fmt(n)} game${n > 1 ? "s" : ""}`, of: "on", consoles: (n) => `system${n > 1 ? "s" : ""}`,
     play: "Play", resume: "Resume", cheats: "Cheat codes", back: "Back", more: "Show more", readMore: "Read more",
     nowPlaying: "Now playing on the console", launching: "Launching on the console", save: "Save now", quit: "Quit game",
@@ -287,7 +288,8 @@ const TEXT = {
     favorites: "My favorites", favorite: "Favorite", noFavorites: "No favorite yet: the star on a game in ROMKADE Manager adds it here.",
     inGameSave: "In-game save", states: (n) => `${fmt(n)} save state${n > 1 ? "s" : ""}`,
     lastSaved: (d) => `latest on ${d}`, noSave: "No save of this game on the console",
-    savesUnchecked: "Saves are shown while the console is on", savesUpdate: "Update the ROMKADE app on the console to see its saves" },
+    savesUnchecked: "Saves are shown while the console is on", savesUpdate: "Update the ROMKADE app on the console to see its saves",
+    setupGuide: "Setup guide", getManager: "Download ROMKADE Manager" },
   es: { games: (n) => `${fmt(n)} juego${n > 1 ? "s" : ""}`, of: "en", consoles: (n) => `consola${n > 1 ? "s" : ""}`,
     play: "Jugar", resume: "Continuar", cheats: "Trucos", back: "Volver", more: "Mostrar más", readMore: "Leer más",
     nowPlaying: "Jugando en la consola", launching: "Iniciando en la consola", save: "Guardar ahora", quit: "Salir del juego",
@@ -303,7 +305,8 @@ const TEXT = {
     favorites: "Mis favoritos", favorite: "Favorito", noFavorites: "Aún no hay favoritos: la estrella de un juego en ROMKADE Manager lo añade aquí.",
     inGameSave: "Partida guardada en el juego", states: (n) => `${fmt(n)} guardado${n > 1 ? "s" : ""} rápido${n > 1 ? "s" : ""}`,
     lastSaved: (d) => `el último el ${d}`, noSave: "Ninguna partida guardada de este juego en la consola",
-    savesUnchecked: "Las partidas guardadas se ven con la consola encendida", savesUpdate: "Actualiza la app ROMKADE de la consola para ver sus partidas guardadas" },
+    savesUnchecked: "Las partidas guardadas se ven con la consola encendida", savesUpdate: "Actualiza la app ROMKADE de la consola para ver sus partidas guardadas",
+    setupGuide: "Guía de puesta en marcha", getManager: "Descargar ROMKADE Manager" },
 };
 const GENRE = {
   fr: { action: "Action", aventure: "Aventure", beat: "Beat'em up", combat: "Combat", course: "Course", plateforme: "Plateforme", rpg: "Jeu de rôle", shmup: "Shoot'em up", tir: "Tir", sport: "Sport", reflexion: "Réflexion", labyrinthe: "Labyrinthe", strategie: "Stratégie", simulation: "Simulation", flipper: "Flipper", societe: "Société et casino", quiz: "Quiz", musique: "Musique et rythme", educatif: "Éducatif", compilation: "Compilation", autre: "Autre" },
@@ -315,7 +318,7 @@ const ERRORS = {
   fr: { no_account: "Compte ROMKADE introuvable : reconnecte-toi à ROMKADE.",
     unknown_platform: (e) => `Console « ${e.name} » inconnue. Exemples : Super Nintendo, Mega Drive, Game Boy Advance, PlayStation, Arcade.`,
     unknown_genre: (e) => `Genre « ${e.name} » inconnu.`,
-    no_console: "Aucune console appairée. Sur la console, ouvre l'app ROMKADE (menu APPS) : elle affiche un code à 6 caractères à donner ici.",
+    no_console: "Aucune console reliée. Installe ROMKADE Manager sur ton ordinateur et ajoute l'app ROMKADE à la console en un clic. Si l'app est déjà sur la console, ouvre-la (menu APPS) : elle affiche un code à 6 caractères à donner ici.",
     several_consoles: (e) => `Plusieurs consoles : précise laquelle (${(e.consoles || []).join(", ")}).`,
     unknown_console: (e) => `Console « ${e.name} » introuvable. Consoles : ${(e.consoles || []).join(", ")}`,
     console_asleep: (e) => `La console ${e.console} ne répond pas : elle est sans doute éteinte ou en veille (le Wi-Fi se coupe en veille). Réveille-la, puis réessaie.`,
@@ -332,7 +335,7 @@ const ERRORS = {
   es: { no_account: "Cuenta ROMKADE no encontrada: vuelve a conectarte a ROMKADE.",
     unknown_platform: (e) => `Consola «${e.name}» desconocida. Ejemplos: Super Nintendo, Mega Drive, Game Boy Advance, PlayStation, Arcade.`,
     unknown_genre: (e) => `Género «${e.name}» desconocido.`,
-    no_console: "Ninguna consola vinculada. En la consola, abre la app ROMKADE (menú APPS): muestra un código de 6 caracteres para darlo aquí.",
+    no_console: "Ninguna consola vinculada. Instala ROMKADE Manager en tu ordenador y añade la app ROMKADE a la consola con un clic. Si la app ya está en la consola, ábrela (menú APPS): muestra un código de 6 caracteres para darlo aquí.",
     several_consoles: (e) => `Varias consolas: indica cuál (${(e.consoles || []).join(", ")}).`,
     unknown_console: (e) => `Consola «${e.name}» no encontrada. Consolas: ${(e.consoles || []).join(", ")}`,
     console_asleep: (e) => `La consola ${e.console} no responde: seguramente está apagada o en reposo (el Wi-Fi se corta en reposo). Despiértala y vuelve a intentarlo.`,
@@ -444,7 +447,7 @@ let bridged = false;
 function receive(result) {
   if (!result) return;
   const r = result.result && !result.content ? result.result : result;  // enveloppe éventuelle de l'hôte
-  if (r.isError) { render(errorView(errorText(r))); return; }
+  if (r.isError) { render(errorView(errorText(r), r.structuredContent)); return; }
   const data = r.structuredContent || parseText(r);
   if (data && typeof data === "object") show(data, false);
 }
@@ -493,7 +496,13 @@ function showLoading(args) {
   root.innerHTML = shell(`<div class="screen skeleton"><div class="grid">${Array.from({ length: 6 }, () => '<div class="tile"><div class="cover"></div></div>').join("")}</div></div>`);
   reportSize();
 }
-function errorView(msg) { return shell(`<div class="notice notice--err">${esc(msg || t("error"))}</div>`); }
+/* Erreurs de mise en route (pas de console, console muette) : liens vers le guide et le téléchargement du Manager. */
+const DOWNLOAD = { fr: "https://romkade.com/telechargement/", en: "https://romkade.com/en/download/", es: "https://romkade.com/es/descarga/" };
+function errorView(msg, e = {}) {
+  const links = [e.help && `<button type="button" class="btn btn--primary" data-link="${esc(e.help)}">${esc(t("setupGuide"))}</button>`,
+    e.download && `<button type="button" class="btn btn--neon" data-link="${esc(DOWNLOAD[lang] || e.download)}">${esc(t("getManager"))}</button>`].filter(Boolean);
+  return shell(`<div class="notice notice--err">${esc(msg || t("error"))}</div>${links.length ? `<div class="actions">${links.join("")}</div>` : ""}`);
+}
 
 function cover(g, cls = "", large = false) {
   const src = large ? (g.cover_large || g.cover) : g.cover;

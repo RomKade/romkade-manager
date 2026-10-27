@@ -46,8 +46,12 @@ INSTRUCTIONS = """ROMKADE connects the user's retro handheld console (Anbernic�
 - game_details also tells whether the user has saves for the game on the console (in-game save, save states, with
   their date); it can only check them while the console is on.
 - Playing (launch_game), quitting, volume and save states need the console switched on and on Wi-Fi.
-- If no console is paired yet, ask the user to open the ROMKADE app on the console (APPS menu): it shows a
-  6-character code, then call pair_console with it.
+- If no console is paired yet (error no_console), guide the user in a few short steps: install ROMKADE Manager on
+  a computer and add the ROMKADE app to the console from it, or, if the app is already on the console, open it
+  (APPS menu) to get a 6-character code and call pair_console with it. Always give the setup guide link from the
+  error (help) and the download link (download).
+- If the console does not answer (console_asleep), ask the user to wake it up and check its Wi-Fi, and give the
+  setup guide link (help).
 - Before launch_game, find the game with search_games and use its game_id. Prefer the user's region when several
   versions exist.
 - Each result is already displayed to the user by the ROMKADE interface (covers, game sheet, buttons to play,
@@ -73,6 +77,10 @@ AGENT_ERRORS = {
 }
 MAX_PAIR_FAILURES = 10  # par compte et par heure : le code d'appairage ne se devine pas à l'aveugle
 CONSOLE_ART = {p.stem for p in (STATIC / "consoles").glob("*.webp")}
+# Liens donnés avec les erreurs de mise en route (pas de console, console muette) : l'assistant et l'interface
+# renvoient l'utilisateur vers le guide au lieu de le laisser sans suite.
+HELP_URL = "https://romkade.com/docs/guide/assistants/"
+DOWNLOAD_URL = "https://romkade.com/en/download/"
 
 
 HEAVY = {"cover", "cover_large", "platform_art", "art", "description", "capabilities"}
@@ -185,8 +193,10 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
     def pick(account: str, console: str | None) -> Console:
         mine = consoles(account)
         if not mine:
-            raise UserError("no_console", "No console is paired yet. On the console, open the ROMKADE app (APPS "
-                            "menu): it shows a 6-character code to give here (pair_console).")
+            raise UserError("no_console", "No console is paired yet. Install ROMKADE Manager on a computer "
+                            f"({DOWNLOAD_URL}) and add the ROMKADE app to the console from it; if the app is already "
+                            "on the console, open it (APPS menu): it shows a 6-character code to give here "
+                            f"(pair_console). Setup guide: {HELP_URL}", help=HELP_URL, download=DOWNLOAD_URL)
         if not console:
             if len(mine) == 1:
                 return mine[0]
@@ -206,8 +216,8 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
             return await relay.call(c.id, action, params, timeout)
         except ConsoleOffline as exc:
             raise UserError("console_asleep", f"The console {c.label} does not answer: it is probably off or "
-                            "asleep (Wi-Fi turns off in sleep mode). Ask the user to wake it up, then try again.",
-                            console=c.label) from exc
+                            "asleep (Wi-Fi turns off in sleep mode). Ask the user to wake it up, then try again. "
+                            f"Setup guide: {HELP_URL}", console=c.label, help=HELP_URL) from exc
         except CommandTimeout as exc:
             raise UserError("console_timeout", f"The console {c.label} did not answer in time. It may have gone "
                             "to sleep: try again in a moment.", console=c.label) from exc
