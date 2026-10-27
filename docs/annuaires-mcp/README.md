@@ -8,7 +8,7 @@ lui-même (outils, icône) et une fiche courte.
 
 | Annuaire | Qui | État |
 |---|---|---|
-| Registre MCP officiel (`com.romkade/romkade`) : fiche `server.json` validée, preuve du domaine sur romkade.com | Claude | ✅ prêt, à publier |
+| Registre MCP officiel (`com.romkade/romkade`) : fiche `server.json` validée, preuve du domaine sur romkade.com | Claude | ✅ publié le 2026-10-27 (version 1.0.0, statut actif) |
 | Smithery (smithery.ai) | vous (compte Smithery) | ⬜ |
 | Glama (glama.ai) : repris du registre officiel, puis revendiqué | vous (compte Glama) + Claude (fichier de preuve) | ⬜ |
 | awesome-remote-mcp-servers (GitHub) : proposition d'ajout | Claude, après votre accord | ⬜ |
@@ -27,7 +27,8 @@ s'en servent comme source.
 - Clé privée : `~/.config/romkade/mcp-registry-ed25519.pem` sur le Mac (hors dépôt, droits 600). Sans elle, plus de
   publication sous `com.romkade` : en garder une copie dans le trousseau ou un gestionnaire de mots de passe. Perdue,
   on en refait une et on remplace la clé publique sur le site.
-- Publier (et republier à chaque nouvelle version : changer `version`) :
+- Publier (et republier à chaque nouvelle version : changer `version`). La connexion expire au bout de quelques
+  minutes : se reconnecter juste avant de publier.
 
   ```sh
   cd docs/annuaires-mcp
