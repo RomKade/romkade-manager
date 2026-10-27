@@ -14,8 +14,9 @@ démo. OpenAI demande un paquet ZIP : manifeste, configuration MCP, icônes, cap
 | Test dans ChatGPT avec le compte de démo (serveur personnalisé, OAuth) | Claude | ✅ 2026-10-27 : les 5 cas de test passent |
 | CSP et domaine de l'interface pour ChatGPT (`openai/widgetCSP`, `openai/widgetDomain`) | Claude | ✅ déployé (« CSP désactivée » en mode développeur est normal) |
 | Vidéo de démonstration (`https://romkade.com/video/romkade-in-chatgpt.mp4`) | Claude | ✅ |
-| Vérification d'identité OpenAI | vous | ⬜ |
-| Envoi du ZIP, jeton de domaine, connexion du serveur, identifiants, soumission | vous | ⬜ |
+| Vérification d'identité OpenAI (Individual) | vous | ✅ |
+| Envoi du ZIP, domaine vérifié, serveur connecté (13 outils, aucun relevé), identifiants, soumission | vous | ✅ soumis le 2026-10-27, version 1.0.0 en revue |
+| Publication après acceptation (bouton **Publish plugin**) | vous | ⬜ |
 
 ## Contenu
 
