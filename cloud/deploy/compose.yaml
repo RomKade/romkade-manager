@@ -18,7 +18,7 @@ services:
       POSTHOG_HOST: https://eu.i.posthog.com
       # Vérification du domaine pour l'annuaire de ChatGPT (platform.openai.com/plugins) : jeton public, servi sur
       # /.well-known/openai-apps-challenge.
-      ROMKADE_OPENAI_CHALLENGE: ""
+      ROMKADE_OPENAI_CHALLENGE: "byrLyHpJbuudcHApC1JrRgpjmxGkf4WbkvA_c3evs7c"
     # Secrets du serveur (clé d'administration Supabase, pour supprimer un compte) : fichier de la droplet, hors dépôt
     # et hors déploiement (~/app/romkade-cloud/secrets.env, lisible par le seul compte de déploiement).
     env_file:
