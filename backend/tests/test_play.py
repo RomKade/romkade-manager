@@ -94,3 +94,15 @@ def test_launch_closes_leftover_standalone_emulators():
     games = cmd.split("AGM_GAMES=", 1)[1].split("'")[1].split()
     assert "drastic" in games and "PPSSPPSDL" in games and "retroarch" not in games
     assert 'for name in $AGM_GAMES' in launcher.LAUNCH_SCRIPT
+
+
+def test_launch_waits_for_the_previous_launch_script():
+    """Le script du jeu précédent relâche le menu en finissant : le nouveau l'attend avant de mettre le menu en pause,
+    sinon le menu repart derrière le nouveau jeu (console ralentie)."""
+    from app.device import launcher
+
+    script = launcher.LAUNCH_SCRIPT
+    assert script.index("previous_launches") < script.index('kill -STOP "$LOOP"')
+    assert "grep -qx agm-launch" in script and '"$start" -lt "$MY_START"' in script
+    # Le mot ne doit jamais être seul sur une ligne du script (sinon chaque sous-shell serait pris pour un ancien).
+    assert all(line.strip() != "agm-launch" for line in script.splitlines())

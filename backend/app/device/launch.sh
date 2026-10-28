@@ -101,6 +101,25 @@ for name in $AGM_GAMES; do
     done
 done
 
+# 1 ter. Le script du jeu précédent (« bash -c … agm-launch … ») finit après son jeu : il relâche alors la boucle
+# du menu. On l'attend avant de la mettre en pause (2.) : relâchée après, elle relancerait le menu derrière le
+# nouveau jeu, qui tournerait en arrière-plan tout le jeu et ralentirait la console.
+# Seuls ceux démarrés avant ce script : ses propres sous-shells ont la même ligne de commande.
+MY_START=$(awk '{print $22}' /proc/$$/stat)
+previous_launches() {
+    local d start
+    for d in /proc/[0-9]*; do
+        # argument « agm-launch » seul sur sa ligne (le texte du script, lui aussi dans la ligne de commande, a
+        # des retours à la ligne mais ce mot n'y est jamais seul)
+        { tr '\0' '\n' < "$d/cmdline" | grep -qx agm-launch; } 2>/dev/null || continue
+        start=$(awk '{print $22}' "$d/stat" 2>/dev/null)
+        [ -n "$start" ] && [ "$start" -lt "$MY_START" ] && echo "${d#/proc/}"
+    done
+}
+for _ in $(seq 1 50); do [ -z "$(previous_launches)" ] && break; sleep 0.2; done
+OLD=$(previous_launches)
+[ -n "$OLD" ] && { log "script précédent toujours là ($OLD) : arrêté"; kill $OLD 2>/dev/null; }
+
 # Manette de chaque joueur choisie dans Game Manager (app/device/players_apply.sh, passé dans AGM_PLAYERS).
 # RetroArch est fermé : sa config ne sera plus écrasée. Recalculé à chaque jeu, avec les manettes branchées
 # maintenant (numéro dans l'ordre de RetroArch + réservation de la manette).
