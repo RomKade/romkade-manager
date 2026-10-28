@@ -14,6 +14,7 @@ dependencies = [
     "pillow>=10",
     "httpx>=0.27",  # recherche YouTube (certificats via certifi)
     "segno>=1.6",
+    "pygame-ce>=2.5",  # manettes de l'ordinateur lues par le Manager (SDL), même onglet masqué (services/pc_pads.py)
     "anthropic>=1.15",  # descriptions des jeux (scripts/descriptions.py)  # QR code de l'adresse « ./run.sh --telephone »
 ]
 

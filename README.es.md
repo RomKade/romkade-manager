@@ -68,6 +68,9 @@ Empareja tus mandos Bluetooth desde tu ordenador, ve todos los conectados a la c
 ROMKADE Manager aplica tu elección a tus juegos: conecta la consola a tu tele y juega a dos en pantalla grande, sin
 rebuscar en los menús de la consola.
 
+¿Tu mando no llega hasta la consola? Usa el conectado a tu ordenador (Xbox, PlayStation, por Bluetooth o USB):
+ROMKADE Manager lo lee él mismo y lo envía a la consola por Wi-Fi, incluso con el navegador en segundo plano.
+
 ## Conecta tu consola a tu altavoz Bluetooth
 
 <p align="center"><img src="docs/readme/bluetooth-es.webp" alt="El sonido del juego enviado a un altavoz Bluetooth" width="720"></p>

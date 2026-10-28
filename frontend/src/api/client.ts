@@ -9,6 +9,10 @@ export type GameCheats = { available: boolean; files: CheatFile[]; can_install: 
 /** Le Manager sur le téléphone (QR code, Wi-Fi de la maison). */
 export type PhoneStatus = { devices: number; listening: boolean; available: boolean };
 export type PhonePair = { url: string; qr: string; expires_in: number; devices: number };
+/** Manettes de l'ordinateur lues par le Manager lui-même (marchent onglet masqué). */
+export type PcPadRelay = { token: string; pad: number; name: string; status: string; error: string | null };
+export type PcPads = { available: boolean; reason: string | null; pads: { id: number; name: string; relayed: boolean }[];
+  relays: PcPadRelay[] };
 
 export type DescriptionDraft = {
   mode: "translate" | "write"; model: string; known: boolean; texts: Record<string, { text: string; origin: string }>;
@@ -205,6 +209,9 @@ export const api = {
   phone: () => request<PhoneStatus>("GET", "/phone"),
   phonePair: () => request<PhonePair>("POST", "/phone/pair"),
   phoneDisconnect: () => request<PhoneStatus>("DELETE", "/phone"),
+  pcPads: () => request<PcPads>("GET", "/pc-pads"),
+  pcPadRelay: (pad: number) => request<PcPadRelay>("POST", "/pc-pads/relays", { pad }),
+  pcPadStop: (token: string) => request<void>("DELETE", `/pc-pads/relays/${encodeURIComponent(token)}`),
   volume: () => request<Volume>("GET", "/volume"),
   setVolume: (body: { percent?: number; muted?: boolean }) => request<Volume>("PUT", "/volume", body),
   nowPlaying: () => request<NowPlaying>("GET", "/device/now-playing"),

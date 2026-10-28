@@ -67,6 +67,9 @@ Associe tes manettes Bluetooth depuis ton ordinateur, vois toutes celles branch�
 chaque joueur. ROMKADE Manager applique ton choix à tes jeux : branche la console sur ta télé et joue à deux sur grand
 écran, sans fouiller dans les menus de la console.
 
+Ta manette ne porte pas jusqu'à la console ? Prends celle connectée à ton ordinateur (Xbox, PlayStation, en Bluetooth
+ou en USB) : ROMKADE Manager la lit lui-même et la relaie à la console par le Wi-Fi, même navigateur en arrière-plan.
+
 ## Connecte ta console à ton enceinte Bluetooth
 
 <p align="center"><img src="docs/readme/bluetooth-fr.webp" alt="Le son du jeu envoyé sur une enceinte Bluetooth" width="720"></p>

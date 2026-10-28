@@ -65,6 +65,9 @@ Pair your Bluetooth controllers from your computer, see every controller plugged
 each player. ROMKADE Manager applies your choice to your games: plug the console into your TV and play two-player on
 the big screen, without digging through the console's menus.
 
+No controller that reaches the console? Use the one connected to your computer (Xbox, PlayStation, Bluetooth or
+USB): ROMKADE Manager reads it itself and relays it to the console over Wi-Fi, even with the browser in the background.
+
 ## Connect your console to your Bluetooth speaker
 
 <p align="center"><img src="docs/readme/bluetooth-en.webp" alt="Game sound sent to a Bluetooth speaker" width="720"></p>

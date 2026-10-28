@@ -8,7 +8,8 @@ import { useCaps, useDeviceStatus, useLaunchGame, useNowPlaying, usePlayers, use
 import { ErrorNotice, PageHeader, Spinner } from "../components/ui";
 import { useT } from "../i18n";
 import {
-  type ComputerRelay, controllerLabel, dropUnusedRelays, gamepadsSupported, linkComputerPad, padName, useComputerPads, useRelays,
+  type ComputerRelay, controllerLabel, dropUnusedRelays, gamepadsSupported, linkComputerPad, padName, type PcPad, serverPadsActive,
+  useComputerPads, useRelays,
 } from "../lib/computerPads";
 import { assignPlayer, completePlayers } from "../lib/players";
 
@@ -44,7 +45,7 @@ export function ControllersPage() {
   const choose = (player: number, index: number, then?: () => void) =>
     save.mutate(assignPlayer(players, player, index), { onSuccess: (d) => { dropUnusedRelays(d); then?.(); } });
   // Manette de l'ordinateur : on la relaie vers la console, puis on donne au joueur la manette virtuelle créée.
-  const chooseComputer = async (player: number, pad: Gamepad) => {
+  const chooseComputer = async (player: number, pad: PcPad) => {
     setLinking(true);
     setLinkError("");
     try {
@@ -109,7 +110,7 @@ const DIRECTIONS = ["dpad", "dpadLeft", "dpadRight"] as const;
 function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirection, relays, linking, linkError, onComputer }: {
   p: Players; players: number[]; busy: boolean; error: unknown; canRelaunch: boolean;
   onChoose: (player: number, index: number) => void; onDirection: (player: number, direction: number) => void;
-  relays: ComputerRelay[]; linking: boolean; linkError: string; onComputer: (player: number, pad: Gamepad) => void;
+  relays: ComputerRelay[]; linking: boolean; linkError: string; onComputer: (player: number, pad: PcPad) => void;
 }) {
   const t = useT();
   const bluetooth = useCaps().bluetooth;
@@ -171,15 +172,17 @@ function PlayersBlock({ p, players, busy, error, canRelaunch, onChoose, onDirect
         <p className="muted">{t("players.directionLead")}</p>
         {/* Le navigateur ne montre une manette de l'ordinateur qu'après un appui sur un de ses boutons, page ouverte
             (protection de la vie privée) : aucun bouton « Rafraîchir » ne peut la faire apparaître plus tôt. */}
-        {gamepadsSupported() && (
+        {(serverPadsActive() || gamepadsSupported()) && (
           <p className={`players__pc ${pads.length ? "is-seen" : ""}`} role="status">
             <Gamepad2 size={16} aria-hidden />
             {pads.length
               ? t("players.computerSeen", { name: pads.map(padName).join(", ") })
-              : t("players.computerPress")}
+              : t(serverPadsActive() ? "players.computerNone" : "players.computerPress")}
           </p>
         )}
-        {gamepadsSupported() && <p className="muted">{t("players.computerHint")}</p>}
+        {(serverPadsActive() || gamepadsSupported()) && (
+          <p className="muted">{t(serverPadsActive() ? "players.computerHintServer" : "players.computerHint")}</p>
+        )}
         {linking && <p className="muted" role="status">{t("players.computerLinking")}</p>}
         {linkError && <p className="players__warn"><AlertTriangle size={16} aria-hidden /> {linkError}</p>}
         {error ? <ErrorNotice error={error} /> : !p.applied && <p className="muted">{t(canRelaunch ? "players.pendingRelaunch" : "players.pending")}</p>}

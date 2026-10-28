@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { api, type Controller, type Players } from "../api/client";
+import { api, type Controller, type PcPads, type Players } from "../api/client";
 import { controllerName } from "./players";
 
 /**
@@ -10,6 +10,11 @@ import { controllerName } from "./players";
  * vaut l'identifiant du relais.
  *
  * Les relais vivent tant que l'onglet est ouvert, d'une page à l'autre de l'application (pas liés à un composant).
+ *
+ * Mieux, quand le Manager sait lire les manettes lui-même (pygame-ce, hors Docker : GET /api/pc-pads,
+ * backend app/services/pc_pads.py) : la liste et les relais viennent du serveur, qui relaie sans le navigateur.
+ * Changer d'onglet, réduire ou fermer le navigateur ne coupe plus la manette en plein jeu. Sinon (Docker, page
+ * ouverte sur le téléphone), lecture par le navigateur comme ci-dessus.
  */
 export type RelayStatus = "connecting" | "live" | "error";
 export type ComputerRelay = { token: string; pad: number; name: string; status: RelayStatus; error?: string };
@@ -25,15 +30,56 @@ const RELEASE = '{"release": true}';
 const round = (v: number) => Math.round(v * 1000) / 1000;
 
 function changed() {
-  list = [...relays.values()].map(({ token, pad, name, status, error }) => ({ token, pad, name, status, error }));
+  const browser = [...relays.values()].map(({ token, pad, name, status, error }) => ({ token, pad, name, status, error }));
+  const server = (pcState?.available ? pcState.relays : []).map((r) => ({
+    token: r.token, pad: r.pad, name: r.name, status: (r.status === "error" ? "error" : "live") as RelayStatus,
+    error: r.error ?? undefined }));
+  list = [...browser, ...server];
   listeners.forEach((l) => l());
 }
+
+// ---------- manettes lues par le Manager (serveur) ----------
+let pcState: PcPads | null = null;
+let pcUsers = 0;
+let pcTimer = 0;
+
+/** Relit l'état du serveur (manettes branchées, relais) ; sans réponse, on garde la lecture par le navigateur. */
+async function refreshServer() {
+  try {
+    pcState = await api.pcPads();
+  } catch {
+    pcState = null;
+  }
+  changed();
+}
+
+/** Tant qu'un écran affiche les manettes, l'état du serveur est relu toutes les 2 s (manette allumée, éteinte). */
+function useServerPads(): PcPads | null {
+  const state = useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => pcState, () => pcState);
+  useEffect(() => {
+    if (pcUsers++ === 0) {
+      refreshServer();
+      pcTimer = window.setInterval(refreshServer, 2000);
+    }
+    return () => {
+      if (--pcUsers === 0) window.clearInterval(pcTimer);
+    };
+  }, []);
+  return state;
+}
+
+/** Manette de l'ordinateur proposée à un joueur : lue par le serveur (`server`) ou par le navigateur. */
+export type PcPad = { index: number; name: string; server: boolean };
 
 export const gamepadsSupported = () =>
   typeof navigator !== "undefined" && "getGamepads" in navigator && typeof window !== "undefined" && window.isSecureContext;
 
-/** Nom lisible d'une manette du navigateur (Chrome ajoute « (STANDARD GAMEPAD Vendor: …) »). */
-export const padName = (pad: Gamepad) => pad.id.replace(/\s*\(.*\)\s*$/, "").trim() || pad.id;
+/** Nom lisible d'une manette (Chrome ajoute « (STANDARD GAMEPAD Vendor: …) » au nom des manettes du navigateur). */
+export const padName = (pad: Gamepad | PcPad) =>
+  "server" in pad ? pad.name : pad.id.replace(/\s*\(.*\)\s*$/, "").trim() || pad.id;
+
+/** Le Manager lit les manettes lui-même : pas besoin d'appuyer sur un bouton, et elles marchent onglet masqué. */
+export const serverPadsActive = () => pcState?.available === true;
 
 function snapshot(pad: Gamepad): string {
   return JSON.stringify({ b: pad.buttons.map((b) => round(b.value || (b.pressed ? 1 : 0))), a: pad.axes.map(round) });
@@ -99,6 +145,10 @@ export function startRelay(pad: number, name: string): Promise<string> {
 }
 
 export function stopRelay(token: string) {
+  if (pcState?.relays.some((x) => x.token === token)) {
+    api.pcPadStop(token).catch(() => undefined).finally(refreshServer);
+    return;
+  }
   const r = relays.get(token);
   if (!r) return;
   relays.delete(token);
@@ -113,10 +163,17 @@ export function useRelays(): ComputerRelay[] {
 }
 
 /** Manettes vues par le navigateur (une manette n'apparaît qu'après un appui sur l'un de ses boutons). */
-export function useComputerPads(): Gamepad[] {
+export function useComputerPads(): PcPad[] {
+  const server = useServerPads();
+  const browser = useBrowserPads(!server?.available);
+  if (server?.available) return server.pads.map((p) => ({ index: p.id, name: p.name, server: true }));
+  return browser.map((g) => ({ index: g.index, name: padName(g), server: false }));
+}
+
+function useBrowserPads(enabled: boolean): Gamepad[] {
   const [pads, setPads] = useState<Gamepad[]>([]);
   useEffect(() => {
-    if (!gamepadsSupported()) return;
+    if (!enabled || !gamepadsSupported()) return;
     const read = () => setPads(navigator.getGamepads().filter((g): g is Gamepad => !!g));
     read();
     window.addEventListener("gamepadconnected", read);
@@ -125,7 +182,7 @@ export function useComputerPads(): Gamepad[] {
       window.removeEventListener("gamepadconnected", read);
       window.removeEventListener("gamepaddisconnected", read);
     };
-  }, []);
+  }, [enabled]);
   return pads;
 }
 
@@ -133,10 +190,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Relaie une manette de l'ordinateur et attend que la console la voie : manettes à jour et numéro de la manette
  * virtuelle. En cas d'échec, le relais est arrêté et l'erreur a un message lisible. */
-export async function linkComputerPad(pad: Gamepad, t: (key: string) => string): Promise<{ players: Players; index: number }> {
+export async function linkComputerPad(pad: PcPad, t: (key: string) => string): Promise<{ players: Players; index: number }> {
   let token = "";
   try {
-    token = await startRelay(pad.index, padName(pad));
+    if (pad.server) {
+      token = (await api.pcPadRelay(pad.index)).token;  // relais tenu par le serveur, sans le navigateur
+      await refreshServer();
+    } else {
+      token = await startRelay(pad.index, pad.name);
+    }
     for (let i = 0; i < 12; i++) {
       await sleep(500);
       const d = await api.players();
