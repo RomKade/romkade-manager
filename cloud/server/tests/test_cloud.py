@@ -77,6 +77,7 @@ class FakeAgent:
         self.received: list[dict] = []
         self.playing = None
         self.saves: list[dict] | None = []  # None : agent d'avant l'ordre « saves »
+        self.old_slots = False  # agent d'avant l'emplacement « latest »
 
     async def hello(self) -> dict:
         headers = {"Authorization": f"Bearer {self.secret}"} if self.secret else {}
@@ -102,7 +103,9 @@ class FakeAgent:
             if not cmd:
                 continue
             self.received.append(cmd)
-            if cmd["action"] == "launch":
+            if cmd["action"] == "launch" and self.old_slots and cmd["params"]["slot"] == "latest":
+                reply = {"ok": False, "error": {"code": "bad_slot", "message": "Emplacement de sauvegarde invalide"}}
+            elif cmd["action"] == "launch":
                 self.playing = cmd["params"]
                 reply = {"ok": True, "result": {"launching": "x"}}
             elif cmd["action"] == "status":
@@ -204,9 +207,14 @@ def test_pairing_catalog_cheats_and_play(env):
 
                 launched = data(await mcp.call_tool("launch_game", {"game_id": sonic, "resume": True}))
                 assert launched["game"]["title"] == "Sonic The Hedgehog"
-                assert agent.received[-1]["params"] == {"platform_dir": "MD", "slot": "auto",
+                # « Reprendre » : la sauvegarde la plus récente, faite avec save_state ou automatique
+                assert agent.received[-1]["params"] == {"platform_dir": "MD", "slot": "latest",
                                                         "relative_path": "Sonic The Hedgehog (USA, Europe).md"}
                 assert launched["view"] == "now" and launched["launching"]
+                agent.old_slots = True  # app de la console pas encore à jour : sauvegarde automatique, comme avant
+                data(await mcp.call_tool("launch_game", {"game_id": sonic, "resume": True}))
+                assert [x["params"]["slot"] for x in agent.received[-2:]] == ["latest", "auto"]
+                agent.old_slots = False
                 st = data(await mcp.call_tool("console_status", {}))
                 assert st["playing"] and st["game"]["title"] == "Sonic The Hedgehog" and st["volume"]["percent"] == 40
 

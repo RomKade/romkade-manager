@@ -165,7 +165,8 @@ export const api = {
   cheatsStatus: () => request<CheatsStatus>("GET", "/cheats"),
   downloadCheats: () => request<CheatsStatus>("POST", "/cheats/download"),
   gameCheats: (id: number) => request<GameCheats>("GET", `/games/${id}/cheats`),
-  installCheats: (id: number, name: string) => request<{ path: string }>("POST", `/games/${id}/cheats/install`, { name }),
+  installCheats: (id: number, name: string, only?: number[]) =>
+    request<{ path: string }>("POST", `/games/${id}/cheats/install`, only?.length ? { name, only } : { name }),
   gameControls: (id: number) => request<GameControls>("GET", `/games/${id}/controls`),
   generateControls: (id: number) => request<GameControls>("POST", `/games/${id}/controls`),
   editControls: (id: number, body: GameControlsIn) => request<GameControls>("PUT", `/games/${id}/controls`, body),

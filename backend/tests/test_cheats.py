@@ -1,4 +1,6 @@
+import base64
 import io
+import re
 import zipfile
 
 import httpx
@@ -36,6 +38,17 @@ def test_parse_ranking_and_memory_codes():
                     'cheat1_desc = "vide"\ncheat1_code = ""\n') == [{"desc": "x", "code": "12=7"}]
 
 
+def test_subset_keeps_chosen_codes_enabled():
+    text = ('cheats = 3\n\ncheat0_desc = "vide"\ncheat0_code = ""\n\ncheat1_desc = "Lives"\ncheat1_code = "AA"\n'
+            'cheat1_enable = false\n\ncheat2_desc = "Jump"\ncheat2_address = "12"\ncheat2_value = "7"\n'
+            'cheat2_handler = "1"\ncheat2_repeat_count = "1"\n')
+    # Positions de la liste affichée (le code vide n'y est pas) : « Jump » seul, renuméroté et activé
+    out = ch.subset(text, [1])
+    assert out.startswith("cheats = 1\n") and 'cheat0_desc = "Jump"' in out and 'cheat0_repeat_count = "1"' in out
+    assert "cheat0_enable = true" in out and "Lives" not in out and "cheat1" not in out
+    assert ch.parse(ch.subset(text, [1, 0, 1, 9])) == [{"desc": "Jump", "code": "12=7"}, {"desc": "Lives", "code": "AA"}]
+
+
 async def test_download_list_install_and_assistant(app_factory, monkeypatch, tmp_path):
     monkeypatch.setenv("ROMKADE_DATA_DIR", str(tmp_path / "data"))
     data = fake_zip()
@@ -67,6 +80,11 @@ async def test_download_list_install_and_assistant(app_factory, monkeypatch, tmp
         r = await c.post(f"/api/games/{game['id']}/cheats/install", json={"name": out["files"][1]["name"]})
         assert r.status_code == 200, r.text
         assert "cheat_database_path" in commands[0] and f"'{SNES}'" in commands[0] and "base64 -d" in commands[0]
+        # Un seul code : le fichier copié n'a que lui
+        r = await c.post(f"/api/games/{game['id']}/cheats/install", json={"name": out["files"][0]["name"], "only": [1]})
+        assert r.status_code == 200, r.text
+        sent = base64.b64decode(re.search(r"echo (\S+) \| base64 -d", commands[1]).group(1)).decode()
+        assert ch.parse(sent) == [{"desc": "Always have cape", "code": "7E0019:02"}]
 
         model, seen = fake_llm({"in_scope": True, "intent": "game_help", "search": "cheat codes", "games_mentioned": [],
                                 "wants_solution": False}, ["Vies infinies : 7E0DBE:63\nSource: RetroArch"])

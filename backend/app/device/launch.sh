@@ -3,7 +3,8 @@
 # Aucun fichier n'est écrit sur la carte : le script passe en argument, son journal va dans /tmp.
 #
 #   $1 = dossier de la plateforme (MD, SFC, NDS…)   $2 = chemin complet de la ROM
-#   $3 = facultatif : « auto » (reprise automatique) ou numéro d'emplacement de sauvegarde instantanée
+#   $3 = facultatif : « auto » (reprise automatique), « latest » (sauvegarde instantanée la plus récente,
+#        automatique ou non) ou numéro d'emplacement de sauvegarde instantanée
 #
 # Le menu tourne dans une boucle : /mnt/vendor/ctrl/loadapp.sh relance sans fin dmenu_ln, qui lance dmenu.bin.
 # On met cette boucle en pause (SIGSTOP), on ferme le menu, on lance le jeu comme le fait le mod
@@ -75,6 +76,21 @@ export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-/usr/lib32:/usr/lib:/mnt/vendor/lib}"
 cd /
 
 [ -f "$ROM" ] || { log "ROM introuvable : $ROM"; exit 2; }
+
+# « latest » : la sauvegarde instantanée la plus récente du jeu (states_RA/Roms/<console>/<cœur>/<jeu>.state,
+# .state1…, .state.auto, ou à côté de la ROM). Choisie avant de quitter le jeu en cours (1.) : en quittant,
+# RetroArch réécrit .state.auto avec la position du moment, qui passerait devant la sauvegarde faite juste avant.
+if [ "$SLOT" = "latest" ]; then
+    STEM=$(basename "$ROM"); STEM="${STEM%.*}"
+    NEWEST=$(ls -t "${ROM%%/Roms/*}/states_RA/Roms/$EMU"/*/"$STEM".state* "$(dirname "$ROM")/$STEM".state* 2>/dev/null \
+             | grep -E '\.state([0-9]*|\.auto)$' | head -1)
+    case "$NEWEST" in
+        "") SLOT="auto" ;;
+        *.auto) SLOT="auto" ;;
+        *) SLOT="${NEWEST##*.state}"; SLOT="${SLOT:-0}" ;;
+    esac
+    log "sauvegarde la plus récente : ${NEWEST:-aucune} (emplacement $SLOT)"
+fi
 
 # 0. Menus orphelins (sans parent) laissés par un ancien essai : on les ferme.
 for p in $(pidof dmenu.bin); do

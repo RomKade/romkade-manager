@@ -177,12 +177,13 @@ async def android_launch(run: Runner, client: DeviceClient, platform_dir: str, r
                           {"exit": code, "output": out[-500:]})
 
 
-SLOT_RE = re.compile(r"^(auto|\d{1,3})$")
+SLOT_RE = re.compile(r"^(auto|latest|\d{1,3})$")
 
 
 async def launch(run: Runner, client: DeviceClient, platform_dir: str, rom_path: str, slot: str | None = None,
                  profile=None) -> None:
-    """Lance le jeu ; `slot` : « auto » (reprise automatique) ou numéro d'emplacement de sauvegarde instantanée."""
+    """Lance le jeu ; `slot` : « auto » (reprise automatique), « latest » (sauvegarde instantanée la plus récente,
+    automatique ou non, voir launch.sh) ou numéro d'emplacement de sauvegarde instantanée."""
     if slot is not None and not SLOT_RE.fullmatch(slot):
         raise errors.AppError("bad_slot", "Emplacement de sauvegarde invalide", 422, {"slot": slot})
     method = profile.launcher if profile else "stock-mod"

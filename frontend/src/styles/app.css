@@ -1550,7 +1550,12 @@ kbd {
 .cheats__variant { max-width: 360px; }
 .cheats__empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .cheats__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.cheats__list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: var(--r-control); background: var(--panel-2); }
+.cheats__list button { all: unset; box-sizing: border-box; width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border: 1px solid transparent; border-radius: var(--r-control); background: var(--panel-2); cursor: pointer; }
+.cheats__list button:hover { border-color: var(--ink-3); }
+.cheats__list button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cheats__list button.is-on { background: var(--accent-soft); border-color: var(--accent); }
+.cheats__list button span { display: inline-flex; align-items: flex-start; gap: 6px; }
+.cheats__list button svg { flex: none; margin-top: 3px; color: var(--accent); }
 .cheats__list code { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--fs-sm); color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
 
 /* ---------- Assistant : action sur la console à confirmer ---------- */

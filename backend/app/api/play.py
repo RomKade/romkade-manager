@@ -32,7 +32,7 @@ def _client(request: Request) -> DeviceClient:
 
 
 class LaunchIn(BaseModel):
-    slot: str | None = None  # « auto » ou numéro d'emplacement de sauvegarde instantanée
+    slot: str | None = None  # « auto », « latest » ou numéro d'emplacement de sauvegarde instantanée
 
 
 @router.post("/games/{game_id}/launch", status_code=202)

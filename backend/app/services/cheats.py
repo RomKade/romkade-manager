@@ -177,6 +177,24 @@ def parse(text: str) -> list[dict]:
     return out
 
 
+ANY_LINE_RE = re.compile(r"^\s*cheat(\d+)_(\w+)\s*=\s*(.*?)\s*$")
+
+
+def subset(text: str, keep: list[int]) -> str:
+    """Fichier `.cht` réduit aux codes choisis (positions dans la liste de parse), renumérotés et déjà activés :
+    toutes leurs lignes sont gardées (adresse, type, répétitions…)."""
+    lines: dict[int, list[tuple[str, str]]] = {}
+    for line in text.splitlines():
+        if m := ANY_LINE_RE.match(line):
+            lines.setdefault(int(m.group(1)), []).append((m.group(2), m.group(3)))
+    shown = [n for n in sorted(lines) if parse("\n".join(f"cheat0_{k} = {v}" for k, v in lines[n]))]
+    picked = [shown[k] for k in dict.fromkeys(keep) if 0 <= k < len(shown)]
+    out = [f"cheats = {len(picked)}", ""]
+    for i, n in enumerate(picked):
+        out += [f"cheat{i}_{k} = {v}" for k, v in lines[n] if k != "enable"] + [f"cheat{i}_enable = true", ""]
+    return "\n".join(out)
+
+
 def read(name: str) -> str:
     """Texte d'un fichier du paquet (nom exact, tel que listé par files_for)."""
     with zipfile.ZipFile(path()) as z:

@@ -401,14 +401,20 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                                                                  idempotent_hint=False, open_world_hint=False))
     async def launch_game(game_id: int, ctx: Context, resume: bool = False) -> CallToolResult:
         """Starts a game on the console. A game already running is closed first (RetroArch writes its in-game
-        save; progress since the last save point is lost). `resume`: continue from the automatic save state when
-        there is one. Get game_id from search_games."""
+        save; progress since the last save point is lost). `resume`: continue from the most recent save state
+        (made with save_state or automatic) when there is one. Get game_id from search_games."""
         row = store.game(game_id, account_of(ctx))
         if row is None:
             raise UserError("unknown_game", "Game not found in the library (use a game_id from search_games).")
         c = store.console(row["console_id"])
-        await device(c, "launch", {"platform_dir": row["platform_dir"], "relative_path": row["relative_path"],
-                                   "slot": "auto" if resume else None}, timeout=60)
+        where = {"platform_dir": row["platform_dir"], "relative_path": row["relative_path"]}
+        try:
+            await device(c, "launch", {**where, "slot": "latest" if resume else None}, timeout=60)
+        except UserError as exc:
+            # App de la console d'avant « latest » : reprise sur la sauvegarde automatique, comme avant
+            if exc.details.get("reason") != "bad_slot":
+                raise
+            await device(c, "launch", {**where, "slot": "auto"}, timeout=60)
         return view({"view": "now", "launching": True, "console": describe(c), "playing": True,
                      "game": game_out(row, full=True), "volume": None})
 

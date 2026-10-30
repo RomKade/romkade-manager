@@ -50,6 +50,7 @@ class GameCheatsOut(BaseModel):
 
 class InstallIn(BaseModel):
     name: str = Field(min_length=5, max_length=400)
+    only: list[int] | None = Field(None, max_length=ch.MAX_CHEATS)  # positions des codes choisis ; absent : tous
 
 
 class InstallOut(BaseModel):
@@ -83,7 +84,8 @@ async def game_cheats(game_id: int, request: Request) -> dict:
 
 @router.post("/games/{game_id}/cheats/install", response_model=InstallOut)
 async def install_cheats(game_id: int, body: InstallIn, request: Request) -> dict:
-    """Copie le fichier de codes choisi dans le dossier des codes de RetroArch, sous le nom du jeu."""
+    """Copie le fichier de codes choisi dans le dossier des codes de RetroArch, sous le nom du jeu ; avec `only`,
+    seulement ces codes (déjà activés)."""
     st = request.app.state
     profile = st.system.profile()
     if not profile.ra_config:
@@ -98,7 +100,10 @@ async def install_cheats(game_id: int, body: InstallIn, request: Request) -> dic
     idx = ch.index()
     if idx is None or body.name not in idx.files_for(directory, filename):
         raise errors.AppError("cheats_not_found", "Ce fichier de codes ne correspond pas à ce jeu.", 404)
-    data = (await asyncio.to_thread(ch.read, body.name)).encode()
+    text = await asyncio.to_thread(ch.read, body.name)
+    if body.only:
+        text = ch.subset(text, body.only)
+    data = text.encode()
     if len(data) > MAX_INSTALL_BYTES:
         raise errors.AppError("cheats_too_big", "Ce fichier de codes est trop gros pour être copié d'ici.", 422)
     command = ch.install_command(profile.ra_config, body.name.split("/", 1)[0], stem_of(filename), data)
