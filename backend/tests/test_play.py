@@ -72,6 +72,9 @@ async def test_now_playing_and_quit(app_factory):
         now = (await c.get("/api/device/now-playing")).json()
         assert now["playing"] and now["process"] == "retroarch" and now["game"]["title"] == "Super Mario World"
         assert (await c.post("/api/device/quit-game")).json() == {"result": "quit"}
+        # Sans RetroArch, l'émulateur autonome (drastic pour la DS…) est fermé lui aussi
+        assert "pidof retroarch >/dev/null || { s=$(pidof PPSSPPSDL drastic" in launcher.QUIT_COMMAND
+        assert "kill -TERM $s" in launcher.QUIT_COMMAND and "retroarch drastic" not in launcher.QUIT_COMMAND
         console.playing = None
         now = (await c.get("/api/device/now-playing")).json()
         assert not now["playing"] and now["menu"] and now["game"] is None

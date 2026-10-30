@@ -80,7 +80,14 @@ ES_STATUS_COMMAND = "echo @@ES; " + ES_GET % {"u": f"{ES_HTTP}/runningGame"} + "
 # Commande réseau de RetroArch (network_cmd_enable, port 55355), envoyée en UDP par bash. Le binaire
 # « retroarch --command QUIT » ne marche pas depuis SSH : il lui manque LD_LIBRARY_PATH.
 QUIT_UDP = "echo -n QUIT > /dev/udp/127.0.0.1/55355"
-QUIT_COMMAND = (f"pidof retroarch >/dev/null || {{ echo none; exit 0; }}; "
+# Émulateur autonome (DS, PSP, émulateurs du firmware) : pas de commande « Quitter ». SIGTERM (drastic écrit sa
+# configuration en le recevant), puis SIGKILL ; launch.sh relâche alors le menu, qui revient.
+STANDALONE = " ".join(p for p in GAME_PROCESSES if p != "retroarch")
+QUIT_STANDALONE = (f"s=$(pidof {STANDALONE}); [ -n \"$s\" ] || {{ echo none; exit 0; }}; kill -TERM $s; "
+                   "for i in $(seq 1 15); do kill -0 $s 2>/dev/null || break; sleep 0.2; done; "
+                   "kill -KILL $s 2>/dev/null; sleep 0.5; "
+                   f"pidof {STANDALONE} >/dev/null && echo still || echo quit")
+QUIT_COMMAND = (f"pidof retroarch >/dev/null || {{ {QUIT_STANDALONE}; exit 0; }}; "
                 f"for i in $(seq 1 30); do pidof retroarch >/dev/null || break; bash -c '{QUIT_UDP}' 2>/dev/null; sleep 0.3; done; "
                 f"pidof retroarch >/dev/null && echo still || echo quit")
 # Autres firmwares : bash n'existe pas toujours (BusyBox) -> nc ; RetroArch ignore les commandes réseau si
