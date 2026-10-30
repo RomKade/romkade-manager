@@ -7,8 +7,8 @@ Ce qui ne marche pas sur cette console :
 
 On ajoute donc notre propre volume logiciel ALSA (`softvol`) devant la sortie des jeux. ASOUNDRC (/.asoundrc, lu
 par les jeux lancés depuis Game Manager, qui tournent avec HOME=/) fait de « default » une chaîne
-volume (CONTROL, -30 à +12 dB) -> coupure (interrupteur) -> sortie : haut-parleurs, ou enceinte Bluetooth
-(agm_bt, voir bluetooth.py). Le réglage CONTROL apparaît sur la carte 0 quand un jeu ouvre la sortie et reste
+volume (CONTROL, -30 à +12 dB) -> coupure (interrupteur) -> sortie : haut-parleurs, TV ou enceinte Bluetooth
+(agm_bt, voir bluetooth.py ; choix de la sortie : sound.py). Le réglage CONTROL apparaît sur la carte 0 quand un jeu ouvre la sortie et reste
 jusqu'au redémarrage : amixer le lit et le règle à tout moment.
 launch.sh met le volume de RetroArch (audio_volume) à 0 dB : c'est ce réglage-ci qui fait le volume.
 
@@ -18,6 +18,7 @@ Jeu lancé depuis le menu de la console :
 """
 
 import re
+import shlex
 
 from app import errors
 from app.device.launcher import Runner
@@ -36,17 +37,18 @@ FIRMWARE_HOOKS = [("LINEOUT Switch", 1), ("SPK Switch", 1), ("OutputL Mixer DACL
                   ("OutputR Mixer DACR Switch", 1), ("digital volume", 63)]
 
 
-def asoundrc(slave: str = SPEAKERS) -> str:
+def asoundrc(slave: str = SPEAKERS, tv: bool = True) -> str:
     """/.asoundrc : sortie « default » des jeux lancés depuis Game Manager, avec notre volume devant `slave`.
 
     agm_speakers reproduit le « default » du firmware (mêmes hooks), en 16 bits imposés : sans cela, la chaîne
     de volume envoyait du 32 bits à la puce son, et le son sortait très faible.
 
     Console branchée à une TV, le RetroArch du firmware ouvre lui-même « playback_hdmi » (défini dans
-    /etc/asound.conf), quel que soit son réglage audio_device : vers une enceinte Bluetooth, on redéfinit donc aussi
-    « playback_hdmi » sur notre sortie. Vers les haut-parleurs, la TV garde le son.
+    /etc/asound.conf), quel que soit son réglage audio_device : vers une enceinte Bluetooth, ou vers les
+    haut-parleurs même TV branchée (`tv=False`), on redéfinit donc aussi « playback_hdmi » sur notre sortie.
+    Sinon, la TV garde le son (voir sound.py).
     """
-    hdmi = "pcm.!playback_hdmi agm_vol\n" if slave != SPEAKERS else ""
+    hdmi = "pcm.!playback_hdmi agm_vol\n" if slave != SPEAKERS or not tv else ""
     hooks = "\n".join(f'            {{ name "{name}" preserve true lock true value {value} }}'
                        for name, value in FIRMWARE_HOOKS)
     return f"""# Game Manager : volume des jeux lancés depuis Game Manager (supprimable sans risque) {VERSION}
@@ -84,6 +86,16 @@ pcm.agm_speakers {{
     }}
 }}
 """
+
+
+def install_command() -> str:
+    """/.asoundrc installé s'il manque ou date d'une autre version, en gardant la sortie choisie (voir sound.py) :
+    enceinte Bluetooth (agm_bt), haut-parleurs même TV branchée (playback_hdmi redéfini), ou TV."""
+    def write(rc: str) -> str:
+        return f"printf %s {shlex.quote(rc)} > {ASOUNDRC}"
+    return (f"grep -q {VERSION} {ASOUNDRC} 2>/dev/null || {{ if grep -q agm_bt {ASOUNDRC} 2>/dev/null; "
+            f"then {write(asoundrc('agm_bt'))}; elif grep -q playback_hdmi {ASOUNDRC} 2>/dev/null; "
+            f"then {write(asoundrc(tv=False))}; else {write(asoundrc())}; fi; }}; ")
 
 
 # Réglages lus et écrits par leur nom exact (cget / cset) : « amixer sset 'Game Manager' » mélangeait notre

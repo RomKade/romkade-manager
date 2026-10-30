@@ -1,4 +1,4 @@
-import { Bluetooth, BookOpen, Camera, ChevronDown, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, LogOut, RefreshCw, RotateCw, Save, Settings as SettingsIcon } from "lucide-react";
+import { Bluetooth, BookOpen, Camera, ChevronDown, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, LogOut, RefreshCw, RotateCw, Save, Settings as SettingsIcon, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 
@@ -23,6 +23,7 @@ const NAV = [
   { to: "/sauvegardes", label: "common.nav.saves", icon: Save },
   { to: "/captures", label: "common.nav.screenshots", icon: Camera },
   { to: "/manettes", label: "common.nav.players", icon: Gamepad2 },
+  { to: "/son", label: "common.nav.sound", icon: Volume2 },
   { to: "/bluetooth", label: "common.nav.bluetooth", icon: Bluetooth },
   { to: "/synchronisation", label: "common.nav.sync", icon: RefreshCw },
   { to: "/parametres", label: "common.nav.settings", icon: SettingsIcon },
@@ -33,7 +34,7 @@ export function Sidebar() {
   const active = (useTransfers().data ?? []).filter(isActive).length;
   const caps = useCaps();
   const system = useSystem().data;
-  const nav = NAV.filter((n) => (n.to !== "/bluetooth" || caps.bluetooth) && (n.to !== "/manettes" || caps.players));
+  const nav = NAV.filter((n) => (n.to !== "/bluetooth" || caps.bluetooth) && (n.to !== "/son" || caps.bluetooth_audio) && (n.to !== "/manettes" || caps.players));
   return (
     <aside className="sidebar">
       <div className="brand">

@@ -1525,6 +1525,14 @@ kbd {
 .status-dot.is-error { background: var(--err); box-shadow: none; }
 .status-dot.is-none { background: var(--line-strong); box-shadow: none; }
 
+/* Son : sortie des jeux (cartes de l'Assistant IA, avec le test sonore dans la carte choisie) */
+.sound__option { cursor: default; }
+.sound__pick { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
+.sound__pick input { position: absolute; opacity: 0; pointer-events: none; }
+.sound__option:has(input:disabled) .sound__pick { cursor: progress; }
+.sound__test { align-self: flex-start; }
+.sound__options + .field__hint { margin-top: 10px; }
+
 /* Paramètres > Assistant IA : prénom de l'assistant */
 .names__other { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
 .names__other .field { max-width: 240px; }

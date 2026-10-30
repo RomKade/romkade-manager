@@ -24,6 +24,7 @@ import { PlaytimePage } from "./pages/Playtime";
 import { SavesPage } from "./pages/Saves";
 import { ScreenshotsPage } from "./pages/Screenshots";
 import { SettingsPage } from "./pages/Settings";
+import { SoundPage } from "./pages/Sound";
 import { SyncPage } from "./pages/Sync";
 import { TermsPage } from "./pages/Terms";
 import { TransfersPage } from "./pages/Transfers";
@@ -102,6 +103,7 @@ export function AppRoutes() {
         <Route path="sauvegardes" element={<SavesPage />} />
         <Route path="captures" element={<ScreenshotsPage />} />
         <Route path="manettes" element={<ControllersPage />} />
+        <Route path="son" element={<SoundPage />} />
         <Route path="bluetooth" element={<BluetoothPage />} />
         <Route path="temps-de-jeu" element={<PlaytimePage />} />
         <Route path="parametres" element={<SettingsPage />} />

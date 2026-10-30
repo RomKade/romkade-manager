@@ -67,6 +67,7 @@ function llmStatus() {
 }
 let systemCaps: Record<string, boolean> | null = null; // null : système inconnu (tout reste affiché)
 let volume = { percent: 60, muted: false };
+let sound: { output: string; address?: string | null } = { output: "tv" };
 // Captures d'écran gardées sur le Mac (deux pour Super Mario World), supprimées par DELETE.
 const shot = (name: string) => ({ name, taken_at: "2026-10-19T20:30:00Z", size: 1000, url: `/api/screenshots/1/${name}` });
 let shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
@@ -151,6 +152,12 @@ function mockFetch() {
       : { playing: false, process: null, rom_path: null, menu: true, game: null });
     const dev = (address: string, name: string, kind: string, paired: boolean, connected: boolean, rssi: number | null) =>
       ({ address, name, icon: "", kind, paired, trusted: paired, connected, rssi });
+    if (url === "/api/sound/test") return json({ result: "played" });
+    if (url === "/api/sound") {
+      if (init?.method === "PUT") sound = JSON.parse(String(init.body)) as typeof sound;
+      return json({ output: sound.output, address: sound.address ?? null, hdmi: true,
+        devices: [dev("F8:DF:15:00:00:02", "JBL Flip", "audio", true, false, -50)] });
+    }
     if (url === "/api/bluetooth/test-sound") return json({ result: "played" });
     if (url.startsWith("/api/bluetooth")) return json({
       adapter: { present: true, powered: true, discovering: false, name: "ANBERNIC" }, bluealsa: true, audio_output: null,
@@ -324,6 +331,7 @@ beforeEach(() => {
   knowledgeJob = { running: false, total: 0, done: 0, found: 0, current: null, stopping: false };
   llm = { ...NO_LLM };
   volume = { percent: 60, muted: false };
+  sound = { output: "tv" };
   playAlerts = [];
   vi.stubGlobal("fetch", mockFetch());
   // Comme Chrome : scrollIntoView renvoie une promesse (un effet qui la renvoyait faisait planter toute la page).
@@ -1224,6 +1232,23 @@ describe("Bluetooth", () => {
     await userEvent.click(within(speaker).getByRole("button", { name: /Envoyer le son des jeux sur cet appareil/ }));
     await waitFor(() => expect(bodies.at(-1)).toMatchObject({ url: "/api/bluetooth/audio-output" }));
     expect(screen.queryByText(/était déjà lancé/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Son", () => {
+  it("envoie le son des jeux sur la télé, la console ou une enceinte déjà appairée", async () => {
+    renderAt("/son");
+    const group = await screen.findByRole("radiogroup", { name: "Sortie du son" });
+    expect(within(group).getByRole("radio", { name: /Télé \(HDMI\)/ })).toBeChecked();
+    expect(within(group).getByText(/le son sort sur la télé/)).toBeInTheDocument();
+    await userEvent.click(within(group).getByRole("radio", { name: /^Console/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/sound", output: "speakers", address: null }));
+    await userEvent.click(within(group).getByRole("radio", { name: /JBL Flip/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/sound", output: "bluetooth", address: "F8:DF:15:00:00:02" }));
+    await waitFor(() => expect(within(group).getByRole("radio", { name: /JBL Flip/ })).toBeChecked());
+    await userEvent.click(within(group).getByRole("button", { name: /Tester le son/ }));
+    await waitFor(() => expect(bodies.at(-1)).toEqual({ url: "/api/sound/test", output: "bluetooth", address: "F8:DF:15:00:00:02" }));
+    expect(await within(group).findByText(/Un carillon vient de sonner/)).toBeInTheDocument();
   });
 });
 

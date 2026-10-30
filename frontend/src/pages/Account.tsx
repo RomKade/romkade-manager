@@ -1,6 +1,6 @@
 import type { Factor, OAuthGrant } from "@supabase/supabase-js";
-import { useQueryClient } from "@tanstack/react-query";
-import { AppWindow, ArrowRight, Bot, Check, CheckCircle2, Cloud, Copy, Gamepad2, KeyRound, Link2, LogOut, Mail, PlugZap, ShieldCheck, UserRound } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, Bot, Check, CheckCircle2, Cloud, Copy, Gamepad2, KeyRound, Link2, LogOut, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Navigate, NavLink, useParams } from "react-router-dom";
 
@@ -8,9 +8,10 @@ import { useDeviceStatus } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { CodeInput, PasswordInput } from "../auth/AuthScreen";
 import { ACCOUNT_TABS, accountPath } from "../auth/accountTabs";
-import { CLOUD_URL, cloud, localAgent, type AgentStatus, type CloudConsole } from "../auth/cloud";
+import { CLOUD_URL, cloud, localAgent, useCloudConsoles, type AgentStatus, type CloudConsole } from "../auth/cloud";
 import { PasswordStrength, passwordValid } from "../auth/password";
 import { supabase } from "../auth/supabase";
+import { StepCards } from "../components/StepCards";
 import { SubNav } from "../components/SubNav";
 import { PageHeader } from "../components/ui";
 import { locale, useT } from "../i18n";
@@ -59,8 +60,24 @@ export function AccountPage() {
 export function RemoteControl() {
   const t = useT();
   translate = t as typeof translate;
+  const linked = useCloudConsoles().data?.[0];
+  const grants = useGrants().data;
+  const names = (grants ?? []).map((g) => g.client.name || g.client.id).join(", ");
   return (
     <div className="account__tab remote">
+      <StepCards label={t("account.remote.steps.label")} steps={[
+        { n: 1, label: t("account.remote.steps.console"), done: !!linked, target: "remote-1",
+          sub: linked ? `${linked.name} · ${t(linked.online ? "account.consoles.online" : "account.consoles.offline")}`
+            : t("account.remote.steps.consoleTodo"),
+          action: t(linked ? "settings.steps.review" : "settings.steps.open") },
+        { n: 2, label: t("account.remote.steps.add"), done: !!grants?.length, target: "remote-2",
+          sub: grants?.length ? names : t("account.remote.steps.addTodo"),
+          action: t(grants?.length ? "settings.steps.review" : "settings.steps.open") },
+        { n: 3, label: t("account.remote.steps.apps"), done: !!grants?.length && !!linked?.online, target: "remote-3",
+          sub: !grants?.length ? t("account.remote.steps.appsTodo")
+            : linked?.online ? t("account.remote.steps.appsReady") : t("account.remote.steps.appsAsleep"),
+          action: t(grants?.length ? "settings.steps.review" : "settings.steps.open") },
+      ]} />
       <div className="remote__flow" aria-label={t("account.remote.flowLabel")}>
         <span className="remote__node"><Bot size={16} aria-hidden /> ChatGPT · Claude</span>
         <ArrowRight size={16} aria-hidden className="remote__arrow" />
@@ -83,7 +100,7 @@ function AddToAssistant() {
     try { await navigator.clipboard.writeText(CLOUD_URL); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* sélection manuelle */ }
   };
   return (
-    <Block icon={<PlugZap size={18} aria-hidden />} title={t("account.remote.add.title")} lead={t("account.remote.add.lead")}>
+    <Block step={2} title={t("account.remote.add.title")} lead={t("account.remote.add.lead")}>
       {/* Adresse du connecteur : un seul encart, lien et bouton « Copier » dedans. */}
       <div className={`copy-link ${copied ? "is-copied" : ""}`}>
         <Link2 size={18} aria-hidden className="copy-link__icon" />
@@ -106,10 +123,14 @@ function AddToAssistant() {
   );
 }
 
-function Block({ icon, title, lead, children, danger }: { icon?: ReactNode; title: string; lead?: string; children: ReactNode; danger?: boolean }) {
+/** Bloc d'une page du compte ; `step` : étape du Pilotage à distance (pastille numérotée, cible des cartes d'étapes). */
+function Block({ icon, title, lead, children, danger, step }: { icon?: ReactNode; title: string; lead?: string; children: ReactNode; danger?: boolean; step?: number }) {
   return (
-    <section className={`block account__block ${danger ? "account__block--danger" : ""}`}>
-      <div className="block__head"><h2>{icon}{icon && " "}{title}</h2></div>
+    <section className={`block account__block ${danger ? "account__block--danger" : ""}`} aria-labelledby={step ? `remote-${step}` : undefined}>
+      <div className="block__head">
+        {step ? <h2 id={`remote-${step}`}><span className="step-badge" aria-hidden>{step}</span> {title}</h2>
+          : <h2>{icon}{icon && " "}{title}</h2>}
+      </div>
       {lead && <p className="muted account__lead">{lead}</p>}
       {children}
     </section>
@@ -316,7 +337,7 @@ function Consoles() {
   const linked = list?.[0];  // une seule console par compte pour l'instant
   const here = connected && agent?.installed === true;  // la console branchée au Manager est celle qui est reliée
   return (
-    <Block icon={<Cloud size={18} aria-hidden />} title={t("account.consoles.title")} lead={t("account.consoles.lead")}>
+    <Block step={1} title={t("account.consoles.title")} lead={t("account.consoles.lead")}>
       {list === null ? <span className="auth-spin" aria-hidden /> : linked ? (
         // Console reliée : un seul état, dit en clair, et ce qu'on peut en faire.
         <div className={`account__linked ${linked.online ? "is-online" : ""}`}>
@@ -399,17 +420,20 @@ function Consoles() {
   );
 }
 
+/** Assistants autorisés (OAuth) : liste de l'étape 3, et état des cartes d'étapes. */
+const useGrants = () => useQuery({
+  queryKey: ["oauth-grants"], retry: false,
+  queryFn: async (): Promise<OAuthGrant[]> => (await supabase.auth.oauth.listGrants()).data ?? [],
+});
+
 function ConnectedApps() {
   const t = useT();
-  const [grants, setGrants] = useState<OAuthGrant[] | null>(null);
+  const qc = useQueryClient();
+  const grants = useGrants().data ?? null;
+  const setGrants = (data: OAuthGrant[]) => qc.setQueryData(["oauth-grants"], data);
   const a = useAction();
-  const load = useCallback(async () => {
-    const { data } = await supabase.auth.oauth.listGrants();
-    setGrants(data ?? []);
-  }, []);
-  useEffect(() => { load(); }, [load]);
   return (
-    <Block icon={<AppWindow size={18} aria-hidden />} title={t("account.apps.title")} lead={t("account.apps.lead")}>
+    <Block step={3} title={t("account.apps.title")} lead={t("account.apps.lead")}>
       {grants === null ? <span className="auth-spin" aria-hidden /> : grants.length === 0 ? <p className="muted">{t("account.apps.none")}</p> : (
         <ul className="account__list">
           {grants.map((g) => (

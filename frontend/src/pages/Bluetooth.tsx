@@ -146,7 +146,7 @@ export function BluetoothPage() {
  * Le son vient de changer de sortie alors qu'un jeu tourne : RetroArch garde la sortie ouverte au démarrage. Un jeu
  * RetroArch de la bibliothèque se relance d'un clic (launch.sh le quitte proprement puis reprend la partie).
  */
-function RelaunchNotice({ now, onDone }: { now: NowPlaying; onDone: () => void }) {
+export function RelaunchNotice({ now, onDone }: { now: NowPlaying; onDone: () => void }) {
   const t = useT();
   const caps = useCaps();
   const launch = useLaunchGame();

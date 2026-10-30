@@ -49,13 +49,11 @@ async def ssh_run(client: DeviceClient, command: str, timeout: float = 20) -> tu
 
 def launch_command(platform_dir: str, rom_path: str, slot: str | None = None) -> str:
     from app.device.bluetooth import ALSA_CONF, alsa_conf  # bluetooth et volume importent Runner d'ici
-    from app.device.volume import ASOUNDRC, VERSION, asoundrc
+    from app.device.volume import install_command
 
     # Volume des jeux (voir volume.py) : /.asoundrc installé s'il manque ou date d'une autre version (en gardant
-    # la sortie Bluetooth si elle était choisie).
-    rc = (f"grep -q {VERSION} {ASOUNDRC} 2>/dev/null || {{ if grep -q agm_bt {ASOUNDRC} 2>/dev/null; "
-          f"then printf %s {shlex.quote(asoundrc('agm_bt'))} > {ASOUNDRC}; "
-          f"else printf %s {shlex.quote(asoundrc())} > {ASOUNDRC}; fi; }}; ")
+    # la sortie choisie).
+    rc = install_command()
     # Sortie Bluetooth choisie avec une version précédente de bluetooth.alsa_conf (sans agm_bt_clock) : réécrite
     # pour la même enceinte.
     mac = "$(sed -n 's/^defaults.bluealsa.device \"\\(.*\\)\"$/\\1/p' " + ALSA_CONF + ")"

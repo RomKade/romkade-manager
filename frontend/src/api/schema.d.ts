@@ -1279,6 +1279,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sound Status */
+        get: operations["sound_status_api_sound_get"];
+        /**
+         * Sound Set
+         * @description Sortie du son des jeux lancés depuis Game Manager, à partir du prochain jeu lancé. Une enceinte Bluetooth
+         *     appairée mais pas connectée est d'abord connectée.
+         */
+        put: operations["sound_set_api_sound_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sound/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sound Test
+         * @description Test sonore : un court carillon sur la sortie, pour vérifier que le son y arrive.
+         */
+        post: operations["sound_test_api_sound_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/descriptions": {
         parameters: {
             query?: never;
@@ -2026,6 +2068,57 @@ export interface paths {
         /** Phone Pair */
         post: operations["phone_pair_api_phone_pair_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc-pads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pc Pads */
+        get: operations["pc_pads_api_pc_pads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc-pads/relays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Relay */
+        post: operations["start_relay_api_pc_pads_relays_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pc-pads/relays/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Stop Relay */
+        delete: operations["stop_relay_api_pc_pads_relays__token__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3214,6 +3307,33 @@ export interface components {
             menu: boolean;
             game?: components["schemas"]["GameOut"] | null;
         };
+        /** OutputIn */
+        OutputIn: {
+            /**
+             * Output
+             * @enum {string}
+             */
+            output: "speakers" | "tv" | "bluetooth";
+            /** Address */
+            address?: string | null;
+        };
+        /** OutputTestOut */
+        OutputTestOut: {
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "played" | "in_use" | "menu";
+        };
+        /** PadOut */
+        PadOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Relayed */
+            relayed: boolean;
+        };
         /** Page */
         Page: {
             /** Total */
@@ -3241,6 +3361,17 @@ export interface components {
              * Format: password
              */
             password: string;
+        };
+        /** PcPadsOut */
+        PcPadsOut: {
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason?: string | null;
+            /** Pads */
+            pads: components["schemas"]["PadOut"][];
+            /** Relays */
+            relays: components["schemas"]["RelayOut"][];
         };
         /** PeriodOut */
         PeriodOut: {
@@ -3503,6 +3634,24 @@ export interface components {
             /** Seconds */
             seconds: number;
         };
+        /** RelayIn */
+        RelayIn: {
+            /** Pad */
+            pad: number;
+        };
+        /** RelayOut */
+        RelayOut: {
+            /** Token */
+            token: string;
+            /** Pad */
+            pad: number;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Error */
+            error?: string | null;
+        };
         /** RemoteFileOut */
         RemoteFileOut: {
             /**
@@ -3744,6 +3893,20 @@ export interface components {
             size: number;
             /** Url */
             url: string;
+        };
+        /** SoundOut */
+        SoundOut: {
+            /**
+             * Output
+             * @enum {string}
+             */
+            output: "speakers" | "tv" | "bluetooth";
+            /** Address */
+            address: string | null;
+            /** Hdmi */
+            hdmi: boolean;
+            /** Devices */
+            devices: components["schemas"]["BtDeviceOut"][];
         };
         /** SoundTestOut */
         SoundTestOut: {
@@ -6243,6 +6406,92 @@ export interface operations {
             };
         };
     };
+    sound_status_api_sound_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoundOut"];
+                };
+            };
+        };
+    };
+    sound_set_api_sound_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutputIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SoundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sound_test_api_sound_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutputIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     descriptions_status_api_descriptions_get: {
         parameters: {
             query?: never;
@@ -7505,6 +7754,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PairOut"];
+                };
+            };
+        };
+    };
+    pc_pads_api_pc_pads_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PcPadsOut"];
+                };
+            };
+        };
+    };
+    start_relay_api_pc_pads_relays_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelayIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_relay_api_pc_pads_relays__token__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

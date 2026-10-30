@@ -233,6 +233,7 @@ export function useBluetoothActions() {
   const set = (data: Awaited<ReturnType<typeof api.bluetooth>>) => {
     qc.setQueryData(["bluetooth"], data);
     qc.invalidateQueries({ queryKey: ["players"] });  // une manette connectée ou partie change la liste
+    qc.invalidateQueries({ queryKey: ["sound"] });  // une enceinte aussi, sur la page Son
   };
   return {
     scan: useMutation({ mutationFn: api.btScan, onSuccess: set }),
@@ -258,6 +259,22 @@ export function useSetPlayers() {
 export function useSetDirections() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: api.setDirections, onSuccess: (d) => qc.setQueryData(["players"], d) });
+}
+
+/** Sortie du son des jeux : haut-parleurs, TV (HDMI) ou enceinte Bluetooth. Changer de sortie relit le Bluetooth. */
+export const useSound = (enabled: boolean) =>
+  useQuery({ queryKey: ["sound"], queryFn: api.sound, enabled, retry: false, refetchInterval: 20_000 });
+
+export function useSoundActions() {
+  const qc = useQueryClient();
+  return {
+    set: useMutation({
+      mutationFn: api.setSound,
+      onSuccess: (d) => { qc.setQueryData(["sound"], d); qc.invalidateQueries({ queryKey: ["bluetooth"] }); },
+      onError: () => qc.invalidateQueries({ queryKey: ["sound"] }),
+    }),
+    test: useMutation({ mutationFn: api.testSound }),
+  };
 }
 
 /** Volume du son des jeux (console ou appareil Bluetooth). */
