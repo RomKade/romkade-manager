@@ -378,7 +378,7 @@ function PlayingBanner({ gameId }: { gameId: number }) {
       <span className="led led--live" aria-hidden />
       <strong>{t("dashboard.nowPlaying")}</strong>
       <span className="playing-banner__actions">
-        {(ra || !caps.resume_slot) && caps.quit && <>
+        {caps.quit && <>
           {ra && caps.save_state && <button type="button" className="button button--small button--save" onClick={() => save.mutate()} disabled={save.isPending}
             aria-label={save.isSuccess ? t("dashboard.saved") : t("dashboard.saveNow")} title={t("dashboard.saveNow")}>
             <Save size={14} aria-hidden /> {save.isSuccess ? t("dashboard.savedShort") : t("dashboard.saveShort")}

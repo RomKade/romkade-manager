@@ -50,7 +50,7 @@ export function NowPlayingCard({ online, onOpen }: { online: boolean; onOpen?: (
               <Save size={16} aria-hidden /> {save.isPending ? t("dashboard.saving") : t("dashboard.saveNow")}
             </button>
           )}
-          {(ra || !caps.resume_slot) && caps.quit && (
+          {caps.quit && (
             <button type="button" className="button button--small button--danger" onClick={() => quit.mutate()} disabled={quit.isPending}>
               <Square size={16} fill="currentColor" aria-hidden /> {quit.isPending ? t("common.device.quitting") : t("common.device.quit")}
             </button>
@@ -59,7 +59,6 @@ export function NowPlayingCard({ online, onOpen }: { online: boolean; onOpen?: (
           {now.game && <ScreenshotButton variant="small" label="full" />}
           {now.game && <NowFavorite id={now.game.id} />}
         </div>
-        {!((ra || !caps.resume_slot) && caps.quit) && <p className="muted">{t("dashboard.quitOnConsole")}</p>}
         {(save.isError || quit.isError) && <p className="text-error">{errorMessage(save.error ?? quit.error)}</p>}
       </div>
     </section>
