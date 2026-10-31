@@ -75,6 +75,10 @@ async def test_now_playing_and_quit(app_factory):
         # Sans RetroArch, l'émulateur autonome (drastic pour la DS…) est fermé lui aussi
         assert "pidof retroarch >/dev/null || { s=$(pidof PPSSPPSDL drastic" in launcher.QUIT_COMMAND
         assert "kill -TERM $s" in launcher.QUIT_COMMAND and "retroarch drastic" not in launcher.QUIT_COMMAND
+        # Jeu figé par l'alerte de temps de jeu : l'alerte est fermée et le jeu relâché avant de le quitter
+        for cmd in (launcher.QUIT_COMMAND, launcher.QUIT_GENERIC_COMMAND):
+            assert cmd.startswith("p=$(cat /tmp/romkade-break.pid") and "kill -CONT $(pidof retroarch PPSSPPSDL" in cmd
+        assert "kill -CONT $(pidof retroarch $AGM_GAMES)" in launcher.LAUNCH_SCRIPT
         console.playing = None
         now = (await c.get("/api/device/now-playing")).json()
         assert not now["playing"] and now["menu"] and now["game"] is None

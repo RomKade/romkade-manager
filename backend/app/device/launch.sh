@@ -97,6 +97,11 @@ for p in $(pidof dmenu.bin); do
     [ "$(awk '{print $4}' "/proc/$p/stat" 2>/dev/null)" = 1 ] && close_menu "$p" && log "menu orphelin $p fermé"
 done
 
+# 0 bis. Jeu figé par l'alerte de temps de jeu (romkade-break, SIGSTOP) : il ne pourrait pas se fermer. L'alerte
+# est fermée (elle relâche le jeu) et le jeu relâché.
+p=$(cat /tmp/romkade-break.pid 2>/dev/null) && kill -TERM "$p" 2>/dev/null && sleep 0.3 && log "alerte de temps de jeu fermée"
+kill -CONT $(pidof retroarch $AGM_GAMES) 2>/dev/null
+
 # 1. Un jeu RetroArch tourne déjà : on le quitte proprement (sauvegarde auto comprise).
 for _ in $(seq 1 50); do
     pidof retroarch >/dev/null || break

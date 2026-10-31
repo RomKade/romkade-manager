@@ -87,13 +87,17 @@ QUIT_STANDALONE = (f"s=$(pidof {STANDALONE}); [ -n \"$s\" ] || {{ echo none; exi
                    "for i in $(seq 1 15); do kill -0 $s 2>/dev/null || break; sleep 0.2; done; "
                    "kill -KILL $s 2>/dev/null; sleep 0.5; "
                    f"pidof {STANDALONE} >/dev/null && echo still || echo quit")
-QUIT_COMMAND = (f"pidof retroarch >/dev/null || {{ {QUIT_STANDALONE}; exit 0; }}; "
+# Jeu figé par l'alerte de temps de jeu (break_screen.py, SIGSTOP) : il ne lit plus les commandes ni les signaux
+# d'arrêt. L'alerte est fermée (elle relâche le jeu et remet l'image) et le jeu relâché (SIGCONT) avant de le quitter.
+UNFREEZE = ("p=$(cat /tmp/romkade-break.pid 2>/dev/null) && kill -TERM \"$p\" 2>/dev/null && sleep 0.3; "
+            f"kill -CONT $(pidof retroarch {STANDALONE}) 2>/dev/null; ")
+QUIT_COMMAND = (f"{UNFREEZE}pidof retroarch >/dev/null || {{ {QUIT_STANDALONE}; exit 0; }}; "
                 f"for i in $(seq 1 30); do pidof retroarch >/dev/null || break; bash -c '{QUIT_UDP}' 2>/dev/null; sleep 0.3; done; "
                 f"pidof retroarch >/dev/null && echo still || echo quit")
 # Autres firmwares : bash n'existe pas toujours (BusyBox) -> nc ; RetroArch ignore les commandes réseau si
 # network_cmd_enable est coupé -> SIGTERM, que RetroArch traite comme « Quitter » (sauvegarde en jeu écrite).
 QUIT_GENERIC_COMMAND = (
-    "pidof retroarch >/dev/null || { echo none; exit 0; }; "
+    UNFREEZE + "pidof retroarch >/dev/null || { echo none; exit 0; }; "
     "for i in 1 2 3 4 5 6 7 8 9 10; do pidof retroarch >/dev/null || break; "
     f"{{ bash -c '{QUIT_UDP}' || printf QUIT | nc -u -w1 127.0.0.1 55355; }} >/dev/null 2>&1; sleep 0.3; done; "
     "pidof retroarch >/dev/null && { kill -TERM $(pidof retroarch); sleep 2; }; "
