@@ -19,6 +19,16 @@ cd "$(dirname "$0")/backend"
 PHONE=0
 [ "$1" = "--telephone" ] && PHONE=1
 
+# Instance précédente du Manager sur le port : arrêtée (SIGTERM, puis SIGKILL), puis relancée. Un autre
+# programme sur le port n'est jamais arrêté.
+OLD=$(lsof -t -iTCP:$PORT -sTCP:LISTEN 2>/dev/null)
+if [ -n "$OLD" ] && ps -o command= -p $OLD | grep -q "uvicorn app.main:app"; then
+  echo "Instance précédente du Manager ($OLD) : arrêt…"
+  kill $OLD 2>/dev/null
+  for _ in $(seq 1 20); do lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1 || break; sleep 0.5; done
+  lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1 && kill -9 $OLD 2>/dev/null && sleep 0.5
+fi
+
 if lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1; then
   echo "Le port $PORT est déjà utilisé par :"
   lsof -nP -iTCP:$PORT -sTCP:LISTEN
