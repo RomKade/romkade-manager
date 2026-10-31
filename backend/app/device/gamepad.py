@@ -88,6 +88,11 @@ class Relay:
                 pass
         await self._stack.aclose()
 
+    async def wait_closed(self) -> None:
+        """Rend la main quand la manette virtuelle disparaît côté console (connexion coupée, console en veille)."""
+        if self._proc is not None:
+            await self._proc.wait_closed()
+
     def send(self, buttons: list[float], axes: list[float]) -> None:
         after = to_events(buttons, axes)
         line = changes(self.state, after)

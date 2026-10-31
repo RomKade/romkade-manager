@@ -29,6 +29,7 @@ log = logging.getLogger("agm")
 
 MAX_RELAYS = 4
 START_SECONDS = 10
+RETRY_SECONDS = (1, 2, 5, 10)  # relais coupé : délais entre les nouveaux essais
 
 
 @dataclass
@@ -169,32 +170,44 @@ class PcPads:
         return r
 
     async def _run(self, r: RelayState, started: asyncio.Future) -> None:
-        try:
-            async with Relay(self.client_factory(), r.token) as relay:
-                r.status = "live"
-                started.set_result(True)
-                while True:
-                    pad = self.pads.get(r.pad)
-                    if pad is None:
-                        relay.release()  # manette éteinte : rien ne reste appuyé sur la console
-                        r.status = "waiting"
-                    else:
-                        relay.send(pad.b, pad.a)
-                        r.status = "live"
-                    r.changed.clear()
-                    await r.changed.wait()
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:  # noqa: BLE001 — console injoignable, connexion perdue
-            err = exc if isinstance(exc, errors.AppError) else errors.AppError(
-                "gamepad_relay_lost", "Connexion à la console perdue.", 502, {"reason": str(exc)})
-            if not started.done():
-                started.set_exception(err)
-            r.status, r.error = "error", err.message
-            log.info("relais de manette %s arrêté : %s", r.token, err.message)
-        finally:
-            if self.relays.get(r.token) is r and r.status != "error":
-                self.relays.pop(r.token, None)
+        """Relaie la manette tant que le relais existe. Connexion perdue après le départ (console en veille, Wi-Fi
+        coupé) : nouvel essai toutes les quelques secondes, avec le même identifiant, donc le même joueur."""
+        retry = 0
+        while True:
+            try:
+                async with Relay(self.client_factory(), r.token) as relay:
+                    r.status, r.error, retry = "live", None, 0
+                    if not started.done():
+                        started.set_result(True)
+                    closed = asyncio.ensure_future(relay.wait_closed())
+                    try:
+                        while not closed.done():
+                            pad = self.pads.get(r.pad)
+                            if pad is None:
+                                relay.release()  # manette éteinte : rien ne reste appuyé sur la console
+                                r.status = "waiting"
+                            else:
+                                relay.send(pad.b, pad.a)
+                                r.status = "live"
+                            r.changed.clear()
+                            change = asyncio.ensure_future(r.changed.wait())
+                            await asyncio.wait({closed, change}, return_when=asyncio.FIRST_COMPLETED)
+                            change.cancel()
+                    finally:
+                        closed.cancel()
+                    raise ConnectionError("manette virtuelle fermée par la console")
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001 — console injoignable, connexion perdue
+                err = exc if isinstance(exc, errors.AppError) else errors.AppError(
+                    "gamepad_relay_lost", "Connexion à la console perdue.", 502, {"reason": str(exc)})
+                if not started.done():
+                    started.set_exception(err)
+                    return
+                r.status, r.error = "connecting", err.message
+                log.info("relais de manette %s : %s, nouvel essai", r.token, err.message)
+                await asyncio.sleep(RETRY_SECONDS[min(retry, len(RETRY_SECONDS) - 1)])
+                retry += 1
 
     async def stop_relay(self, token: str) -> None:
         r = self.relays.pop(token, None)

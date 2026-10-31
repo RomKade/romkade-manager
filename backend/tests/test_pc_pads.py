@@ -37,7 +37,7 @@ class FakeRelay:
     created: list["FakeRelay"] = []
 
     def __init__(self, client, token):
-        self.token, self.sent, self.closed = token, [], False
+        self.token, self.sent, self.closed, self.lost = token, [], False, asyncio.Event()
         FakeRelay.created.append(self)
 
     async def __aenter__(self):
@@ -45,6 +45,9 @@ class FakeRelay:
 
     async def __aexit__(self, *exc):
         self.closed = True
+
+    async def wait_closed(self):
+        await self.lost.wait()
 
     def send(self, b, a):
         self.sent.append(("send", list(b)))
@@ -85,6 +88,20 @@ async def test_relay_lives_in_the_server_and_follows_the_pad(client):
     r = await c.delete(f"/api/pc-pads/relays/{token}", headers={"Origin": "http://127.0.0.1:8765"})
     assert r.status_code == 204 and FakeRelay.created[0].closed
     assert (await c.get("/api/pc-pads")).json()["relays"] == []
+
+
+async def test_relay_reconnects_after_losing_the_console(client, monkeypatch):
+    app, c = client
+    monkeypatch.setattr(pc_pads, "RETRY_SECONDS", (0.1,))
+    await c.get("/api/pc-pads")
+    r = await c.post("/api/pc-pads/relays", json={"pad": 1}, headers={"Origin": "http://127.0.0.1:8765"})
+    token = r.json()["token"]
+
+    FakeRelay.created[0].lost.set()  # console en veille, Wi-Fi coupé : la manette virtuelle disparaît
+    await asyncio.sleep(0.3)
+    assert len(FakeRelay.created) == 2 and FakeRelay.created[1].token == token  # même identifiant, même joueur
+    relay = (await c.get("/api/pc-pads")).json()["relays"][0]
+    assert relay["token"] == token and relay["status"] == "live" and relay["error"] is None
 
 
 async def test_unknown_pad_and_docker(client):
