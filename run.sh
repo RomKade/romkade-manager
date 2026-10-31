@@ -21,7 +21,7 @@ PHONE=0
 
 # Instance précédente du Manager sur le port : arrêtée (SIGTERM, puis SIGKILL), puis relancée. Un autre
 # programme sur le port n'est jamais arrêté.
-OLD=$(lsof -t -iTCP:$PORT -sTCP:LISTEN 2>/dev/null)
+OLD=$(lsof -t -iTCP:$PORT -sTCP:LISTEN 2>/dev/null || true)  # port libre : lsof échoue (set -e)
 if [ -n "$OLD" ] && ps -o command= -p $OLD | grep -q "uvicorn app.main:app"; then
   echo "Instance précédente du Manager ($OLD) : arrêt…"
   kill $OLD 2>/dev/null
