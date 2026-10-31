@@ -1,5 +1,6 @@
 import { ArrowRight, Box, CheckCircle2, Gamepad2, HardDriveUpload, Play, RefreshCw, Star } from "lucide-react";
-import { Fragment, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 
 import {
@@ -97,7 +98,16 @@ export function DashboardPage() {
   const play = usePlayState();
   const dur = useDuration();
   // Même requête que la carte « jeu en cours » (cache partagé) : sert à entourer ce jeu dans « Joués récemment ».
-  const nowPlaying = useNowPlaying(device.data?.connected === true);
+  const nowPlaying = useNowPlaying(device.data?.connected === true, true);
+  // Jeu quitté ou changé (depuis la console ou d'ici) : « Joués récemment » et le temps de jeu relus tout de suite.
+  const qc = useQueryClient();
+  const nowKey = nowPlaying.data ? (nowPlaying.data.playing ? nowPlaying.data.rom_path ?? "?" : "") : undefined;
+  const prevKey = useRef(nowKey);
+  useEffect(() => {
+    if (prevKey.current !== undefined && nowKey !== undefined && nowKey !== prevKey.current)
+      ["recent-played", "play-state"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    prevKey.current = nowKey;
+  }, [nowKey, qc]);
   // Premier de la liste : l'historique de la console donne l'ordre, la date n'est connue que si Game Manager l'a suivi.
   const lastPlayed = played.data?.[0];
   const limit = play.data?.settings.alert_enabled ? play.data.settings.alert_minutes * 60 : null;

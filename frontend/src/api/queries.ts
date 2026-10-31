@@ -118,8 +118,10 @@ export function useControlsMutations(id: number) {
 }
 
 /** Jeu en cours sur la console (une connexion SSH courte, sans écriture), seulement si elle est joignable. */
-export const useNowPlaying = (enabled: boolean) =>
-  useQuery({ queryKey: ["now-playing"], queryFn: api.nowPlaying, enabled, refetchInterval: 15_000, retry: false });
+/** `watch` : pendant une partie, relu toutes les 5 s (tableau de bord : jeu quitté depuis la console vu tout de suite). */
+export const useNowPlaying = (enabled: boolean, watch = false) =>
+  useQuery({ queryKey: ["now-playing"], queryFn: api.nowPlaying, enabled, retry: false,
+    refetchInterval: (q) => (watch && q.state.data?.playing ? 5_000 : 15_000) });
 
 export function useLaunchGame() {
   const qc = useQueryClient();

@@ -36,7 +36,7 @@ from app.services.classify import display_title, stem_of
 log = logging.getLogger("agm.playtime")
 POLL_SECONDS = 30
 GAP_SECONDS = 150          # au-delà, une absence coupe la session (console éteinte, jeu quitté)
-STATUS_FRESH_SECONDS = 20  # l'état mis en cache par le suivi sert aussi à « jeu en cours »
+STATUS_FRESH_SECONDS = 4  # l'état mis en cache par le suivi sert aussi à « jeu en cours » (relu toutes les 5 s en jeu)
 BREAK_SCRIPT = (Path(__file__).resolve().parents[1] / "device" / "break_screen.py").read_text()
 BREAK_PID = "/tmp/romkade-break.pid"
 BREAK_ALIVE = f"p=$(cat {BREAK_PID} 2>/dev/null) && kill -0 \"$p\" 2>/dev/null && echo up || echo down"
