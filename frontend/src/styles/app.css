@@ -1350,6 +1350,15 @@ kbd {
   border-radius: var(--r-panel); border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line)); background: var(--panel); }
 .terms-notice p { flex: 1; min-width: 240px; margin: 0; font-size: var(--fs-sm); }
 .terms-notice__icon { color: var(--warn); flex: none; }
+/* Démo publique (romkade.com/demo) : bandeau en haut de chaque page. */
+.demo-banner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 32px; font-size: var(--fs-sm);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-2) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent-2) 10%, var(--panel)); }
+.demo-banner p { flex: 1; min-width: 200px; margin: 0; }
+.demo-banner__tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-weight: 700;
+  background: var(--accent-2); color: #fff; }
+.demo-banner__link { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); }
+@media (max-width: 720px) { .demo-banner { padding: 8px 16px; } .demo-banner__cta { width: 100%; justify-content: center; } }
 .terms { max-width: 860px; }
 .terms .block p { max-width: 75ch; }
 .about { align-items: flex-start; }
