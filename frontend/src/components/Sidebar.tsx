@@ -1,4 +1,4 @@
-import { Bluetooth, BookOpen, Camera, ChevronDown, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, LogOut, RefreshCw, RotateCw, Save, Settings as SettingsIcon, Volume2 } from "lucide-react";
+import { Bluetooth, BookOpen, Camera, ChevronDown, ExternalLink, Gamepad2, Globe, Gauge, HardDriveUpload, Hourglass, Library, Loader2, LogOut, MessagesSquare, RefreshCw, RotateCw, Save, Settings as SettingsIcon, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 
@@ -9,7 +9,7 @@ import { gb } from "../lib/format";
 import icon80 from "../assets/brand/romkade-manager-icon-80.webp";
 import logo240 from "../assets/brand/romkade-manager-logo-240.webp";
 import logo480 from "../assets/brand/romkade-manager-logo-480.webp";
-import { docsUrl } from "../lib/credits";
+import { DISCORD_URL, docsUrl } from "../lib/credits";
 import { APP_VERSION } from "../version";
 import { GitHubStar } from "./GitHubStar";
 import { ACCOUNT_TABS, accountPath } from "../auth/accountTabs";
@@ -62,6 +62,14 @@ export function Sidebar() {
             <a href={docsUrl()} target="_blank" rel="noreferrer noopener" className="nav__link">
               <BookOpen aria-hidden size={18} strokeWidth={1.75} />
               <span>{t("common.nav.docs")}</span>
+              <ExternalLink aria-hidden size={13} className="nav__external" />
+              <span className="visually-hidden"> {t("common.nav.newTab")}</span>
+            </a>
+          </li>
+          <li>
+            <a href={DISCORD_URL} target="_blank" rel="noreferrer noopener" className="nav__link">
+              <MessagesSquare aria-hidden size={18} strokeWidth={1.75} />
+              <span>Discord</span>
               <ExternalLink aria-hidden size={13} className="nav__external" />
               <span className="visually-hidden"> {t("common.nav.newTab")}</span>
             </a>

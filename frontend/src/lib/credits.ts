@@ -7,6 +7,8 @@ export const REPO = { owner: "RomKade", name: "romkade-manager" } as const;
 export const REPO_URL = `https://github.com/${REPO.owner}/${REPO.name}`;
 /** Documentation en ligne (romkade.com/docs, MkDocs) dans la langue de l'interface : anglais à la racine, /fr/, /es/. */
 export const DOCS_URL = "https://romkade.com/docs/";
+/** Serveur Discord de la communauté : entraide, compatibilité, bugs et idées (lien de la barre latérale). */
+export const DISCORD_URL = "https://discord.gg/sQqvZNWxa";
 export const docsUrl = () => `${DOCS_URL}${getLang() === "en" ? "" : `${getLang()}/`}`;
 
 /**
