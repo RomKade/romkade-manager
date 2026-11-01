@@ -1,4 +1,5 @@
-"""Données du cloud ROMKADE : comptes, consoles appairées, catalogue et favoris de chaque console (SQLite).
+"""Données du cloud ROMKADE : comptes, consoles appairées, catalogue et favoris de chaque console, soluces des jeux
+(SQLite).
 
 Les secrets (jeton du compte, secret de la console) ne sont gardés que sous forme d'empreinte SHA-256 : la base
 seule ne permet ni de parler au MCP au nom d'un compte, ni de se faire passer pour une console.
@@ -49,6 +50,8 @@ CREATE TABLE IF NOT EXISTS google_links (
     account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, linked_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS google_oauth (
     key TEXT PRIMARY KEY, kind TEXT NOT NULL, data TEXT NOT NULL, at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS guides (
+    key TEXT PRIMARY KEY, status TEXT NOT NULL, sources TEXT NOT NULL, chunks BLOB NOT NULL, fetched REAL NOT NULL);
 """
 
 
@@ -343,6 +346,20 @@ class Store:
         if row is None or row[0] != kind or time.time() - row[2] > ttl:
             return None
         return json.loads(row[1])
+
+    # ---------- soluces (guide.py), communes à tous les comptes ----------
+    def guide(self, key: str) -> dict | None:
+        row = self._db.execute("SELECT status, sources, chunks, fetched FROM guides WHERE key = ?", (key,)).fetchone()
+        if row is None:
+            return None
+        return {"status": row["status"], "sources": json.loads(row["sources"]),
+                "chunks": json.loads(gzip.decompress(row["chunks"])), "fetched": row["fetched"]}
+
+    def put_guide(self, key: str, guide: dict) -> None:
+        with self._lock, self._db:
+            self._db.execute("INSERT OR REPLACE INTO guides VALUES (?, ?, ?, ?, ?)",
+                             (key, guide["status"], json.dumps(guide["sources"]),
+                              gzip.compress(json.dumps(guide["chunks"]).encode()), guide["fetched"]))
 
     def is_favorite(self, console_id: str, platform_dir: str, relative_path: str) -> bool:
         return self._db.execute("SELECT 1 FROM favorites WHERE console_id = ? AND platform_dir = ? AND relative_path = ?",

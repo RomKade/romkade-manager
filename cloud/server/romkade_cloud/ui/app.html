@@ -203,6 +203,8 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 
 /* Cheats */
+.shot { margin: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #000; }
+.shot img { display: block; width: 100%; height: auto; image-rendering: pixelated; }
 .cheat-head { display: grid; grid-template-columns: 56px 1fr; gap: 12px; align-items: center; margin-bottom: 12px; }
 .filter { width: 100%; height: 38px; border-radius: var(--r-control); border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
   padding: 0 12px; font: inherit; font-size: var(--fs-sm); margin-bottom: 10px; outline: none; }
@@ -272,7 +274,9 @@ const TEXT = {
     inGameSave: "Sauvegarde en jeu", states: (n) => `${fmt(n)} sauvegarde${n > 1 ? "s" : ""} instantanée${n > 1 ? "s" : ""}`,
     lastSaved: (d) => `dernière le ${d}`, noSave: "Aucune sauvegarde de ce jeu sur la console",
     savesUnchecked: "Sauvegardes visibles quand la console est allumée", savesUpdate: "Mets à jour l'app ROMKADE de la console pour voir ses sauvegardes",
-    setupGuide: "Guide de mise en route", getManager: "Télécharger ROMKADE Manager" },
+    setupGuide: "Guide de mise en route", getManager: "Télécharger ROMKADE Manager",
+    guide: "Soluce", passages: (n) => `${fmt(n)} passage${n > 1 ? "s" : ""} trouvé${n > 1 ? "s" : ""}`, noGuide: "Aucune soluce trouvée pour ce jeu.",
+    guideSource: "Soluces : StrategyWiki, Sega Retro, Wikipédia (CC BY-SA 4.0, GFDL 1.2)", screen: "Écran de la console", menu: "Menu de la console" },
   en: { games: (n) => `${fmt(n)} game${n > 1 ? "s" : ""}`, of: "on", consoles: (n) => `system${n > 1 ? "s" : ""}`,
     play: "Play", resume: "Resume", cheats: "Cheat codes", back: "Back", more: "Show more", readMore: "Read more",
     nowPlaying: "Now playing on the console", launching: "Launching on the console", save: "Save now", quit: "Quit game",
@@ -289,7 +293,9 @@ const TEXT = {
     inGameSave: "In-game save", states: (n) => `${fmt(n)} save state${n > 1 ? "s" : ""}`,
     lastSaved: (d) => `latest on ${d}`, noSave: "No save of this game on the console",
     savesUnchecked: "Saves are shown while the console is on", savesUpdate: "Update the ROMKADE app on the console to see its saves",
-    setupGuide: "Setup guide", getManager: "Download ROMKADE Manager" },
+    setupGuide: "Setup guide", getManager: "Download ROMKADE Manager",
+    guide: "Guide", passages: (n) => `${fmt(n)} passage${n > 1 ? "s" : ""} found`, noGuide: "No guide found for this game.",
+    guideSource: "Guides: StrategyWiki, Sega Retro, Wikipedia (CC BY-SA 4.0, GFDL 1.2)", screen: "Console screen", menu: "Console menu" },
   es: { games: (n) => `${fmt(n)} juego${n > 1 ? "s" : ""}`, of: "en", consoles: (n) => `consola${n > 1 ? "s" : ""}`,
     play: "Jugar", resume: "Continuar", cheats: "Trucos", back: "Volver", more: "Mostrar más", readMore: "Leer más",
     nowPlaying: "Jugando en la consola", launching: "Iniciando en la consola", save: "Guardar ahora", quit: "Salir del juego",
@@ -306,7 +312,9 @@ const TEXT = {
     inGameSave: "Partida guardada en el juego", states: (n) => `${fmt(n)} guardado${n > 1 ? "s" : ""} rápido${n > 1 ? "s" : ""}`,
     lastSaved: (d) => `el último el ${d}`, noSave: "Ninguna partida guardada de este juego en la consola",
     savesUnchecked: "Las partidas guardadas se ven con la consola encendida", savesUpdate: "Actualiza la app ROMKADE de la consola para ver sus partidas guardadas",
-    setupGuide: "Guía de puesta en marcha", getManager: "Descargar ROMKADE Manager" },
+    setupGuide: "Guía de puesta en marcha", getManager: "Descargar ROMKADE Manager",
+    guide: "Guía", passages: (n) => `${fmt(n)} pasaje${n > 1 ? "s" : ""} encontrado${n > 1 ? "s" : ""}`, noGuide: "No se encontró ninguna guía para este juego.",
+    guideSource: "Guías: StrategyWiki, Sega Retro, Wikipedia (CC BY-SA 4.0, GFDL 1.2)", screen: "Pantalla de la consola", menu: "Menú de la consola" },
 };
 const GENRE = {
   fr: { action: "Action", aventure: "Aventure", beat: "Beat'em up", combat: "Combat", course: "Course", plateforme: "Plateforme", rpg: "Jeu de rôle", shmup: "Shoot'em up", tir: "Tir", sport: "Sport", reflexion: "Réflexion", labyrinthe: "Labyrinthe", strategie: "Stratégie", simulation: "Simulation", flipper: "Flipper", societe: "Société et casino", quiz: "Quiz", musique: "Musique et rythme", educatif: "Éducatif", compilation: "Compilation", autre: "Autre" },
@@ -379,6 +387,7 @@ const P = {
   mute: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   check: '<path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>',
+  link: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
   pad: '<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>',
 };
@@ -475,7 +484,8 @@ function shell(body, opts = {}) {
     <footer class="foot"><span>${credits}</span><button type="button" data-link="https://romkade.com">romkade.com</button></footer>`;
 }
 function render(data) {
-  const views = { games: gamesView, game: gameView, now: nowView, library: libraryView, cheats: cheatsView, consoles: consolesView };
+  const views = { games: gamesView, game: gameView, now: nowView, library: libraryView, cheats: cheatsView, consoles: consolesView,
+    guide: guideView, screen: screenView };
   const view = views[data?.view] || (() => shell(`<div class="empty">${esc(JSON.stringify(data)).slice(0, 400)}</div>`));
   try {
     root.innerHTML = typeof data === "string" ? data : view(data);
@@ -636,6 +646,31 @@ function cheatsView(d) {
     ${rows ? `${(d.cheats || []).length > 6 ? `<input class="filter" type="search" placeholder="${esc(t("filter"))}" data-filter>` : ""}<ul class="cheats">${rows}</ul>` : `<div class="empty">${esc(d.note || t("noCheats"))}</div>`}
     ${d.other_versions?.length ? `<p class="muted small" style="margin:10px 2px 0">${esc(t("otherVersions"))} : ${esc(d.other_versions.join(", "))}</p>` : ""}`,
     { credits: [t("cheatSource")] });
+}
+
+/* Soluce : les pages sources (l'assistant rédige l'indice ou la solution à partir des passages) */
+function guideView(d) {
+  const g = d.game || {};
+  const pages = (d.sources || []).map((p) => `
+    <li><span class="d"><b>${esc(p.page || "")}</b> <span class="muted small">${esc([p.source, p.lang].filter(Boolean).join(" · "))}</span></span>
+      <button type="button" class="btn btn--ghost" data-link="${esc(p.url)}">${icon("link")}</button></li>`).join("");
+  const found = d.status === "found";
+  return shell(`
+    ${history.length ? `<button type="button" class="btn btn--ghost back" data-back>${icon("back")} ${esc(t("back"))}</button>` : ""}
+    <div class="cheat-head">${cover(g)}<div><h2>${esc(g.title)}</h2>
+      <div class="muted small">${esc([t("guide"), d.query, found ? t("passages", (d.passages || []).length) : ""].filter(Boolean).join(" · "))}</div></div></div>
+    ${found && pages ? `<ul class="cheats">${pages}</ul>` : `<div class="empty">${esc(t("noGuide"))}</div>`}`,
+    { credits: [t("guideSource")] });
+}
+
+/* Écran de la console (capture du moment) */
+function screenView(d) {
+  const g = d.game || {};
+  const title = d.playing ? g.title : t("menu");
+  return shell(`
+    <figure class="shot"><img src="${esc(d.image || "")}" alt="${esc(t("screen"))}"></figure>
+    <div class="muted small" style="margin-top:8px">${esc([t("screen"), title, g.platform].filter(Boolean).join(" · "))}</div>`,
+    { console: d.console });
 }
 
 /* Consoles */

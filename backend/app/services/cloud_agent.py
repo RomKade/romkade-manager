@@ -42,8 +42,8 @@ OLD_APP_NAMES = ("ROMKADE",)  # anciens noms, effacés à l'installation
 # sinon l'app ROMKADE échoue au premier appel (test_bundle_covers_every_app_import).
 VENDOR = ("__init__.py", "errors.py", "platforms.py")
 VENDOR_SERVICES = ("__init__.py", "saves.py")  # sauvegardes de la carte, lues sur place (outil game_details)
-VENDOR_DEVICE = ("__init__.py", "launcher.py", "volume.py", "systems.py", "bluetooth.py", "launch.sh", "onion_launch.sh",
-                 "players_apply.sh", "volume_keys.py")
+VENDOR_DEVICE = ("__init__.py", "launcher.py", "volume.py", "systems.py", "bluetooth.py", "screen.py", "launch.sh",
+                 "onion_launch.sh", "players_apply.sh", "volume_keys.py")
 
 
 def manager_version() -> str:
@@ -285,3 +285,21 @@ async def uninstall(run, client, roms_root: str) -> None:
     base = agent_dir(roms_root)
     await run(client, f"[ -x {shlex.quote(base + '/uninstall.sh')} ] && {shlex.quote(base + '/uninstall.sh')}; "
                       f"rm -f {shlex.quote(base + '/agent.json')}; sync; echo ok", timeout=30)
+
+
+async def guide(token: str, title: str, directory: str, query: str,
+                transport: httpx.AsyncBaseTransport | None = None) -> dict | None:
+    """Soluce d'un jeu gardée par ROMKADE Cloud (mêmes passages que l'outil MCP game_guide), pour l'assistant quand
+    le Manager n'a pas encore récupéré les connaissances de ce jeu. None : cloud injoignable, session expirée ou
+    limite atteinte (l'assistant répond alors sans soluce)."""
+    try:
+        async with httpx.AsyncClient(timeout=90, transport=transport) as http:  # première demande d'un jeu : wikis lus
+            r = await http.get(f"{CLOUD_URL}/api/guide", params={"title": title, "platform": directory, "q": query[:300]},
+                               headers={"Authorization": f"Bearer {token}"})
+    except httpx.HTTPError as exc:
+        log.info("soluce du cloud injoignable : %s", exc)
+        return None
+    if r.status_code != 200:
+        log.info("soluce du cloud refusée : %s", r.status_code)
+        return None
+    return r.json()

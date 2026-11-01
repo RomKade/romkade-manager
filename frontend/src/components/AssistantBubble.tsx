@@ -2,8 +2,8 @@ import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, Gamepad2, Send, Spa
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
-import type { Game } from "../api/client";
-import { useDeviceStatus, useLlmSettings, useNowPlaying } from "../api/queries";
+import { api, type Game } from "../api/client";
+import { useCaps, useDeviceStatus, useLlmSettings, useNowPlaying } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { getLang, useT } from "../i18n";
 import { type ActionState, askAssistant, assistant, type AssistantGame, type ChatMessage, type ConsoleAction, type Scope, useAssistant } from "../lib/assistant";
@@ -13,6 +13,8 @@ import { DukeAvatar } from "./DukeAvatar";
 
 const MAX_QUESTION = 500;
 const MAX_USER_TURNS = 20;
+// « Je suis bloqué » (fr, en, es) : avec le jeu de la conversation en cours sur la console, l'assistant regarde l'écran.
+const STUCK_RE = /bloqu|coinc|stuck|atascad|trabad/i;
 
 /**
  * Assistant de jeu (voir docs/STRATEGIE-IA.md) : une bulle en bas à droite. Périmètre « Bibliothèque » par défaut ;
@@ -35,8 +37,8 @@ export function AssistantBubble({ placement, onOpenGame }: { placement: "page" |
   return (
     <div className={`assistant assistant--${placement}`}>
       {st.open ? (
-        <Panel detected={detected} ready={llm?.ready ?? false} local={llm?.local ?? false} provider={llm?.provider ?? null}
-          onOpenGame={onOpenGame} />
+        <Panel detected={detected} playingId={playing?.id ?? null} ready={llm?.ready ?? false} local={llm?.local ?? false}
+          provider={llm?.provider ?? null} onOpenGame={onOpenGame} />
       ) : (
         <button type="button" className="assistant__fab" title={t("assistant.subtitle")} onClick={() => assistant.setOpen(true)}>
           <span className="assistant__face"><DukeAvatar size={26} /></span> {st.name}
@@ -46,8 +48,9 @@ export function AssistantBubble({ placement, onOpenGame }: { placement: "page" |
   );
 }
 
-function Panel({ detected, ready, local, provider, onOpenGame }: {
-  detected: AssistantGame | null; ready: boolean; local: boolean; provider: string | null; onOpenGame?: (id: number) => void;
+function Panel({ detected, playingId, ready, local, provider, onOpenGame }: {
+  detected: AssistantGame | null; playingId: number | null; ready: boolean; local: boolean; provider: string | null;
+  onOpenGame?: (id: number) => void;
 }) {
   const t = useT();
   const st = useAssistant();
@@ -67,11 +70,34 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
   const userTurns = messages.filter((m) => m.role === "user").length;
   const gameScope = scope.kind === "game" ? scope.game : null;
   // Pseudo du compte ROMKADE, pour l'accueil (rien sur un téléphone associé par QR code : pas de session).
-  const account = (useAuth().session?.user.user_metadata as { name?: string } | undefined)?.name?.trim();
+  const session = useAuth().session;
+  const account = (session?.user.user_metadata as { name?: string } | undefined)?.name?.trim();
+  const caps = useCaps();
+  const canSee = !!gameScope && playingId === gameScope.id && caps.screenshot;
+
+  /** Bloqué dans le jeu en cours : capture de l'écran, puis indice (ou solution) tiré de la soluce du jeu. */
+  const sendStuck = async (q: string, game: AssistantGame, solution: boolean) => {
+    const target: Scope = { kind: "game", game };
+    const history = [...assistant.messages(target), { role: "user", content: q } as ChatMessage];
+    assistant.setMessages(target, [...history, { role: "assistant", content: "", pending: true, looking: true }]);
+    setText("");
+    setBusy(true);
+    try {
+      const r = await api.assistantStuck({ game_id: game.id, lang: getLang(), name: st.name, question: q, solution },
+        session?.access_token);
+      assistant.setMessages(target, [...history, { role: "assistant", content: r.text, intent: "game_help", sources: r.sources,
+        shot: { gameId: r.game_id, url: r.shot.url, takenAt: r.shot.taken_at } }]);
+    } catch (err) {
+      assistant.setMessages(target, [...history, { role: "error", message: (err as Error).message }]);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const send = async (question: string) => {
     const q = question.trim().slice(0, MAX_QUESTION);
     if (!q || busy) return;
+    if (canSee && STUCK_RE.test(q)) return sendStuck(q, gameScope!, false);
     const target: Scope = scope;
     const history = [...assistant.messages(target), { role: "user", content: q } as ChatMessage];
     assistant.setMessages(target, [...history, { role: "assistant", content: "", pending: true }]);
@@ -201,7 +227,8 @@ function Panel({ detected, ready, local, provider, onOpenGame }: {
         )}
         {offerSolution && (
           <div className="assistant__chips">
-            <button type="button" className="chip" onClick={() => send(t("assistant.solution"))}>
+            <button type="button" className="chip" onClick={() => (canSee && last.shot
+              ? sendStuck(t("assistant.solution"), gameScope!, true) : send(t("assistant.solution")))}>
               <Sparkles size={13} aria-hidden /> {t("assistant.solution")}
             </button>
           </div>
@@ -248,7 +275,12 @@ function Message({ m, game, onOpenGame, onSettle }: {
   if (m.role === "error") return <li className="assistant__msg assistant__msg--error" role="alert">{m.message}</li>;
   return (
     <li className="assistant__msg assistant__msg--bot" aria-busy={m.pending}>
-      {m.content || (m.pending && !m.action && <span className="assistant__typing"><DukeAvatar size={16} className="is-thinking" /> {t("assistant.thinking", { name })}</span>)}
+      {m.shot && (
+        <a className="assistant__stuck-shot" href={m.shot.url} target="_blank" rel="noreferrer noopener">
+          <img src={m.shot.url} alt={t("assistant.stuckShot")} title={t("assistant.stuckShot")} />
+        </a>
+      )}
+      {m.content || (m.pending && !m.action && <span className="assistant__typing"><DukeAvatar size={16} className="is-thinking" /> {t(m.looking ? "assistant.looking" : "assistant.thinking", { name })}</span>)}
       {m.action && <AssistantAction action={m.action} state={m.actionState} note={m.actionNote} onSettle={onSettle} />}
       {(m.games ?? []).length > 0 && !game && !m.action && (
         <span className="assistant__games">

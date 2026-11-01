@@ -14,6 +14,8 @@
                              (ROMKADE_OPENAI_CHALLENGE ; 404 sans lui)
     /api/me/…                API du compte pour ROMKADE Manager (jeton de session Supabase) : consoles reliées,
                              liaison d'une console sans code, suppression du compte
+    /api/guide               soluce d'un jeu (titre, console, recherche) pour l'assistant de ROMKADE Manager (même
+                             jeton) : les mêmes passages que l'outil MCP game_guide (guide.py)
     /oauth/consent           ancienne adresse de la page de connexion -> https://romkade.com/authentification/
     /icon.png, /romkade-logo.webp, /fonts/…, /consoles/…   logo, polices et illustrations de l'interface
     /art/<clé>.webp          jaquette d'un jeu (libretro-thumbnails, mise en cache)
@@ -40,6 +42,7 @@ from starlette.responses import FileResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from app.platforms import PLATFORMS, canonical
 from app.services import cheats as cheat_db
 
 from . import catalog
@@ -47,6 +50,7 @@ from .analytics import Analytics
 from .art import Art
 from .auth import SupabaseAuth, account_id
 from .google_home import GoogleHome
+from .guide import GuideUnavailable, Guides
 from .homegraph import HomeGraph
 from .relay import Relay
 from .store import MAX_CONSOLES, Store
@@ -59,6 +63,7 @@ LOGIN_PAGE = "https://romkade.com/authentification/"  # page de connexion ROMKAD
 PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp", "romkade-logo.png"}  # .png : e-mails
 MAX_BODY = 8 * 1024 * 1024
 MAX_FAVORITES = 500
+GUIDE_FETCHES_PER_HOUR = 30  # soluces pas encore gardées, récupérées pour un compte : les wikis ne sont pas un proxy
 # Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée.
 TOKEN_PATH = re.compile(r"^/(?:mcp/)?([A-Za-z0-9_-]{32,})/?$")
 WEB_CLIENTS = ["https://claude.ai", "https://chatgpt.com", "https://chat.openai.com", "https://www.perplexity.ai",
@@ -120,7 +125,7 @@ class AccountPath:
 
 
 def create_app(store: Store | None = None, relay: Relay | None = None, public_url: str | None = None,
-               auth: SupabaseAuth | None = None, token_urls: bool | None = None):
+               auth: SupabaseAuth | None = None, token_urls: bool | None = None, guides: Guides | None = None):
     store = store or Store(os.environ.get("ROMKADE_CLOUD_DB", "data/cloud.sqlite3"))
     relay = relay or Relay()
     public_url = (public_url or os.environ.get("ROMKADE_PUBLIC_URL", "")).rstrip("/")
@@ -128,7 +133,8 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     publishable_key = os.environ.get("ROMKADE_SUPABASE_PUBLISHABLE_KEY", "")
     if auth is None and supabase_url:
         auth = SupabaseAuth(supabase_url, publishable_key)
-    mcp = build(store, relay, public_url)
+    guides = guides or Guides(store)
+    mcp = build(store, relay, public_url, guides)
     # Google Home (google_home.py) : identifiants donnés à Google et client public Supabase du relais d'autorisation.
     google = GoogleHome(store, relay, auth, public_url, os.environ.get("ROMKADE_GOOGLE_CLIENT_ID", ""),
                         os.environ.get("ROMKADE_GOOGLE_CLIENT_SECRET", ""),
@@ -380,6 +386,34 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         log.info("compte supprimé (%s console(s))", consoles)
         return JSONResponse({"deleted": True, "consoles": consoles})
 
+    guide_fetches: dict[str, list[float]] = {}
+
+    async def guide(request: Request) -> Response:
+        """Soluce d'un jeu du Manager (pas encore dans le catalogue du cloud) : par son titre et son dossier."""
+        who = await me(request)
+        if who is None:
+            return JSONResponse({"error": "unauthorized"}, 401)
+        account, _ = who
+        q = request.query_params
+        title, platform = (q.get("title") or "").strip(), (q.get("platform") or "").strip()
+        if not title or len(title) > 200 or canonical(platform) not in PLATFORMS:
+            return JSONResponse({"error": "bad_request"}, 400)
+        if not guides.cached(platform, title):
+            now = time.time()
+            recent = [t for t in guide_fetches.get(account, []) if now - t < 3600]
+            if len(recent) >= GUIDE_FETCHES_PER_HOUR:
+                return JSONResponse({"error": "rate_limited"}, 429, headers={"Retry-After": "600"})
+            guide_fetches[account] = [*recent, now]
+        try:
+            limit = int(q.get("limit") or 4)
+        except ValueError:
+            limit = 4
+        try:
+            found = await guides.search(title, platform, (q.get("q") or "")[:300], limit)
+        except GuideUnavailable:
+            return JSONResponse({"error": "unavailable"}, 503)
+        return JSONResponse(found)
+
     async def home(_: Request) -> Response:
         return Response(status_code=302, headers={"Location": "https://romkade.com"})
 
@@ -404,6 +438,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/api/me/consoles", my_consoles, methods=["GET", "POST"]),
         Route("/api/me/consoles/{console_id}", my_console, methods=["PATCH", "DELETE"]),
         Route("/api/me", delete_me, methods=["DELETE"]),
+        Route("/api/guide", guide, methods=["GET"]),
         Route("/", home),
         Mount("/fonts", StaticFiles(directory=STATIC / "fonts")),
         Mount("/consoles", StaticFiles(directory=STATIC / "consoles")),
@@ -427,7 +462,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
             await analytics.close()
 
     app.router.lifespan_context = lifespan
-    app.state.store, app.state.relay, app.state.google = store, relay, google
+    app.state.store, app.state.relay, app.state.google, app.state.guides = store, relay, google, guides
     if token_urls is None:  # adresses à jeton : par défaut, seulement là où il n'y a pas d'OAuth
         token_urls = auth is None or os.environ.get("ROMKADE_TOKEN_URLS") == "1"
     return AccountPath(CrossOrigin(app), store, auth, public_url, token_urls)

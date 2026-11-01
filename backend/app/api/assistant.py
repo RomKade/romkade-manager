@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import random
+from types import SimpleNamespace
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -17,9 +18,12 @@ from pydantic import BaseModel, Field
 
 from app import errors
 from app.services import assistant as asst
+from app.api import play as play_api
 from app.api import saves as saves_api
 from app.api.catalog import console_id
+from app.device import screen
 from app.services import catalog_query as cq
+from app.services import cloud_agent
 from app.services import knowledge as kn
 from app.services import llm as llm_mod
 
@@ -359,6 +363,98 @@ async def analyze_screenshot(game_id: int, name: str, body: ShotAnalysisIn, requ
     if not text:
         raise errors.AppError("screenshot_analysis_empty", f"{llm.label} n'a rien rendu pour cette capture.", 502)
     return {"text": text[:2000],
+            "model": llm.label}
+
+
+class StuckIn(BaseModel):
+    game_id: int
+    lang: Literal["fr", "en", "es"] = "fr"
+    name: str = Field("Duke", max_length=20)
+    question: str = Field("", max_length=asst.MAX_QUESTION)  # vide : « je suis bloqué ici, un indice ? »
+    solution: bool = False  # solution complète demandée (après un indice)
+
+
+class StuckOut(BaseModel):
+    text: str
+    game_id: int
+    shot: dict  # capture rangée avec celles du jeu (name, taken_at, size, url)
+    where: str  # où en est le joueur, lu sur l'écran (en anglais)
+    guide: Literal["local", "cloud", "none"]  # d'où vient la soluce
+    sources: list[dict]
+    model: str
+
+
+@router.post("/assistant/stuck", response_model=StuckOut)
+async def stuck(body: StuckIn, request: Request) -> dict:
+    """« Je suis bloqué » : capture de l'écran du jeu en cours, lue par le modèle réglé (qui doit lire les images)
+    pour savoir où en est le joueur, puis indice tiré de la soluce du jeu : connaissances du Manager, sinon celle
+    gardée par ROMKADE Cloud (jeton de session ROMKADE dans X-Romkade-Token, transmis sans être gardé)."""
+    st = request.app.state
+    llm = llm_mod.resolve(st)
+    profile = await st.system.ensure()
+    if not profile.capabilities()["screenshot"]:
+        raise errors.AppError("screenshot_unsupported", f"La capture d'écran n'est pas prise en charge sur "
+                              f"{profile.label}.", 409, {"system": profile.id})
+    now = await play_api.now_playing(request)
+    if not now.playing or now.game is None or now.game.id != body.game_id:
+        raise errors.AppError("stuck_not_playing", "Ce jeu ne tourne pas sur la console : lance-le pour que "
+                              "l'assistant voie où tu en es.", 409)
+    png = await screen.grab(st.device_runner, play_api._client(request))
+    g = now.game
+    shot = await asyncio.to_thread(st.screenshots.add, g.id, png, {"title": g.title, "platform_code": g.platform.code,
+                                                                   "platform_label": g.platform.label})
+
+    def info():
+        with st.sessions() as s:
+            f = cq.get_file(s, g.id)
+            return asst._game_title(f), f.platform.label or f.platform.directory, f.platform.directory
+
+    title, console, directory = await asyncio.to_thread(info)
+    try:
+        where = await asyncio.to_thread(llm.describe_image, asst.where_system(title, console), "Where is the player?",
+                                        png, max_tokens=80)
+    except errors.AppError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise errors.AppError("screenshot_analysis_failed", f"{llm.provider.label} n'a pas pu lire l'écran : {exc}",
+                              502) from exc
+    seen = asst.OutputFilter()  # raisonnement <think> et liens retirés
+    where = " ".join((seen.feed(where) + seen.done()).split())[:200] or "unknown"
+    question = body.question.strip() or asst.STUCK_QUESTION[body.lang]
+    query = f"{where} {question}"
+
+    def local():
+        with st.sessions() as s:
+            f = cq.get_file(s, g.id)
+            chunks = kn.best_chunks(s, f.platform_id, f.normalized_title, query, asst.PASSAGES)
+            if chunks and (extra := kn.version_chunk(s, f.platform_id, f.normalized_title, directory, chunks)):
+                chunks = [*chunks, extra]
+            return (asst.game_card(s, f, body.lang, console_id(request)), *asst.passages_text(chunks))
+
+    card, passages, sources = await asyncio.to_thread(local)
+    origin = "local" if passages else "none"
+    token = request.headers.get("x-romkade-token", "").strip()
+    if not passages and token:
+        found = await cloud_agent.guide(token, title, directory, query)
+        if found and found.get("passages"):
+            passages, sources = asst.passages_text([SimpleNamespace(**{k: p.get(k) or "" for k in (
+                "source", "page", "section", "url", "text", "license")}) for p in found["passages"]])
+            origin = "cloud"
+    context = (f"{card}\n\nOn screen now (read from the screenshot): {where}\n\n"
+               + (f"Passages:\n{passages}" if passages else "(No reference passage for this game.)"))
+    system = asst.answer_system(body.lang, asst.stuck_scope(title), context, body.solution, body.name)
+    try:
+        raw = await asyncio.to_thread(llm.describe_image, system, question, png)
+    except errors.AppError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise errors.AppError("screenshot_analysis_failed", f"{llm.provider.label} n'a pas pu lire l'écran : {exc}",
+                              502) from exc
+    out = asst.OutputFilter()
+    text = (out.feed(raw) + out.done()).strip()
+    if not text:
+        raise errors.AppError("screenshot_analysis_empty", f"{llm.label} n'a rien rendu pour cette capture.", 502)
+    return {"text": text, "game_id": g.id, "shot": shot, "where": where, "guide": origin, "sources": sources,
             "model": llm.label}
 
 

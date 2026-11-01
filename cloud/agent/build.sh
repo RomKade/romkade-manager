@@ -20,7 +20,7 @@ cp "$HERE/../../LICENSE" "$HERE/../../NOTICE" "$OUT/romkade/"
 cp -R "$HERE/stubs/." "$OUT/romkade/vendor/"
 cp "$APP/__init__.py" "$APP/errors.py" "$OUT/romkade/vendor/app/"
 cp "$APP/services/__init__.py" "$APP/services/saves.py" "$OUT/romkade/vendor/app/services/"
-cp "$APP/device/__init__.py" "$APP/device/launcher.py" "$APP/device/volume.py" "$APP/device/systems.py" \
+cp "$APP/device/__init__.py" "$APP/device/launcher.py" "$APP/device/volume.py" "$APP/device/systems.py" "$APP/device/screen.py" \
    "$APP/device/launch.sh" "$APP/device/onion_launch.sh" "$APP/device/players_apply.sh" "$APP/device/volume_keys.py" \
    "$OUT/romkade/vendor/app/device/"
 printf '{"server": "%s"}\n' "$1" > "$OUT/romkade/agent.json"

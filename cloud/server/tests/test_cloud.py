@@ -1,6 +1,7 @@
 """Bout en bout : vrai serveur (uvicorn), vrai client MCP, faux agent de console qui répond aux ordres."""
 
 import asyncio
+import base64
 import json
 import os
 import socket
@@ -78,6 +79,7 @@ class FakeAgent:
         self.playing = None
         self.saves: list[dict] | None = []  # None : agent d'avant l'ordre « saves »
         self.old_slots = False  # agent d'avant l'emplacement « latest »
+        self.screen: bytes | None = None  # PNG de l'écran ; None : agent d'avant l'ordre « screenshot »
 
     async def hello(self) -> dict:
         headers = {"Authorization": f"Bearer {self.secret}"} if self.secret else {}
@@ -118,6 +120,10 @@ class FakeAgent:
                 reply = ({"ok": False, "error": {"code": "unknown_action", "message": "Action inconnue : saves"}}
                          if self.saves is None else
                          {"ok": True, "result": {"saves": [x for x in self.saves if x["name"].lower() in names]}})
+            elif cmd["action"] == "screenshot":
+                reply = ({"ok": False, "error": {"code": "unknown_action", "message": "Action inconnue : screenshot"}}
+                         if self.screen is None else
+                         {"ok": True, "result": {"png": base64.b64encode(self.screen).decode()}})
             elif cmd["action"] == "save_state":
                 reply = {"ok": False, "error": {"code": "no_retroarch_game", "message": "Aucun jeu RetroArch en cours"}}
             else:

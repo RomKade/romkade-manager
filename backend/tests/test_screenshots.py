@@ -81,3 +81,65 @@ async def test_unsupported_system(app_factory):
         r = await c.post("/api/device/screenshot")
         assert r.status_code == 409 and r.json()["error"]["code"] == "screenshot_unsupported"
         assert (await c.get("/api/device/system")).json()["capabilities"]["screenshot"] is False
+
+
+async def test_stuck_reads_the_screen_then_the_guide(app_factory, monkeypatch):
+    """« Je suis bloqué » : capture, où en est le joueur (lu sur l'écran), puis indice tiré de la soluce : celle du
+    Manager, sinon celle de ROMKADE Cloud (jeton de session transmis), sinon aucune."""
+    import json
+
+    from app.services import cloud_agent, llm
+    from tests.test_assistant import add_mario_knowledge
+
+    sent = []
+
+    def vision(request):
+        body = json.loads(request.content)
+        sent.append(body)
+        where = body["messages"][0]["content"].startswith("You look at a screenshot")
+        return httpx.Response(200, json={"choices": [{"message": {"content": "Vanilla Dome castle door" if where
+                                                                  else "<think>x</think>Indice : prends la cape."}}]})
+
+    monkeypatch.setattr(llm, "resolve", lambda state: llm.LLM(llm.PROVIDERS["local"], "gemma-test",
+                                                              "http://localhost:1234/v1", None,
+                                                              transport=httpx.MockTransport(vision)))
+    asked = []
+
+    async def cloud_guide(token, title, directory, query):
+        asked.append((token, title, directory))
+        return {"status": "found", "passages": [{"source": "segaretro", "page": "Mario/Hints", "section": "Castle",
+                                                 "url": "https://segaretro.org/x", "text": "Fly over the wall.",
+                                                 "license": "GFDL 1.2"}]}
+
+    monkeypatch.setattr(cloud_agent, "guide", cloud_guide)
+    console = ScreenConsole(playing=MARIO)
+    async with make(app_factory, console) as c:
+        app = c._transport.app
+        await sync(c)
+        mario = (await c.post("/api/device/screenshot")).json()["game_id"]
+        await c.delete((await c.get(f"/api/games/{mario}/screenshots")).json()[0]["url"])
+
+        # Sans soluce nulle part (pas de session ROMKADE) : l'assistant le sait.
+        r = await c.post("/api/assistant/stuck", json={"game_id": mario, "lang": "fr"})
+        assert r.status_code == 200, r.text
+        out = r.json()
+        assert out["guide"] == "none" and out["text"] == "Indice : prends la cape." and out["where"] == "Vanilla Dome castle door"
+        assert out["shot"]["url"].startswith(f"/api/screenshots/{mario}/")  # rangée avec les captures du jeu
+        system = sent[-1]["messages"][0]["content"]
+        assert "No reference passage" in system and "Vanilla Dome castle door" in system and "short hint first" in system
+        assert sent[-1]["messages"][1]["content"][0]["text"] == "Je suis bloqué ici, un indice ?"
+
+        # Soluce de ROMKADE Cloud, avec le jeton de la session.
+        out = (await c.post("/api/assistant/stuck", json={"game_id": mario, "lang": "fr", "question": "Le château ?"},
+                            headers={"X-Romkade-Token": "jeton"})).json()
+        assert out["guide"] == "cloud" and out["sources"][0]["license"] == "GFDL 1.2"
+        assert asked == [("jeton", "Super Mario World", "SFC")] and "Fly over the wall." in sent[-1]["messages"][0]["content"]
+
+        # Connaissances du Manager : d'abord elles, le cloud n'est pas appelé.
+        add_mario_knowledge(app)
+        out = (await c.post("/api/assistant/stuck", json={"game_id": mario}, headers={"X-Romkade-Token": "jeton"})).json()
+        assert out["guide"] == "local" and out["sources"][0]["source"] == "strategywiki" and len(asked) == 1
+
+        # Un autre jeu que celui qui tourne : refusé.
+        r = await c.post("/api/assistant/stuck", json={"game_id": mario + 999})
+        assert r.status_code == 409 and r.json()["error"]["code"] == "stuck_not_playing"

@@ -22,7 +22,9 @@ export type ActionState = "done" | "cancelled" | "failed";
 export type ChatMessage =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; intent?: string | null; games?: AssistantGame[]; sources?: ChatSource[];
-      pending?: boolean; action?: ConsoleAction; actionState?: ActionState; actionNote?: string }
+      pending?: boolean; action?: ConsoleAction; actionState?: ActionState; actionNote?: string;
+      /** « Je suis bloqué » : capture de l'écran sur laquelle l'indice s'appuie ; `looking` pendant la lecture. */
+      shot?: { gameId: number; url: string; takenAt: string }; looking?: boolean }
   | { role: "refusal"; reason: string }
   | { role: "error"; message: string };
 

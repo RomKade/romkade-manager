@@ -196,6 +196,12 @@ function mockFetch() {
         source: "retroarch", kind: "sram", slot: null, platform: "SFC", name: "Super Mario World (USA)", size: 2048,
         modified_at: "2026-10-16T10:00:00Z", game: null },
     ]);
+    if (url === "/api/assistant/stuck") {
+      assistantBodies.push({ ...JSON.parse(String(init?.body)), token: (init?.headers as Record<string, string>)["X-Romkade-Token"] ?? null });
+      return json({ text: "Indice : vole au-dessus du mur avec la cape.", game_id: 1, where: "Vanilla Dome castle", guide: "cloud", model: "Gemma",
+        shot: shot("20261101-100000.png"), sources: [{ source: "strategywiki", page: "Super Mario World/Vanilla Dome",
+          url: "https://strategywiki.org/wiki/Super_Mario_World/Vanilla_Dome", license: "CC BY-SA 4.0" }] });
+    }
     if (url === "/api/assistant") {
       assistantBodies.push(JSON.parse(String(init?.body)));
       if (assistantAction) {
@@ -731,6 +737,24 @@ describe("Assistant de jeu", () => {
     expect(within(panel).getByText(/modèle local : rien ne quitte cet ordinateur/)).toBeInTheDocument();
     expect(assistantBodies[0]).toMatchObject({ scope: "game", game_id: 1, lang: "fr", name: "Duke",
       messages: [{ role: "user", content: "Je bloque au château" }] });
+  });
+
+  it("bloqué dans le jeu en cours : regarde l'écran de la console, puis donne un indice", async () => {
+    llm = { ...llm, provider: "local", model: "gemma", base_url: "http://localhost:1234/v1" };
+    playingId = 1;
+    assistant.setScope({ kind: "game", game: { id: 1, title: "Super Mario World", platform: "Super Nintendo" } });
+    renderAt("/");
+    await userEvent.click(await screen.findByRole("button", { name: /^Duke$/ }));
+    const panel = screen.getByRole("region", { name: "Duke" });
+    await screen.findAllByText("En cours sur la console");  // jeu de la conversation en cours sur la console
+    await userEvent.click(await within(panel).findByRole("button", { name: "Je suis bloqué, un indice ?" }));
+    expect(await within(panel).findByText("Indice : vole au-dessus du mur avec la cape.")).toBeInTheDocument();
+    expect(within(panel).getByRole("img", { name: "Écran de la console au moment de la question" })).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: /StrategyWiki · CC BY-SA 4.0/ })).toBeInTheDocument();
+    expect(assistantBodies.at(-1)).toMatchObject({ game_id: 1, lang: "fr", question: "Je suis bloqué, un indice ?", solution: false });
+    // Solution complète : nouvelle capture, solution demandée.
+    await userEvent.click(within(panel).getByRole("button", { name: /Donne-moi la solution complète/ }));
+    await waitFor(() => expect(assistantBodies.at(-1)).toMatchObject({ solution: true }));
   });
 
   it("se replie et se déplie d'un chevron, sans perdre la conversation", async () => {

@@ -50,6 +50,8 @@ export type Sound = S["SoundOut"];
 export type SoundOutput = Sound["output"];
 export type OutputTest = S["OutputTestOut"];
 export type Shot = S["ShotOut"];
+export type StuckAnswer = { text: string; game_id: number; shot: Shot; where: string; guide: "local" | "cloud" | "none";
+  sources: { source: string; page: string; url: string; license: string }[]; model: string };
 export type GameShots = S["GameShotsOut"];
 export type ShotTaken = S["TakenOut"];
 export type Players = S["PlayersOut"];
@@ -89,12 +91,12 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      headers: body === undefined ? headers : { "Content-Type": "application/json", ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -233,6 +235,10 @@ export const api = {
   /** Lecture d'une capture par le modèle réglé (texte de l'écran, rôle des touches). */
   captionScreenshot: (id: number, name: string, body: { lang: string; tone: string; previous: string[] }) =>
     request<{ text: string; model: string; saw_image: boolean }>("POST", `/games/${id}/screenshots/${encodeURIComponent(name)}/caption`, body),
+  /** « Je suis bloqué » : capture du jeu en cours, puis indice tiré de la soluce (du Manager, sinon de ROMKADE Cloud
+   * avec le jeton de la session ROMKADE). */
+  assistantStuck: (body: { game_id: number; lang: string; name: string; question: string; solution: boolean }, token?: string) =>
+    request<StuckAnswer>("POST", "/assistant/stuck", body, token ? { "X-Romkade-Token": token } : undefined),
   analyzeScreenshot: (id: number, name: string, lang: string) =>
     request<{ text: string; model: string }>("POST", `/games/${id}/screenshots/${encodeURIComponent(name)}/analyze`, { lang }),
   deleteScreenshot: (url: string) => request<void>("DELETE", url.replace(/^\/api/, "")),

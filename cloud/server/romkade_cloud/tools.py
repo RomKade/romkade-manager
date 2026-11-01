@@ -1,8 +1,8 @@
 """Outils MCP de ROMKADE : ce que ChatGPT, Claude… peuvent faire avec la console et son catalogue.
 
-Le catalogue, les favoris et les cheats sont lus dans le cloud (marchent console éteinte) ; jouer, quitter, le son,
-la sauvegarde et la liste des sauvegardes d'un jeu passent par le relais jusqu'à l'agent de la console (console
-allumée, en Wi-Fi).
+Le catalogue, les favoris, les cheats et les soluces sont lus dans le cloud (marchent console éteinte) ; jouer,
+quitter, le son, la sauvegarde, la liste des sauvegardes d'un jeu et l'écran passent par le relais jusqu'à l'agent de
+la console (console allumée, en Wi-Fi).
 
 Chaque outil est relié à l'interface ROMKADE (MCP Apps, ui://romkade/app.html, voir ui/app.html) : l'assistant
 affiche la vue indiquée par le champ « view » du résultat (jeux, fiche, en cours, bibliothèque, cheats, consoles).
@@ -13,8 +13,10 @@ l'utilisateur par l'assistant, dans sa langue : écrits en anglais (relecteurs d
 
 import asyncio
 import base64
+import binascii
 import functools
 import inspect
+import io
 import json
 import time
 from datetime import UTC, datetime
@@ -25,14 +27,15 @@ from mcp.server.apps import APP_MIME_TYPE, Apps
 from mcp.server.mcpserver.resources import TextResource
 from mcp.server.mcpserver import Context, Icon
 from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import CallToolResult, TextContent, ToolAnnotations
+from mcp.types import CallToolResult, ImageContent, TextContent, ToolAnnotations
 
 from app.platforms import PLATFORMS, canonical
 from app.services import boxart
 from app.services import cheats as cheat_db
-from app.services.classify import normalize_title, stem_of
+from app.services.classify import display_title, normalize_title, stem_of
 from app.services.genres import GENRES
 
+from .guide import GuideUnavailable, Guides
 from .relay import CommandFailed, CommandTimeout, ConsoleOffline, Relay
 from .store import MAX_CONSOLES, Console, Store
 
@@ -59,11 +62,16 @@ INSTRUCTIONS = """ROMKADE connects the user's retro handheld console (Anbernic�
   save, quit, volume, cheats). Do not rebuild it: no lists, cards, tables, buttons or images of your own. Answer in
   one or two short sentences, at most.
 - Cheat codes: mention a few relevant ones (at most 6) unless the user asks for more.
+- When the user is stuck in a game (a level, a boss, a puzzle, where to go): call look_at_screen to see where they
+  are (console on), then game_guide with what you see. Base the answer on the guide passages and name the source;
+  give a short hint first and the full solution only if the user asks for it. Without a guide (status not_found),
+  say so: an answer from memory about a retro game is often wrong.
 - Only the games already on the user's console are known here. Never help find or download ROMs.
 Reply in the user's language."""
 
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
 ACT = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
+GUIDE = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=True)  # lit des wikis publics
 SETTING = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 
 # Erreurs de l'agent (messages en français, venus des modules du Manager) : texte anglais par code.
@@ -75,6 +83,7 @@ AGENT_ERRORS = {
     "bad_path": "Invalid game.",
     "device_command_timeout": "The console did not answer in time.",
     "unknown_action": "The ROMKADE app on the console is too old for this: update it from ROMKADE Manager.",
+    "screenshot_failed": "The console screen could not be read.",
 }
 MAX_PAIR_FAILURES = 10  # par compte et par heure : le code d'appairage ne se devine pas à l'aveugle
 CONSOLE_ART = {p.stem for p in (STATIC / "consoles").glob("*.webp")}
@@ -84,7 +93,9 @@ HELP_URL = "https://romkade.com/docs/guide/assistants/"
 DOWNLOAD_URL = "https://romkade.com/en/download/"
 
 
-HEAVY = {"cover", "cover_large", "platform_art", "art", "description", "capabilities"}
+HEAVY = {"cover", "cover_large", "platform_art", "art", "description", "capabilities", "image"}
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+SCREEN_QUALITY = 85  # capture envoyée en JPEG : 5 à 10 fois plus légère que le PNG de la console
 
 
 def _for_model(value):
@@ -178,8 +189,22 @@ def genre_key(name: str | None) -> str | None:
                     genres=list(GENRES))
 
 
-def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
+def to_jpeg(png: bytes) -> bytes:
+    from PIL import Image  # dépendance du Manager (jaquettes)
+
+    out = io.BytesIO()
+    Image.open(io.BytesIO(png)).convert("RGB").save(out, "JPEG", quality=SCREEN_QUALITY)
+    return out.getvalue()
+
+
+def search_title(row) -> str:
+    """Titre cherché dans les wikis : celui de la base No-Intro sans étiquettes, sinon le titre affiché."""
+    return display_title(row["full_title"]) if row["full_title"] else row["title"]
+
+
+def build(store: Store, relay: Relay, public_url: str = "", guides: Guides | None = None) -> MCPServer:
     base = public_url.rstrip("/")
+    guides = guides or Guides(store)
     apps = Apps()
     pair_failures: dict[str, list[float]] = {}
 
@@ -381,6 +406,25 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
                      "other_versions": [f["label"] for f in files[1:4]],
                      "source": "libretro-database (CC BY-SA 4.0)", "source_url": cheat_db.SOURCE_URL})
 
+    @ui_tool(title="Game guide", annotations=GUIDE)
+    async def game_guide(game_id: int, ctx: Context, query: str = "") -> CallToolResult:
+        """Walkthrough and tips for a game of the library, from StrategyWiki, Sega Retro and Wikipedia (CC BY-SA
+        4.0 / GFDL, cite the source): the passages that match `query`. Use it when the user is stuck or asks how to
+        progress. `query`: what they are stuck on, in English (the guides are mostly in English), e.g. « level 3
+        boss », « key to the dungeon », « how to get the hammer » ; empty: the start of the guide. Status not_found:
+        no guide for this game. The first request for a game can take up to a minute (guide fetched, then kept)."""
+        row = store.game(game_id, account_of(ctx))
+        if row is None:
+            raise UserError("unknown_game", "Game not found in the library (use a game_id from search_games).")
+        try:
+            found = await guides.search(search_title(row), row["platform_dir"], query or "")
+        except GuideUnavailable as exc:
+            raise UserError("guide_unavailable", "The game guides (Wikipedia, StrategyWiki) cannot be reached right "
+                            "now: try again in a moment.") from exc
+        return view({"view": "guide", "game": game_out(row), "query": query, **found,
+                     **({"note": "No guide found for this game: an answer from memory may be wrong."}
+                        if found["status"] != "found" else {})})
+
     # ---------- console (par le relais) ----------
     async def now_playing(c: Console) -> dict:
         st = await device(c, "status")
@@ -396,6 +440,27 @@ def build(store: Store, relay: Relay, public_url: str = "") -> MCPServer:
         """Live state of the console: game being played (if any), volume, save and quit buttons. Needs the
         console on."""
         return view(await now_playing(pick(account_of(ctx), console)))
+
+    @ui_tool(title="Look at the screen", annotations=READ)
+    async def look_at_screen(ctx: Context, console: str | None = None) -> CallToolResult:
+        """Screenshot of what the console shows right now (game in progress, menu), with the game being played. Use
+        it when the user is stuck or asks about what is on screen, then game_guide for the solution. Needs the
+        console on. The image is not stored."""
+        c = pick(account_of(ctx), console)
+        state = await now_playing(c)
+        shot = await device(c, "screenshot", timeout=40)
+        try:
+            png = base64.b64decode(shot.get("png") or "", validate=True)
+        except binascii.Error:
+            png = b""
+        if not png.startswith(PNG_MAGIC):
+            raise UserError("console_failed", AGENT_ERRORS["screenshot_failed"], console=c.label,
+                            reason="screenshot_failed")
+        jpeg = base64.b64encode(await asyncio.to_thread(to_jpeg, png)).decode()
+        data = {**state, "view": "screen", "image": f"data:image/jpeg;base64,{jpeg}"}
+        text = json.dumps(_for_model(data), ensure_ascii=False, separators=(",", ":"))
+        return CallToolResult(content=[ImageContent(type="image", data=jpeg, mime_type="image/jpeg"),
+                                       TextContent(type="text", text=text)], structured_content=data)
 
     @ui_tool(title="Launch a game", annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True,
                                                                  idempotent_hint=False, open_world_hint=False))

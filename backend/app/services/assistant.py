@@ -530,6 +530,27 @@ def shot_system(title: str, console: str, lang: str) -> str:
     return SHOT_SYSTEM.format(title=title, console=console, language=LANG_NAMES.get(lang, "English"))
 
 
+# « Je suis bloqué » (POST /api/assistant/stuck) : l'écran de la console dit où en est le joueur, la soluce (connaissances
+# du Manager, sinon ROMKADE Cloud) dit comment avancer.
+WHERE_SYSTEM = """You look at a screenshot of the retro video game « {title} » ({console}). In English, in 15 words at
+most, say where the player is: level, stage, world or area name, boss, puzzle, room, menu or map, as written on screen
+or clearly recognisable. Only what is visible; answer « unknown » if you cannot tell."""
+STUCK_SCOPE = ("This conversation is only about the game « {title} »: politely refuse anything else. The user is stuck "
+               "and sent a screenshot of their console screen, taken just now: use it to see where they are and what is "
+               "on screen, but take facts about the game (how to get past, where to go, items, bosses) only from the "
+               "CONTEXT.")
+STUCK_QUESTION = {"fr": "Je suis bloqué ici, un indice ?", "en": "I'm stuck here, a hint?",
+                  "es": "Estoy atascado aquí, ¿una pista?"}
+
+
+def where_system(title: str, console: str) -> str:
+    return WHERE_SYSTEM.format(title=title, console=console)
+
+
+def stuck_scope(title: str) -> str:
+    return STUCK_SCOPE.format(title=title)
+
+
 def title_matches(title: str, names: list[str]) -> bool:
     """Pour lancer un jeu : le titre trouvé doit vraiment être celui demandé (« Tetris » oui, « Marko's Magic Football »
     pour « Super Mario World » non) : un nom contenu dans l'autre, ou très proche (fautes de frappe)."""

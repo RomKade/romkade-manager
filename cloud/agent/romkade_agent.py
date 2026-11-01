@@ -32,10 +32,12 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "vendor"))
 
 from app import errors  # noqa: E402
-from app.device import launcher, systems, volume  # noqa: E402
+import base64  # noqa: E402
+
+from app.device import launcher, screen, systems, volume  # noqa: E402
 from app.services import saves  # noqa: E402
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 CONFIG = HERE / "agent.json"            # {"server": "https://…", "secret": "…"} (sur la carte : survit au redémarrage)
 FAVORITES = HERE / "favorites.json"   # écrit par le Manager : {"favorites": [[dossier, chemin relatif], …]}
 MAX_RECENT = 30                       # jeux joués récemment envoyés au cloud (historique de RetroArch)
@@ -257,7 +259,7 @@ class Agent:
         return {"agent_version": VERSION, "hostname": socket.gethostname(), "model": model, "firmware": firmware,
                 "profile": self.profile.id, "os_name": self.detection.os_name if self.detection else None,
                 "roms_root": self.roms_root,
-                "capabilities": {k: caps[k] for k in ("launch", "resume_slot", "quit", "save_state", "volume")}}
+                "capabilities": {k: caps[k] for k in ("launch", "resume_slot", "quit", "save_state", "volume", "screenshot")}}
 
     async def hello(self) -> dict:
         try:
@@ -375,12 +377,19 @@ class Agent:
                for f in found if not names or f.stem.lower() in names]
         return {"saves": out[:MAX_SAVES], "total": len(out)}
 
+    async def do_screenshot(self, _p: dict) -> dict:
+        """L'écran de la console en PNG (base64), lu dans le framebuffer comme le fait le Manager. Rien n'est écrit
+        sur la carte."""
+        if not self.profile.capabilities().get("screenshot"):
+            raise errors.AppError("screenshot_failed", "Capture d'écran impossible sur ce firmware.", 409)
+        return {"png": base64.b64encode(await screen.grab(run_local, self.client)).decode()}
+
     async def do_rescan(self, _p: dict) -> dict:
         await self.sync_catalog(force=True)
         return {"rescanned": True}
 
     ACTIONS = {"status": do_status, "launch": do_launch, "quit": do_quit, "save_state": do_save_state,
-               "volume": do_volume, "rescan": do_rescan, "saves": do_saves}
+               "volume": do_volume, "rescan": do_rescan, "saves": do_saves, "screenshot": do_screenshot}
 
     async def handle(self, command: dict) -> None:
         action = command.get("action")
