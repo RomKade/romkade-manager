@@ -2,8 +2,8 @@
 certification Google Home) et les démonstrations. © 2026 ROMKADE, tous droits réservés.
 
 Elle parle au cloud exactement comme l'app ROMKADE d'une vraie console (/agent/hello, catalog, favorites, recent,
-poll, result) et répond aux mêmes ordres (status, launch, quit, save_state, volume, saves, rescan) en simulant l'état
-d'une console : jeu en cours, volume, sauvegardes. Son catalogue ne contient que des jeux homebrew distribués
+poll, result) et répond aux mêmes ordres (status, launch, quit, save_state, volume, saves, rescan, screenshot) en
+simulant l'état d'une console : jeu en cours, volume, sauvegardes, écran (une image dessinée : titre du jeu ou menu). Son catalogue ne contient que des jeux homebrew distribués
 gratuitement par leurs auteurs (aucun jeu commercial).
 
 Mise en place (une fois) : le compte ROMKADE de démonstration est créé sur romkade.com, puis
@@ -12,6 +12,8 @@ Puis le service romkade-demo (cloud/deploy/compose.yaml) lance : python -m romka
 """
 
 import asyncio
+import base64
+import io
 import logging
 import os
 import time
@@ -57,7 +59,25 @@ class DemoConsole:
     def info(self) -> dict:
         return {"agent_version": VERSION, "hostname": "romkade-demo", "model": "ROMKADE demo console",
                 "firmware": "simulated", "profile": "demo", "roms_root": "/demo/Roms",
-                "capabilities": {"launch": True, "resume_slot": True, "quit": True, "save_state": True, "volume": True}}
+                "capabilities": {"launch": True, "resume_slot": True, "quit": True, "save_state": True, "volume": True,
+                                 "screenshot": True}}
+
+    def screen(self) -> bytes:
+        """Écran simulé (640x480, couleurs de ROMKADE) : le jeu en cours ou le menu de la console, en PNG."""
+        from PIL import Image, ImageDraw, ImageFont
+
+        img = Image.new("RGB", (640, 480), (5, 12, 28))
+        draw = ImageDraw.Draw(img)
+        font = ImageFont.load_default(size=30)
+        small = ImageFont.load_default(size=18)
+        draw.rectangle((24, 24, 615, 455), outline=(0, 229, 255), width=3)
+        title = self.playing[1].rsplit(".", 1)[0].split(" (")[0] if self.playing else "Menu"
+        draw.text((320, 200), title, font=font, fill=(255, 255, 255), anchor="mm")
+        draw.text((320, 250), "Level 1" if self.playing else "Choose a game", font=small, fill=(255, 64, 160), anchor="mm")
+        draw.text((320, 420), "ROMKADE demo console · simulated screen", font=small, fill=(140, 160, 190), anchor="mm")
+        out = io.BytesIO()
+        img.save(out, "PNG")
+        return out.getvalue()
 
     # ---------- ordres (mêmes réponses que l'app ROMKADE) ----------
     def handle(self, action: str, p: dict) -> dict:
@@ -96,6 +116,8 @@ class DemoConsole:
             return {"saves": out, "total": len(out)}
         if action == "rescan":
             return {"rescanned": True}
+        if action == "screenshot":
+            return {"png": base64.b64encode(self.screen()).decode()}
         raise ValueError(f"Action inconnue : {action}")
 
     async def run_once(self, http: httpx.AsyncClient) -> None:

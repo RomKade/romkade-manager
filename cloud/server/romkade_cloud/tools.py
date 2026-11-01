@@ -9,6 +9,10 @@ affiche la vue indiquée par le champ « view » du résultat (jeux, fiche, en c
 Un client sans MCP Apps reçoit les mêmes données en texte. Les messages d'erreur sont écrits pour être relayés à
 l'utilisateur par l'assistant, dans sa langue : écrits en anglais (relecteurs des annuaires, modèle), avec un code
 (`error`) que l'interface traduit (fr, en, es).
+
+Outils en bêta (BETA_TOOLS : soluce et écran) : seulement à l'adresse /beta tant que l'examen des annuaires de Claude
+et de ChatGPT porte sur la version sans eux (le relecteur teste chaque outil de l'adresse publique). Après l'examen,
+BETA_ONLY = False les ajoute aussi à l'adresse publique.
 """
 
 import asyncio
@@ -62,12 +66,15 @@ INSTRUCTIONS = """ROMKADE connects the user's retro handheld console (Anbernic�
   save, quit, volume, cheats). Do not rebuild it: no lists, cards, tables, buttons or images of your own. Answer in
   one or two short sentences, at most.
 - Cheat codes: mention a few relevant ones (at most 6) unless the user asks for more.
+- Only the games already on the user's console are known here. Never help find or download ROMs.
+Reply in the user's language."""
+STUCK_INSTRUCTIONS = """
 - When the user is stuck in a game (a level, a boss, a puzzle, where to go): call look_at_screen to see where they
   are (console on), then game_guide with what you see. Base the answer on the guide passages and name the source;
   give a short hint first and the full solution only if the user asks for it. Without a guide (status not_found),
-  say so: an answer from memory about a retro game is often wrong.
-- Only the games already on the user's console are known here. Never help find or download ROMs.
-Reply in the user's language."""
+  say so: an answer from memory about a retro game is often wrong."""
+BETA_TOOLS = ("game_guide", "look_at_screen")
+BETA_ONLY = True  # examens des annuaires en cours (Claude : 2026-10-26, ChatGPT : 1.0.0) sur la version sans eux
 
 READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
 ACT = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
@@ -202,15 +209,21 @@ def search_title(row) -> str:
     return display_title(row["full_title"]) if row["full_title"] else row["title"]
 
 
-def build(store: Store, relay: Relay, public_url: str = "", guides: Guides | None = None) -> MCPServer:
+def build(store: Store, relay: Relay, public_url: str = "", guides: Guides | None = None,
+          beta: bool = False) -> MCPServer:
+    """Serveur MCP ROMKADE ; `beta` : celui de l'adresse /beta, avec les outils en bêta (BETA_TOOLS)."""
     base = public_url.rstrip("/")
     guides = guides or Guides(store)
+    extra = beta or not BETA_ONLY
     apps = Apps()
     pair_failures: dict[str, list[float]] = {}
 
     def ui_tool(**kwargs):
         register = apps.tool(resource_uri=UI, **kwargs)
         return lambda fn: register(user_errors(fn))
+
+    def beta_tool(**kwargs):
+        return ui_tool(**kwargs) if extra else (lambda fn: fn)
 
     # ---------- utilitaires ----------
     def consoles(account: str) -> list[Console]:
@@ -406,7 +419,7 @@ def build(store: Store, relay: Relay, public_url: str = "", guides: Guides | Non
                      "other_versions": [f["label"] for f in files[1:4]],
                      "source": "libretro-database (CC BY-SA 4.0)", "source_url": cheat_db.SOURCE_URL})
 
-    @ui_tool(title="Game guide", annotations=GUIDE)
+    @beta_tool(title="Game guide", annotations=GUIDE)
     async def game_guide(game_id: int, ctx: Context, query: str = "") -> CallToolResult:
         """Walkthrough and tips for a game of the library, from StrategyWiki, Sega Retro and Wikipedia (CC BY-SA
         4.0 / GFDL, cite the source): the passages that match `query`. Use it when the user is stuck or asks how to
@@ -441,7 +454,7 @@ def build(store: Store, relay: Relay, public_url: str = "", guides: Guides | Non
         console on."""
         return view(await now_playing(pick(account_of(ctx), console)))
 
-    @ui_tool(title="Look at the screen", annotations=READ)
+    @beta_tool(title="Look at the screen", annotations=READ)
     async def look_at_screen(ctx: Context, console: str | None = None) -> CallToolResult:
         """Screenshot of what the console shows right now (game in progress, menu), with the game being played. Use
         it when the user is stuck or asks about what is on screen, then game_guide for the solution. Needs the
@@ -535,5 +548,8 @@ def build(store: Store, relay: Relay, public_url: str = "", guides: Guides | Non
                                    mime_type=APP_MIME_TYPE, meta=meta, text=html))
 
     icons = [Icon(src=f"{base}/icon.png", mime_type="image/png", sizes=["512x512"])] if base else None
-    return MCPServer("romkade", title="ROMKADE", instructions=INSTRUCTIONS, website_url="https://romkade.com",
+    instructions = INSTRUCTIONS.replace("\nReply in the user's language.", STUCK_INSTRUCTIONS + "\nReply in the user's language.") \
+        if extra else INSTRUCTIONS
+    return MCPServer("romkade", title="ROMKADE Beta" if beta else "ROMKADE", instructions=instructions,
+                     website_url="https://romkade.com",
                      icons=icons, version=VERSION, extensions=[apps])

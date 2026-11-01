@@ -46,3 +46,20 @@ def test_demo_console_answers_like_a_real_one(tmp_path, monkeypatch):
             task.cancel()
 
     asyncio.run(scenario())
+
+
+def test_demo_console_screen():
+    """Écran simulé : une vraie image PNG, avec le jeu en cours ou le menu (look_at_screen pour les relecteurs)."""
+    import base64
+    import io
+
+    from PIL import Image
+
+    from romkade_cloud.demo_console import GAMES, DemoConsole
+
+    demo = DemoConsole("http://x", "s")
+    assert demo.info()["capabilities"]["screenshot"]
+    menu = base64.b64decode(demo.handle("screenshot", {})["png"])
+    demo.handle("launch", {"platform_dir": GAMES[0][0], "relative_path": GAMES[0][1]})
+    game = base64.b64decode(demo.handle("screenshot", {})["png"])
+    assert Image.open(io.BytesIO(game)).size == (640, 480) and menu != game

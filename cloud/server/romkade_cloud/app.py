@@ -3,6 +3,8 @@
     /                        MCP (Streamable HTTP) avec OAuth : jeton d'accès Supabase (comptes ROMKADE) ; sans
                              jeton, 401 et adresse des métadonnées (RFC 9728) pour que ChatGPT, Claude… connectent
                              l'utilisateur
+    /beta                    MCP avec les outils en bêta (tools.BETA_TOOLS : soluce, écran), même connexion : à ajouter
+                             comme second connecteur pour les essayer pendant l'examen des annuaires
     /<jeton du compte>       MCP avec le jeton dans l'adresse (comptes du prototype) : seulement sans OAuth (tests,
                              essais en local) ou avec ROMKADE_TOKEN_URLS=1 ; coupé en production (annuaires d'apps).
     /agent/hello             l'agent se présente (et reçoit son secret et un code d'appairage la première fois)
@@ -64,8 +66,9 @@ PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp", "romkade-logo.
 MAX_BODY = 8 * 1024 * 1024
 MAX_FAVORITES = 500
 GUIDE_FETCHES_PER_HOUR = 30  # soluces pas encore gardées, récupérées pour un compte : les wikis ne sont pas un proxy
-# Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée.
-TOKEN_PATH = re.compile(r"^/(?:mcp/)?([A-Za-z0-9_-]{32,})/?$")
+# Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée ; /<jeton>/beta.
+TOKEN_PATH = re.compile(r"^/(?:mcp/)?([A-Za-z0-9_-]{32,})(/beta)?/?$")
+BETA_PATHS = ("/beta", "/beta/")
 WEB_CLIENTS = ["https://claude.ai", "https://chatgpt.com", "https://chat.openai.com", "https://www.perplexity.ai",
                "https://playground.ai.cloudflare.com"]
 AGENT_FIELDS = ("agent_version", "hostname", "model", "firmware", "profile", "os_name", "roms_root", "capabilities")
@@ -97,22 +100,28 @@ class AccountPath:
             scope.pop("romkade.account", None)
             path = scope["path"]
             m = TOKEN_PATH.match(path)
-            if path in ("/", "/mcp", "/mcp/") and self.auth is not None and _is_mcp_call(scope):
+            beta = path in BETA_PATHS
+            if (path in ("/", "/mcp", "/mcp/") or beta) and self.auth is not None and _is_mcp_call(scope):
                 account = await self._oauth_account(scope)
                 if account is None:
-                    meta = f"{self.public_url}/.well-known/oauth-protected-resource"
+                    meta = f"{self.public_url}/.well-known/oauth-protected-resource{'/beta' if beta else ''}"
                     await JSONResponse({"error": "invalid_token", "error_description": "Connexion ROMKADE requise"},
                                        401, headers={"WWW-Authenticate": f'Bearer resource_metadata="{meta}"'}
                                        )(scope, receive, send)
                     return
-                scope = {**scope, "path": "/mcp", "raw_path": b"/mcp", "romkade.account": account}
-            elif m or path == "/mcp" or path.startswith("/mcp/"):
+                scope = self._inner(scope, account, beta)
+            elif m or path == "/mcp" or path.startswith("/mcp/") or path == "/mcp-beta":
                 account = self.store.account_for_token(m.group(1)) if m and self.token_urls else None
                 if account is None:
                     await JSONResponse({"error": "not_found"}, 404)(scope, receive, send)
                     return
-                scope = {**scope, "path": "/mcp", "raw_path": b"/mcp", "romkade.account": account}
+                scope = self._inner(scope, account, bool(m.group(2)))
         await self.app(scope, receive, send)
+
+    @staticmethod
+    def _inner(scope, account: str, beta: bool) -> dict:
+        inner = "/mcp-beta" if beta else "/mcp"
+        return {**scope, "path": inner, "raw_path": inner.encode(), "romkade.account": account}
 
     async def _oauth_account(self, scope) -> str | None:
         header = dict(scope.get("headers") or []).get(b"authorization", b"").decode("latin-1")
@@ -135,12 +144,14 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         auth = SupabaseAuth(supabase_url, publishable_key)
     guides = guides or Guides(store)
     mcp = build(store, relay, public_url, guides)
+    beta_mcp = build(store, relay, public_url, guides, beta=True)
     # Google Home (google_home.py) : identifiants donnés à Google et client public Supabase du relais d'autorisation.
     google = GoogleHome(store, relay, auth, public_url, os.environ.get("ROMKADE_GOOGLE_CLIENT_ID", ""),
                         os.environ.get("ROMKADE_GOOGLE_CLIENT_SECRET", ""),
                         os.environ.get("ROMKADE_GOOGLE_SUPABASE_CLIENT_ID", ""),
                         homegraph=HomeGraph(os.environ.get("ROMKADE_GOOGLE_SERVICE_ACCOUNT_B64", "")))
     analytics = Analytics(mcp)  # statistiques d'usage, sans le contenu des appels (analytics.py)
+    beta_analytics = Analytics(beta_mcp)
     art = Art(store)
 
     hosts = [h.strip() for h in os.environ.get("ROMKADE_ALLOWED_HOSTS", "").split(",") if h.strip()]
@@ -152,6 +163,9 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
                                          allowed_origins=[*WEB_CLIENTS, "http://localhost:*", "http://127.0.0.1:*"])
     app = mcp.streamable_http_app(streamable_http_path="/mcp", stateless_http=True, json_response=True,
                                   transport_security=security)
+    beta_app = beta_mcp.streamable_http_app(streamable_http_path="/mcp-beta", stateless_http=True, json_response=True,
+                                            transport_security=security)
+    app.router.routes.extend(r for r in beta_app.router.routes if getattr(r, "path", None) == "/mcp-beta")
 
     # ---------- agent ----------
     def console_of(request: Request):
@@ -275,11 +289,12 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         return PlainTextResponse(token) if token else PlainTextResponse("Not found", status_code=404)
 
     # ---------- comptes ROMKADE (OAuth) ----------
-    async def protected_resource(_: Request) -> Response:
-        """RFC 9728 : quel serveur d'autorisation délivre les jetons de ce serveur MCP."""
+    async def protected_resource(request: Request) -> Response:
+        """RFC 9728 : quel serveur d'autorisation délivre les jetons de ce serveur MCP (ou de celui de /beta)."""
         if auth is None:
             return JSONResponse({"error": "not_found"}, 404)
-        return JSONResponse({"resource": public_url, "authorization_servers": [auth.issuer],
+        resource = f"{public_url}/beta" if request.url.path.endswith("/beta") else public_url
+        return JSONResponse({"resource": resource, "authorization_servers": [auth.issuer],
                              "bearer_methods_supported": ["header"], "resource_name": "ROMKADE",
                              "resource_documentation": "https://romkade.com", "resource_logo_uri": f"{public_url}/icon.png"},
                             headers={"Cache-Control": "public, max-age=3600"})
@@ -433,6 +448,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/.well-known/openai-apps-challenge", openai_challenge),
         Route("/.well-known/oauth-protected-resource", protected_resource),
         Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
+        Route("/.well-known/oauth-protected-resource/beta", protected_resource),
         Route("/.well-known/oauth-authorization-server", authorization_server),
         Route("/oauth/consent", consent),
         Route("/api/me/consoles", my_consoles, methods=["GET", "POST"]),
@@ -455,11 +471,12 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
             asyncio.get_running_loop().create_task(_fetch_cheats())
         watcher = asyncio.get_running_loop().create_task(google.watch_online())  # Google Home : en ligne / hors ligne
         try:
-            async with inner_lifespan(a) as state:
+            async with inner_lifespan(a) as state, beta_app.router.lifespan_context(beta_app):
                 yield state
         finally:
             watcher.cancel()
             await analytics.close()
+            await beta_analytics.close()
 
     app.router.lifespan_context = lifespan
     app.state.store, app.state.relay, app.state.google, app.state.guides = store, relay, google, guides

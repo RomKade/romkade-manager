@@ -68,8 +68,15 @@ def test_guide_and_screen_tools(env):  # noqa: F811
             first = await agent.hello()
             await agent.upload(FILES)
             loop = asyncio.create_task(agent.serve())
-            async with Client(f"{base}/{token}") as mcp:
+            # Adresse publique (en examen dans les annuaires) : sans les outils en bêta.
+            async with Client(f"{base}/{token}") as public:
+                assert public.server_info.title == "ROMKADE"
+                names = {t.name for t in (await public.list_tools()).tools}
+                assert "launch_game" in names and not names & {"game_guide", "look_at_screen"}
+            async with Client(f"{base}/{token}/beta") as mcp:
+                assert mcp.server_info.title == "ROMKADE Beta" and "look_at_screen" in mcp.instructions
                 tools = {t.name: t for t in (await mcp.list_tools()).tools}
+                assert {"launch_game", "get_cheats", "game_guide", "look_at_screen"} <= set(tools)
                 assert tools["game_guide"].annotations.read_only_hint and tools["game_guide"].annotations.open_world_hint
                 assert tools["look_at_screen"].annotations.read_only_hint
                 await mcp.call_tool("pair_console", {"code": first["pairing_code"]})
@@ -117,5 +124,23 @@ def test_guide_and_screen_tools(env):  # noqa: F811
         finally:
             server.should_exit = True
             await task
+
+    asyncio.run(scenario())
+
+
+def test_beta_address_asks_for_the_same_romkade_login(env):  # noqa: F811
+    """/beta : même connexion ROMKADE (OAuth), avec ses propres métadonnées (ressource …/beta)."""
+    store, _ = env
+
+    async def scenario():
+        base = "https://mcp.example.com"
+        app = create_app(store, Relay(), public_url=base, auth=FakeAuth())
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as h:
+            r = await h.post("/beta", json={}, headers={"accept": "application/json, text/event-stream"})
+            assert r.status_code == 401
+            assert 'resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/beta"' in r.headers["www-authenticate"]
+            meta = (await h.get("/.well-known/oauth-protected-resource/beta")).json()
+            assert meta["resource"] == f"{base}/beta" and meta["authorization_servers"] == [FakeAuth.issuer]
+            assert (await h.get("/.well-known/oauth-protected-resource")).json()["resource"] == base
 
     asyncio.run(scenario())
