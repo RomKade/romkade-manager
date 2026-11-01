@@ -147,7 +147,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
     supabase_url = os.environ.get("ROMKADE_SUPABASE_URL", "")
     publishable_key = os.environ.get("ROMKADE_SUPABASE_PUBLISHABLE_KEY", "")
     if auth is None and supabase_url:
-        auth = SupabaseAuth(supabase_url, publishable_key)
+        auth = SupabaseAuth(supabase_url, publishable_key, os.environ.get("ROMKADE_SUPABASE_SECRET_KEY", ""))
     guides = guides or Guides(store)
     mcp = build(store, relay, public_url, guides)
     beta_mcp = build(store, relay, public_url, guides, beta=True)
