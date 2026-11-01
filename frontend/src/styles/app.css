@@ -357,18 +357,23 @@ button, input, select { font: inherit; color: inherit; }
 /* ---------- Fiche d'un jeu ---------- */
 .sheet-overlay { position: fixed; inset: 0; background: rgb(3 8 20 / 0.6); backdrop-filter: blur(2px); z-index: 40; animation: fade 160ms var(--ease); }
 .sheet {
-  position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100vw); z-index: 41;
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(600px, 100vw); z-index: 41;
   background: var(--panel); border-left: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
   box-shadow: -20px 0 50px rgb(0 0 0 / 0.4), -1px 0 18px color-mix(in srgb, var(--accent) 12%, transparent); overflow: auto;
   padding: 18px 22px 32px; animation: slide-in 220ms var(--ease);
 }
 @keyframes fade { from { opacity: 0; } }
 @keyframes slide-in { from { transform: translateX(24px); opacity: 0; } }
-.sheet__close { position: absolute; top: 12px; right: 12px; z-index: 2; }
+/* Fermer et l'étoile sont posés sur les images de la tête : fond sombre translucide pour rester lisibles. */
+.sheet__close, .sheet__fav { background: rgb(4 11 24 / 0.55); border-color: rgb(255 255 255 / 0.22); color: #fff; backdrop-filter: blur(6px); }
+.sheet__close:hover, .sheet__fav:hover { background: rgb(4 11 24 / 0.75); }
+.sheet__close { position: absolute; top: 12px; right: 12px; z-index: 3; width: 40px; height: 40px; padding: 0; border-radius: 50%; }
 .sheet__body { display: flex; flex-direction: column; gap: 18px; }
-.sheet__head { display: flex; flex-direction: column; gap: 6px; padding-right: 44px; }  /* place du bouton Fermer */
+.sheet__head { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-bottom: 2px; }
+.sheet__fav { position: absolute; top: 12px; right: 60px; z-index: 3; width: 40px; height: 40px; padding: 0; border-radius: 50%; }  /* sans le padding par défaut : étoile centrée */
+.sheet__fav.is-on { color: #ffc93c; }
 .sheet__platform { color: var(--accent); font-weight: 700; font-size: var(--fs-sm); }
-.sheet__title { font-size: var(--fs-xl); font-stretch: 112%; }
+.sheet__title { font-size: clamp(1.5rem, 1.1rem + 1.4vw, 1.9rem); font-stretch: 112%; line-height: 1.1; text-wrap: balance; }
 .sheet__section { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
 .sheet__section h2 { font-size: var(--fs-md); }
 /* Commandes du jeu */
@@ -701,16 +706,18 @@ button, input, select { font: inherit; color: inherit; }
 /* Jeu signalé comme ne fonctionnant pas : rouge (--err), sur la fiche et dans le filtre de la bibliothèque */
 .broken-button.is-on, .chip--broken.is-on { color: var(--err); border-color: color-mix(in srgb, var(--err) 55%, var(--line)); background: color-mix(in srgb, var(--err) 12%, var(--panel-2)); }
 .tag--broken { display: inline-flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--err) 16%, transparent); color: var(--err); font-weight: 600; }
-/* « Qui joue ? » : les 4 joueurs en deux colonnes, aérés, séparés des boutons Jouer / Favoris en dessous */
-.launch-who { flex-basis: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px;
-  margin: 0 0 14px; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); min-width: 0; }
-.launch-who legend { padding: 0; margin-bottom: 14px; font-weight: 700; }
-.launch-who__player { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-@media (max-width: 480px) { .launch-who { grid-template-columns: minmax(0, 1fr); } }
+/* « Manettes et joueurs » : une ligne par joueur (libellé, puis sa manette), « Ajouter un joueur » en dessous */
+.launch-who { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.launch-who__player { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; }
 .launch-who__player span { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); }
+.launch-who__add { align-self: flex-start; gap: 8px; margin-top: 4px; font-weight: 600; }
+/* Flèche dessinée (la flèche native colle au bord droit) : à 14px du bord */
 .launch-who select {
-  height: 40px; padding: 0 12px; border-radius: var(--r-control); border: 1px solid var(--line-strong);
-  background: var(--panel-2); color: var(--ink); width: 100%; min-width: 0; text-overflow: ellipsis;
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237d93ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 16px;
+  height: 44px; padding: 0 42px 0 12px; border-radius: var(--r-control); border: 1px solid var(--line-strong);
+  background-color: var(--panel-2); color: var(--ink); width: 100%; min-width: 0; text-overflow: ellipsis;
 }
 .launch-who select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 22%, transparent); }
 .device-card__playing { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
@@ -1479,26 +1486,41 @@ kbd {
 .assistant__disclaimer { margin: 0; font-size: 0.72rem; color: var(--ink-3); }
 @media (prefers-reduced-motion: no-preference) { .assistant__panel { animation: fade 160ms ease; } }
 
-/* Fiche d'un jeu : diaporama des images (jaquette d'abord, puis image de la carte) */
-.gallery { display: flex; flex-direction: column; gap: 8px; }
-.gallery__stage { position: relative; background: var(--screen); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
-  border-radius: var(--r-panel); box-shadow: var(--shadow-inset); overflow: hidden; }
-.gallery__stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.gallery__frame { border-radius: 0; }
-.gallery__loading { position: absolute; inset: 0; margin: auto; color: var(--ink-3); }
-.gallery__arrow { position: absolute; top: 50%; translate: 0 -50%; display: grid; place-items: center; width: 38px; height: 38px;
-  border-radius: 50%; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 82%, transparent); color: var(--ink);
-  cursor: pointer; backdrop-filter: blur(6px); }
-.gallery__arrow:hover { border-color: var(--accent); color: var(--accent); }
-.gallery__arrow--prev { left: 10px; }
-.gallery__arrow--next { right: 10px; }
-.gallery__dots { position: absolute; bottom: 10px; left: 50%; translate: -50% 0; display: flex; gap: 6px; padding: 5px 8px;
-  border-radius: 999px; background: color-mix(in srgb, var(--panel) 75%, transparent); }
-.gallery__dot { width: 8px; height: 8px; padding: 0; border-radius: 50%; border: 0; background: var(--ink-3); cursor: pointer; }
-.gallery__dot.is-active { background: var(--accent); }
-.gallery__under { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; min-height: 1.4em; }
-.gallery__credit { font-size: var(--fs-xs); color: var(--ink-3); margin-left: auto; }
-.gallery__credit a { color: inherit; }
+/* Fiche d'un jeu : le jeu en images en tête, sur toute la largeur (capture, écran titre, image de la carte) */
+.sheet-hero { position: relative; margin: -18px -22px 0; aspect-ratio: 16 / 9; overflow: hidden; background: var(--bezel); }
+.sheet-hero:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sheet-hero__frame, .sheet-hero__fallback { position: absolute; inset: 0; }
+.sheet-hero__backdrop { position: absolute; inset: -8%; width: 116%; height: 116%; object-fit: cover; filter: blur(22px) saturate(1.25) brightness(0.6); opacity: 0; transition: opacity 240ms; }
+/* L'image remplit tout le cadre (une capture 4:3 perd un peu de haut et de bas) ; le fond flou ne se voit qu'au chargement. */
+.sheet-hero__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 240ms; }
+.sheet-hero__frame.is-loaded .sheet-hero__img, .sheet-hero__frame.is-loaded .sheet-hero__backdrop { opacity: 1; }
+.sheet-hero__fallback { width: 100%; height: 100%; object-fit: cover; filter: blur(26px) saturate(1.3) brightness(0.55); transform: scale(1.15); }
+/* Fondu vers le panneau en bas : la jaquette et le titre s'y posent. */
+.sheet-hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(0deg, var(--panel) 0, color-mix(in srgb, var(--panel) 55%, transparent) 14%, transparent 42%),
+    linear-gradient(180deg, rgb(4 11 24 / 0.45) 0, transparent 22%); }
+.sheet-hero__loading { position: absolute; inset: 0; margin: auto; color: var(--screen-ink-2); }
+.sheet-hero__arrow { position: absolute; z-index: 2; top: 46%; translate: 0 -50%; display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 50%; border: 1px solid rgb(255 255 255 / 0.22); background: rgb(4 11 24 / 0.55); color: #fff;
+  cursor: pointer; backdrop-filter: blur(6px); transition: background var(--dur, 160ms), border-color var(--dur, 160ms); }
+.sheet-hero__arrow:hover, .sheet-hero__arrow:focus-visible { background: rgb(4 11 24 / 0.8); border-color: #fff; }
+.sheet-hero__arrow--prev { left: 14px; }
+.sheet-hero__arrow--next { right: 14px; }
+/* Miniatures en bas à droite, compteur au-dessus ; elles laissent la place à la jaquette à gauche. */
+.sheet-hero__thumbs { position: absolute; z-index: 2; right: 14px; bottom: 18px; display: flex; gap: 8px; }
+.sheet-hero__count { position: absolute; right: 0; bottom: calc(100% + 6px); font-size: var(--fs-xs); font-weight: 700; color: #fff;
+  text-shadow: 0 1px 4px rgb(0 0 0 / 0.8); }
+.sheet-hero__thumb { width: 88px; aspect-ratio: 16 / 10; padding: 0; overflow: hidden; border-radius: 6px; cursor: pointer;
+  border: 2px solid rgb(255 255 255 / 0.25); background: var(--bezel); opacity: 0.75; transition: opacity 160ms, border-color 160ms; }
+.sheet-hero__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sheet-hero__thumb:hover { opacity: 1; }
+.sheet-hero__thumb.is-active { opacity: 1; border-color: var(--accent); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent); }
+.sheet-hero__credit { position: absolute; z-index: 2; left: 14px; top: 14px; font-size: var(--fs-xs); color: rgb(255 255 255 / 0.75); text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
+.sheet-hero__credit a { color: inherit; }
+@media (max-width: 520px) {
+  .sheet-hero__thumb { width: 60px; }
+  .sheet-hero__arrow { width: 34px; height: 34px; }
+}
 .sheet__trailer { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; }
 
 /* Logo de la barre latérale : retour au tableau de bord */
@@ -1727,3 +1749,61 @@ kbd {
 .onboarding__summary li.is-off { color: var(--ink-2); font-weight: 500; }
 .onboarding__dash { width: 16px; text-align: center; }
 .onboarding__open { align-self: center; margin-top: 8px; }
+
+/* ---------- Fiche d'un jeu : jaquette et « Jouer », groupes repliables, pied ---------- */
+/* Jaquette qui chevauche le bas des images, titre à côté */
+.sheet__ident { position: relative; z-index: 1; display: flex; align-items: flex-end; gap: 18px; margin-top: -78px; }
+.sheet__cover { flex: none; width: 128px; aspect-ratio: 3 / 4; border-radius: 6px; border: 1px solid rgb(255 255 255 / 0.18);
+  box-shadow: 0 14px 30px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(0 0 0 / 0.3); }
+@media (max-width: 520px) {
+  .sheet__ident { gap: 14px; margin-top: -56px; }
+  .sheet__cover { width: 96px; }
+}
+/* État de la console à gauche, Jouer / Reprendre à droite */
+.sheet__play { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 18px; padding: 14px 16px;
+  border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--panel-2); }
+.sheet__play:has(.playing-banner) { display: block; padding: 0; border: 0; background: none; }
+.sheet__play-state { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sheet__play-state > p { margin: 0; }
+.sheet__play-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 220px; }
+.sheet__play-error { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 520px) {
+  .sheet__play { grid-template-columns: minmax(0, 1fr); }
+  .sheet__play-actions { min-width: 0; align-items: stretch; text-align: center; }
+}
+.sheet__status { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: var(--fs-sm); }
+.sheet__status.is-online { color: var(--ok); }
+.sheet__status.is-offline { color: var(--ink-2); }
+.sheet__play-button { align-self: stretch; justify-content: center; min-height: 48px; font-size: var(--fs-md); }
+.sheet__play-alt { text-decoration: underline; text-underline-offset: 3px; font-size: var(--fs-sm); }
+.sheet__play .playing-banner { align-self: stretch; }
+
+.sheet__groups { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.sheet__group { border-bottom: 1px solid var(--line); }
+.sheet__group > summary {
+  display: grid; grid-template-columns: 26px minmax(0, 1fr) 20px; align-items: center; gap: 16px; padding: 14px 0;
+  cursor: pointer; list-style: none; border-radius: var(--r-control);
+}
+.sheet__group > summary::-webkit-details-marker { display: none; }
+.sheet__group > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sheet__group > summary:hover .sheet__group-chevron { color: var(--accent); }
+.sheet__group-icon { color: var(--ink-2); }
+.sheet__group-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sheet__group-text strong { font-family: var(--font-display); font-size: var(--fs-md); font-weight: 650; }
+.sheet__group-text span { font-size: var(--fs-sm); color: var(--ink-2); }
+.sheet__group-chevron { color: var(--ink-2); transition: transform 0.2s var(--ease); }
+.sheet__group[open] .sheet__group-chevron { transform: rotate(-90deg); }
+.sheet__group-body { display: flex; flex-direction: column; gap: 14px; padding: 2px 0 18px 42px; }
+@media (max-width: 520px) { .sheet__group-body { padding-left: 0; } }
+/* Le titre du groupe remplace celui de la section ; une section suivante garde son trait */
+.sheet__group-body > .sheet__section:first-child { border-top: 0; padding-top: 0; }
+.sheet__group-body > .controls > h2, .sheet__group-body > .cheats > h2, .sheet__group-body > .game-info > h2 { display: none; }
+.sheet__group-body > .sheet__trailer + .sheet__section { border-top: 0; padding-top: 0; }
+.sheet__ask { align-self: flex-start; }
+
+.sheet__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 52px; }  /* au-dessus de la bulle de l'assistant */
+.sheet__report { color: var(--ink-2); gap: 8px; font-size: var(--fs-sm); }
+.sheet__report.is-on { color: var(--err); }
+.sheet__reactions { display: inline-flex; align-items: center; gap: 6px; }
+.sheet__reactions .icon-button { width: 40px; height: 40px; padding: 0; border-color: var(--line); }
+.like-button.is-on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }

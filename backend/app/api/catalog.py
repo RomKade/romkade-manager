@@ -187,6 +187,17 @@ async def remove_dislike(game_id: int, request: Request) -> None:
     await asyncio.to_thread(_with_write, request, cq.set_disliked, console_id(request), game_id, False)
 
 
+@router.put("/games/{game_id}/like", status_code=204, tags=["catalog"])
+async def add_like(game_id: int, request: Request) -> None:
+    """« J'aime » (pouce en haut) : retire « Je n'aime pas »."""
+    await asyncio.to_thread(_with_write, request, cq.set_liked, console_id(request), game_id, True)
+
+
+@router.delete("/games/{game_id}/like", status_code=204, tags=["catalog"])
+async def remove_like(game_id: int, request: Request) -> None:
+    await asyncio.to_thread(_with_write, request, cq.set_liked, console_id(request), game_id, False)
+
+
 @router.put("/games/{game_id}/broken", status_code=204, tags=["catalog"])
 async def mark_broken(game_id: int, request: Request) -> None:
     """Signale le jeu comme ne fonctionnant pas sur la console branchée."""
@@ -238,8 +249,10 @@ async def game_image(
 async def game_boxart(
     game_id: int, request: Request,
     size: Literal["thumb", "full"] = Query("thumb", description="thumb : miniature WebP pour la grille"),
+    kind: Literal["box", "snap", "title"] = Query("box", description="box : jaquette ; snap : capture du jeu ; title : écran titre"),
 ) -> FileResponse:
-    """Jaquette du jeu (libretro-thumbnails), téléchargée au premier appel puis servie depuis le cache du Mac."""
+    """Jaquette du jeu (libretro-thumbnails), ou sa capture d'écran, ou son écran titre : téléchargée au premier appel
+    puis servie depuis le cache du Mac."""
     def lookup(s):
         f = cq.get_file(s, game_id)
         s.expunge(f)
@@ -249,9 +262,9 @@ async def game_boxart(
     if not boxart.has_source(f.platform.directory):
         raise errors.AppError("boxart_not_found", "Pas de banque de jaquettes pour cette console", 404)
     store = request.app.state.boxart
-    path = await store.get(f, load_index())
+    path = await store.get(f, load_index(), kind)
     if path is None:
-        raise errors.AppError("boxart_not_found", "Aucune jaquette trouvée pour ce jeu", 404)
+        raise errors.AppError("boxart_not_found", "Aucune image trouvée pour ce jeu", 404)
     served = await store.thumbnail(path) if size == "thumb" else path
     return FileResponse(served, media_type=media_type(str(served)),
                         headers={"Cache-Control": "private, max-age=604800"})

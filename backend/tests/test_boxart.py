@@ -45,6 +45,10 @@ async def test_boxart_downloaded_once_then_cached(app_factory, ssh_server):
         await c.get(mario["boxart_url"])
         assert len(asked) == n  # servi depuis le cache
 
+        r = await c.get(mario["boxart_url"], params={"kind": "snap", "size": "full"})
+        assert r.status_code == 404  # capture du jeu : son propre dossier, absente ici
+        assert "/Nintendo - Super Nintendo Entertainment System/Named_Snaps/Super Mario World (USA).png" in asked
+
         r = await c.get(sonic["boxart_url"])
         assert r.status_code == 404 and r.json()["error"]["code"] == "boxart_not_found"
         n = len(asked)

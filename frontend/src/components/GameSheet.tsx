@@ -1,18 +1,20 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { Ban, Copy, Download, Gamepad2, Loader2, Save, Square, Star, ThumbsDown, Users, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Ban, ChevronRight, Copy, Download, Gamepad2, Info, KeyRound, Lightbulb, Loader2, type LucideIcon, MessageCircle,
+  Play, CirclePlus, Save, Settings, Square, Star, ThumbsDown, ThumbsUp, TriangleAlert, Users, X } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { saveFileUrl, type GameDetail } from "../api/client";
-import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetBroken, useSetDislike, useSetFavorite, useSetPlayers } from "../api/queries";
+import { useCaps, useDeviceStatus, useGame, useGameCheats, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetBroken, useSetDislike, useSetFavorite, useSetLike, useSetPlayers } from "../api/queries";
 import { useT } from "../i18n";
 import { bytes, date, dateTime } from "../lib/format";
 import { controllerLabel, dropUnusedRelays, linkComputerPad, padName, useComputerPads, useRelays } from "../lib/computerPads";
 import { assignPlayer, completePlayers, defaultSlots, PLAYERS } from "../lib/players";
 import { saveLabel } from "../lib/saves";
 import { ConsoleBadge } from "./ConsoleBadge";
-import { assistant } from "../lib/assistant";
+import { Cover } from "./Cover";
+import { assistant, useAssistant } from "../lib/assistant";
 import { AssistantBubble } from "./AssistantBubble";
 import { GameCheatsSection } from "./GameCheats";
 import { GameControlsSection } from "./GameControls";
@@ -78,107 +80,207 @@ export function GameSheet({ id, onClose, onOpen, onVideo }: {
   );
 }
 
+/**
+ * Fiche d'un jeu : en tête, le jeu en images sur toute la largeur (étoile des favoris et Fermer par-dessus) ; la
+ * jaquette, qui chevauche le bas des images, à côté du titre ; puis « Jouer » (« Reprendre la partie » quand une
+ * instantanée auto existe) à côté de l'état de la console ; puis des groupes repliables (manettes, commandes, codes,
+ * sauvegardes, à propos, fichier) ; en bas « Signaler un problème » et les pouces.
+ */
 function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: number) => void; onVideo?: (game: GameDetail) => void }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
+  const candidate = game.role === "candidate";
+  const launch = useLaunch(game.id);
+  const regions = game.region ? game.region.split(", ") : [];
   const copyPath = async () => {
     await navigator.clipboard?.writeText(game.remote_path);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+  const trailer = Boolean(game.youtube_url || onVideo);
 
   return (
     <div className="sheet__body">
-      {/* Titre, puis console, au-dessus des images ; sous les images : bande-annonce (lien) et source de la jaquette. */}
-      <div className="sheet__head">
-        <Dialog.Title className="sheet__title">{game.title}</Dialog.Title>
-        <p className="sheet__platform"><ConsoleBadge code={game.platform.code} label={game.platform.label} />
-          {game.platform.label && <span>{game.platform.label}</span>}
-          <PlayersTag players={game.players ?? null} link={game.players_link} /></p>
-        {!game.present && <p className="tag tag--warn">{t("sheet.absent")}</p>}
-        {game.broken && <p className="tag tag--broken"><Ban size={14} aria-hidden /> {t("sheet.broken.tag")}</p>}
+      <GameGallery key={game.id} game={game} />
+      {candidate && <FavoriteStar id={game.id} on={game.favorite ?? false} />}
+
+      <div className="sheet__ident">
+        <Cover key={game.id} game={game} size="full" className="sheet__cover" />
+        <div className="sheet__head">
+          <Dialog.Title className="sheet__title">{game.title}</Dialog.Title>
+          <p className="sheet__platform"><ConsoleBadge code={game.platform.code} label={game.platform.label} />
+            {game.platform.label && <span>{game.platform.label}</span>}
+            {regions.length > 0 && <span>{regions.map((r) => t(`common.region.${r}`)).join(", ")}</span>}
+            <PlayersTag players={game.players ?? null} link={game.players_link} /></p>
+          {!game.present && <p className="tag tag--warn">{t("sheet.absent")}</p>}
+          {game.broken && <p className="tag tag--broken"><Ban size={14} aria-hidden /> {t("sheet.broken.tag")}</p>}
+        </div>
       </div>
-      <GameGallery key={game.id} game={game} left={
-        <TrailerButton game={game} onVideo={onVideo} className="link-button sheet__trailer">
-          <YoutubeIcon size={16} className="yt-icon--brand" /> {t("sheet.trailer")}
-        </TrailerButton>
-      } />
-      <PlayingBanner gameId={game.id} />
-      {game.role === "candidate" && (
-        <div className="sheet__actions">
-          {game.present && <LaunchButton id={game.id} />}
-          <FavoriteButton id={game.id} on={game.favorite ?? false} />
-          <DislikeButton id={game.id} on={game.disliked ?? false} />
-          <BrokenButton id={game.id} on={game.broken ?? false} />
-        </div>
-      )}
 
-      <GameInfo game={game} />
+      {candidate && <PlayPanel game={game} launch={launch} />}
 
-      {game.role === "candidate" && <GameControlsSection id={game.id} />}
-      {game.role === "candidate" && <GameCheatsSection id={game.id} />}
-      <GameScreenshots id={game.id} title={game.title} />
-
-      <dl className="facts">
-        {game.full_title && <div className="facts__wide"><dt>{t("sheet.fullTitle")}</dt><dd>{game.full_title}</dd></div>}
-        <div><dt>{t("sheet.file")}</dt><dd className="break">{game.filename}</dd></div>
-        <div><dt>{t("sheet.type")}</dt><dd>{t(ROLE_LABEL[game.role])}</dd></div>
-        <div><dt>{t("sheet.format")}</dt><dd>{game.extension ? `.${game.extension}` : t("sheet.noExtension")}</dd></div>
-        <div><dt>{t("sheet.size")}</dt><dd className="num">{bytes(game.size)}</dd></div>
-        <div><dt>{t("sheet.modified")}</dt><dd>{date(game.modified_at)}</dd></div>
-        <div><dt>{t("sheet.firstSeen")}</dt><dd>{dateTime(game.first_seen_at)}</dd></div>
-        <div className="facts__wide">
-          <dt>{t("sheet.location")}</dt>
-          <dd className="path">
-            <code className="break">{game.remote_path}</code>
-            <button type="button" className="icon-button" onClick={copyPath} aria-label={t("sheet.copyPath")}>
-              <Copy size={15} aria-hidden />
-            </button>
-            {copied && <span className="path__copied" role="status">{t("sheet.copied")}</span>}
-          </dd>
-        </div>
-      </dl>
-
-
-      <GameSaves id={game.id} />
-
-      {game.possible_duplicates.length > 0 && (
-        <section className="sheet__section" aria-labelledby="dup-h">
-          <h2 id="dup-h">{t("sheet.duplicates")}</h2>
-          <ul className="dup-list">
-            {game.possible_duplicates.map((d) => (
-              <li key={d.id}>
-                <button type="button" className="link-button" onClick={() => onOpen(d.id)}>
-                  {d.filename}
+      <div className="sheet__groups">
+        {candidate && launch.online && launch.options.length > 0 && (
+          <Group icon={Gamepad2} title={t("sheet.group.players")} sub={t("sheet.group.players.sub")} open>
+            <PlayersPicker launch={launch} />
+          </Group>
+        )}
+        {candidate && <HelpGroup game={game} />}
+        {candidate && <CheatsGroup id={game.id} />}
+        {candidate && <SavesGroup id={game.id} online={launch.online} />}
+        <Group icon={Info} title={t("sheet.group.about")}
+          sub={[t("sheet.group.about.summary"), trailer && t("sheet.trailer")].filter(Boolean).join(" · ")}>
+          {trailer && (
+            <TrailerButton game={game} onVideo={onVideo} className="link-button sheet__trailer">
+              <YoutubeIcon size={16} className="yt-icon--brand" /> {t("sheet.trailer")}
+            </TrailerButton>
+          )}
+          <GameInfo game={game} />
+          <GameScreenshots id={game.id} title={game.title} />
+        </Group>
+        <Group icon={Settings} title={t("sheet.group.file")}
+          sub={[game.extension?.toUpperCase(), bytes(game.size)].filter(Boolean).join(" · ")}>
+          <dl className="facts">
+            {game.full_title && <div className="facts__wide"><dt>{t("sheet.fullTitle")}</dt><dd>{game.full_title}</dd></div>}
+            <div><dt>{t("sheet.file")}</dt><dd className="break">{game.filename}</dd></div>
+            <div><dt>{t("sheet.type")}</dt><dd>{t(ROLE_LABEL[game.role])}</dd></div>
+            <div><dt>{t("sheet.format")}</dt><dd>{game.extension ? `.${game.extension}` : t("sheet.noExtension")}</dd></div>
+            <div><dt>{t("sheet.size")}</dt><dd className="num">{bytes(game.size)}</dd></div>
+            <div><dt>{t("sheet.modified")}</dt><dd>{date(game.modified_at)}</dd></div>
+            <div><dt>{t("sheet.firstSeen")}</dt><dd>{dateTime(game.first_seen_at)}</dd></div>
+            <div className="facts__wide">
+              <dt>{t("sheet.location")}</dt>
+              <dd className="path">
+                <code className="break">{game.remote_path}</code>
+                <button type="button" className="icon-button" onClick={copyPath} aria-label={t("sheet.copyPath")}>
+                  <Copy size={15} aria-hidden />
                 </button>
-                <span className="muted num">{bytes(d.size)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+                {copied && <span className="path__copied" role="status">{t("sheet.copied")}</span>}
+              </dd>
+            </div>
+          </dl>
 
-      <section className="sheet__section" aria-labelledby="hist-h">
-        <h2 id="hist-h">{t("sheet.history")}</h2>
-        <ol className="timeline">
-          {game.history.map((h, i) => (
-            <li key={i}>
-              <span>{t(CHANGE_LABEL[h.change])}</span>
-              <span className="muted">{dateTime(h.run_started_at)}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
+          {game.possible_duplicates.length > 0 && (
+            <section className="sheet__section" aria-labelledby="dup-h">
+              <h2 id="dup-h">{t("sheet.duplicates")}</h2>
+              <ul className="dup-list">
+                {game.possible_duplicates.map((d) => (
+                  <li key={d.id}>
+                    <button type="button" className="link-button" onClick={() => onOpen(d.id)}>
+                      {d.filename}
+                    </button>
+                    <span className="muted num">{bytes(d.size)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="sheet__section" aria-labelledby="hist-h">
+            <h2 id="hist-h">{t("sheet.history")}</h2>
+            <ol className="timeline">
+              {game.history.map((h, i) => (
+                <li key={i}>
+                  <span>{t(CHANGE_LABEL[h.change])}</span>
+                  <span className="muted">{dateTime(h.run_started_at)}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        </Group>
+      </div>
+
+      {candidate && (
+        <div className="sheet__foot">
+          <BrokenButton id={game.id} on={game.broken ?? false} />
+          <Reactions id={game.id} liked={game.liked ?? false} disliked={game.disliked ?? false} />
+        </div>
+      )}
     </div>
   );
 }
 
-/**
- * Disparaît quand ce jeu tourne (le bandeau « En cours » prend le relais) ; bloqué pendant son démarrage.
- * Raccourci de la page Manettes : plusieurs manettes possibles (boutons de la console, manettes branchées, manettes
- * de l'ordinateur) : « Qui joue ? » donne une manette à chaque joueur (jusqu'à 4) ; « Jouer » écrit ce choix (en
- * relayant d'abord les manettes de l'ordinateur), puis lance le jeu, qui le prend en compte au démarrage de RetroArch.
- */
+/** Groupe repliable de la fiche : pictogramme, titre et résumé d'une ligne ; le contenu s'ouvre en dessous. */
+function Group({ icon: Icon, title, sub, open = false, children }: {
+  icon: LucideIcon; title: string; sub?: string; open?: boolean; children: ReactNode;
+}) {
+  return (
+    <details className="sheet__group" open={open}>
+      <summary>
+        <Icon size={22} aria-hidden className="sheet__group-icon" />
+        <span className="sheet__group-text">
+          <strong>{title}</strong>
+          {sub && <span>{sub}</span>}
+        </span>
+        <ChevronRight size={20} aria-hidden className="sheet__group-chevron" />
+      </summary>
+      <div className="sheet__group-body">{children}</div>
+    </details>
+  );
+}
+
+/** Commandes du jeu, et l'assistant ouvert sur ce jeu (sauf s'il est masqué dans les paramètres). */
+function HelpGroup({ game }: { game: GameDetail }) {
+  const t = useT();
+  const { name, hidden } = useAssistant();
+  const ask = () => {
+    assistant.setScope({ kind: "game", game: { id: game.id, title: game.title, platform: game.platform.label ?? game.platform.directory } });
+    assistant.setOpen(true);
+  };
+  return (
+    <Group icon={Lightbulb} title={t("sheet.group.help")}
+      sub={hidden ? t("sheet.group.help.subAlone") : t("sheet.group.help.sub", { name })}>
+      <GameControlsSection id={game.id} />
+      {!hidden && (
+        <button type="button" className="button button--small sheet__ask" onClick={ask}>
+          <MessageCircle size={14} aria-hidden /> {t("sheet.askAssistant", { name })}
+        </button>
+      )}
+    </Group>
+  );
+}
+
+function CheatsGroup({ id }: { id: number }) {
+  const t = useT();
+  const data = useGameCheats(id).data;
+  const count = data?.files[0]?.count ?? 0;
+  const sub = !data ? undefined : !data.available ? t("sheet.group.cheats.download") : count === 0 ? t("sheet.group.cheats.none")
+    : count === 1 ? t("sheet.group.cheats.one") : t("sheet.group.cheats.many", { count });
+  return (
+    <Group icon={KeyRound} title={t("sheet.cheats.title")} sub={sub}>
+      <GameCheatsSection id={id} />
+    </Group>
+  );
+}
+
+/** Sauvegardes de ce jeu sur la console (lecture seule), avec un lien vers la page Sauvegardes. */
+function SavesGroup({ id, online }: { id: number; online: boolean }) {
+  const t = useT();
+  const saves = useGameSaves(online ? id : null);
+  const kinds = [...new Set((saves.data ?? []).map((s) => saveLabel(t, s)))];
+  const sub = !online ? t("sheet.console.offline") : saves.isPending ? t("saves.scanning")
+    : saves.data ? (kinds.length ? kinds.join(" · ") : t("sheet.group.saves.none")) : undefined;
+  return (
+    <Group icon={Save} title={t("saves.title")} sub={sub}>
+      {!online ? <p className="muted">{t("sheet.group.saves.offline")}</p>
+        : saves.isPending ? <Spinner label={t("saves.scanning")} /> : saves.isError ? <ErrorNotice error={saves.error} /> :
+        saves.data.length === 0 ? <p className="muted">{t("saves.noneForGame")}</p> : (
+          <ul className="dup-list">
+            {saves.data.map((s) => (
+              <li key={s.path}>
+                <span>{saveLabel(t, s)}</span>
+                <span className="muted num">{dateTime(s.modified_at)}</span>
+                <PlaySaveButton save={s} />
+                <a className="icon-button" href={saveFileUrl(s.path)} download aria-label={t("saves.download")}><Download size={14} aria-hidden /></a>
+              </li>
+            ))}
+          </ul>
+        )}
+      <Link to={`/sauvegardes?game=${id}`} className="link">{t("saves.manage")}</Link>
+    </Group>
+  );
+}
+
 /** Sous le titre, à côté de la console : 1 joueur, jusqu'à N joueurs, ou à plusieurs avec câble link. Inconnu : rien. */
 function PlayersTag({ players, link }: { players: number | null; link: boolean }) {
   const t = useT();
@@ -192,7 +294,15 @@ function PlayersTag({ players, link }: { players: number | null; link: boolean }
   );
 }
 
-function LaunchButton({ id }: { id: number }) {
+type Launch = ReturnType<typeof useLaunch>;
+
+/**
+ * Lancement depuis la fiche, partagé par « Jouer » et le groupe « Manettes et joueurs ». Raccourci de la page
+ * Manettes : plusieurs manettes possibles (boutons de la console, manettes branchées, manettes de l'ordinateur) ;
+ * chaque joueur (jusqu'à 4) a sa manette ; « Jouer » écrit ce choix (en relayant d'abord les manettes de
+ * l'ordinateur), puis lance le jeu, qui le prend en compte au démarrage de RetroArch.
+ */
+function useLaunch(id: number) {
   const t = useT();
   const launch = useLaunchGame();
   const online = useDeviceStatus().data?.connected === true;
@@ -212,11 +322,10 @@ function LaunchButton({ id }: { id: number }) {
   // Une liste par joueur, les 4 joueurs comme sur la page Manettes : chaque manette est à un seul joueur, les
   // joueurs en trop sont sur « Aucune manette ».
   const options = [...controllers.map((c) => String(c.index)), ...pads.map((g) => `pc:${g.index}`)];
-  const slots = PLAYERS;
-  const initial = defaultSlots(players, options, slots);
+  const initial = defaultSlots(players, options, PLAYERS);
   const [touched, setTouched] = useState<string[] | null>(null);
   // "" : aucune manette pour ce joueur (libère une manette pour la donner à un autre joueur).
-  const draft = touched && touched.length === slots && touched.every((v) => v === "" || options.includes(v)) ? touched : initial;
+  const draft = touched && touched.length === PLAYERS && touched.every((v) => v === "" || options.includes(v)) ? touched : initial;
   const pick = (n: number, value: string) => {
     const next = [...draft];
     const other = value === "" ? -1 : next.indexOf(value);
@@ -224,7 +333,9 @@ function LaunchButton({ id }: { id: number }) {
     next[n] = value;
     setTouched(next);
   };
-  const play = async () => {
+  /** `slot` : instantanée à charger au démarrage (« auto » pour reprendre la partie), sinon démarrage normal. */
+  const play = async (slot: string | null = null) => {
+    const start = () => launch.mutate(slot ? { id, slot } : id);
     setLinkError("");
     setLinking(true);
     try {
@@ -251,8 +362,8 @@ function LaunchButton({ id }: { id: number }) {
         return free;
       });
       setTouched(null);
-      if (final.every((v, i) => v === base[i])) launch.mutate(id);
-      else savePlayers.mutate(final, { onSuccess: (d) => { dropUnusedRelays(d); launch.mutate(id); } });
+      if (final.every((v, i) => v === base[i])) start();
+      else savePlayers.mutate(final, { onSuccess: (d) => { dropUnusedRelays(d); start(); } });
     } catch (e) {
       setLinkError((e as Error).message);
     } finally {
@@ -276,40 +387,99 @@ function LaunchButton({ id }: { id: number }) {
     const timer = setTimeout(() => setStarting(false), 60_000);
     return () => { clearInterval(poll); clearTimeout(timer); };
   }, [launch.isSuccess, launch.submittedAt, qc]);
-  if (now?.playing && now.game?.id === id) return null;
-  if (!caps.launch) return <p className="muted">{t("sheet.launchUnavailable")}</p>;
-  // Un seul état visible de l'envoi au démarrage du jeu (jusqu'à ce que le bandeau « En cours » prenne le relais).
-  const busy = launch.isPending || savePlayers.isPending || starting || linking;
+  return {
+    online, caps, options, draft, pick, optionLabel, play, linkError,
+    playing: now?.playing === true && now.game?.id === id,
+    // Un seul état visible de l'envoi au démarrage du jeu (jusqu'à ce que le bandeau « En cours » prenne le relais).
+    busy: launch.isPending || savePlayers.isPending || starting || linking,
+    error: launch.isError || savePlayers.isError ? (launch.error ?? savePlayers.error) : null,
+  };
+}
+
+/**
+ * Sous le titre : l'état de la console (et l'instantanée auto de RetroArch quand il y en a une) à gauche, « Reprendre
+ * la partie » (ou démarrer normalement) ou « Jouer » à droite. Le bandeau « En cours » le remplace quand ce jeu tourne.
+ */
+function PlayPanel({ game, launch }: { game: GameDetail; launch: Launch }) {
+  const t = useT();
+  const { online, caps, busy } = launch;
+  const saves = useGameSaves(online ? game.id : null);
+  if (launch.playing) return <div className="sheet__play"><PlayingBanner gameId={game.id} /></div>;
+  const auto = caps.resume_slot
+    ? saves.data?.find((s) => s.kind === "state" && s.slot === "auto" && s.source === "retroarch") : undefined;
+  const canLaunch = game.present && caps.launch;
   return (
-    <>
-      {options.length > 1 && (
-        <fieldset className="launch-who" disabled={busy}>
-          <legend>{t("sheet.whoPlays")}</legend>
-          {draft.map((value, n) => (
-            <label key={n} className="launch-who__player">
-              <span>{t("players.player", { n: n + 1 })}</span>
-              <select value={value} onChange={(e) => pick(n, e.target.value)}>
-                <option value="">{t("players.none")}</option>
-                {options.map((o) => {
-                  const other = draft.indexOf(o);
-                  const taken = other >= 0 && other !== n;
-                  return <option key={o} value={o} disabled={taken}>
-                    {taken ? t("players.takenBy", { name: optionLabel(o), n: other + 1 }) : optionLabel(o)}</option>;
-                })}
-              </select>
-            </label>
-          ))}
-        </fieldset>
+    <div className="sheet__play">
+      <div className="sheet__play-state">
+        <p className={`sheet__status ${online ? "is-online" : "is-offline"}`}>
+          <span className="led" aria-hidden /> {t(online ? "sheet.console.online" : "sheet.console.offline")}
+        </p>
+        {auto && <p className="muted">{saveLabel(t, auto)} · {dateTime(auto.modified_at)}</p>}
+        {game.present && !caps.launch && <p className="muted">{t("sheet.launchUnavailable")}</p>}
+      </div>
+      {canLaunch && (
+        <div className="sheet__play-actions">
+          <button type="button" className={`button button--primary sheet__play-button ${busy ? "is-busy" : ""}`}
+            onClick={() => launch.play(auto ? "auto" : null)} disabled={busy} aria-busy={busy}>
+            {busy ? <Loader2 size={18} aria-hidden className="spin" /> : <Play size={18} fill="currentColor" aria-hidden />}{" "}
+            <span role="status">{busy ? t("sheet.starting") : t(auto ? "sheet.resume" : "sheet.play")}</span>
+          </button>
+          {auto && (
+            <button type="button" className="link-button sheet__play-alt" onClick={() => launch.play(null)} disabled={busy}>
+              {t("sheet.playNormally")}
+            </button>
+          )}
+        </div>
       )}
-      <button type="button" className={`button button--primary ${busy ? "is-busy" : ""}`}
-        onClick={play} disabled={busy} aria-busy={busy}>
-        {busy ? <Loader2 size={16} aria-hidden className="spin" /> : <Gamepad2 size={16} aria-hidden />}{" "}
-        <span role="status">{busy ? t("sheet.starting") : t("sheet.play")}</span>
-      </button>
-      {linkError && <p className="sheet__launch-error players__warn">{linkError}</p>}
-      {(launch.isError || savePlayers.isError) && <div className="sheet__launch-error">
-        <ErrorNotice error={launch.error ?? savePlayers.error} title={t("sheet.launchFailed")} /></div>}
-    </>
+      {launch.linkError && <p className="players__warn sheet__play-error">{launch.linkError}</p>}
+      {launch.error && <div className="sheet__play-error"><ErrorNotice error={launch.error} title={t("sheet.launchFailed")} /></div>}
+    </div>
+  );
+}
+
+/** Une ligne par joueur qui a une manette ; « Ajouter un joueur » en montre un de plus (jusqu'à 4). */
+function PlayersPicker({ launch }: { launch: Launch }) {
+  const t = useT();
+  const { draft, options, pick, optionLabel } = launch;
+  const [shown, setShown] = useState(1);
+  const used = draft.reduce((m, v, n) => (v ? n + 1 : m), 0);
+  const count = Math.min(PLAYERS, Math.max(shown, used));
+  return (
+    <fieldset className="launch-who" disabled={launch.busy}>
+      <legend className="visually-hidden">{t("sheet.whoPlays")}</legend>
+      {draft.slice(0, count).map((value, n) => (
+        <label key={n} className="launch-who__player">
+          <span>{t("players.player", { n: n + 1 })}</span>
+          <select value={value} onChange={(e) => pick(n, e.target.value)}>
+            <option value="">{t("players.none")}</option>
+            {options.map((o) => {
+              const other = draft.indexOf(o);
+              const taken = other >= 0 && other !== n;
+              return <option key={o} value={o} disabled={taken}>
+                {taken ? t("players.takenBy", { name: optionLabel(o), n: other + 1 }) : optionLabel(o)}</option>;
+            })}
+          </select>
+        </label>
+      ))}
+      {count < PLAYERS && (
+        <button type="button" className="link-button launch-who__add" onClick={() => setShown(count + 1)}>
+          <CirclePlus size={18} aria-hidden /> {t("sheet.addPlayer")}
+        </button>
+      )}
+    </fieldset>
+  );
+}
+
+/** Étoile en tête de fiche, à côté de Fermer : met le jeu en favori ou l'en retire. */
+function FavoriteStar({ id, on }: { id: number; on: boolean }) {
+  const t = useT();
+  const set = useSetFavorite(id);
+  return (
+    <button type="button" className={`icon-button favorite-button sheet__fav ${on ? "is-on" : ""}`} aria-pressed={on}
+      disabled={set.isPending} onClick={() => set.mutate(!on)} aria-label={t(on ? "sheet.favorite.on" : "sheet.favorite.add")}
+      title={t(on ? "sheet.favorite.on" : "sheet.favorite.add")}>
+      <Star size={22} fill={on ? "currentColor" : "none"} aria-hidden />
+    </button>
   );
 }
 
@@ -325,54 +495,40 @@ export function FavoriteButton({ id, on, small = false }: { id: number; on: bool
   );
 }
 
-/** « Je n'aime pas » : le contraire d'un favori (l'un retire l'autre) ; compte dans le classement des plus aimés. */
-function DislikeButton({ id, on }: { id: number; on: boolean }) {
+/**
+ * Pouce en haut (« J'aime ») et pouce en bas (« Je n'aime pas ») : l'un retire l'autre ; « Je n'aime pas » retire
+ * aussi le favori. Comptent dans le classement des plus aimés de tous les comptes (avec l'accord de l'utilisateur).
+ */
+function Reactions({ id, liked, disliked }: { id: number; liked: boolean; disliked: boolean }) {
   const t = useT();
-  const set = useSetDislike(id);
+  const like = useSetLike(id);
+  const dislike = useSetDislike(id);
+  const busy = like.isPending || dislike.isPending;
   return (
-    <button type="button" className={`button dislike-button ${on ? "is-on" : ""}`} aria-pressed={on}
-      disabled={set.isPending} onClick={() => set.mutate(!on)} title={t(on ? "sheet.dislike.undo" : "sheet.dislike.hint")}>
-      <ThumbsDown size={16} fill={on ? "currentColor" : "none"} aria-hidden /> {t(on ? "sheet.dislike.on" : "sheet.dislike.add")}
-    </button>
+    <span className="sheet__reactions" role="group" aria-label={t("sheet.reactions")}>
+      <button type="button" className={`icon-button like-button ${liked ? "is-on" : ""}`} aria-pressed={liked} disabled={busy}
+        onClick={() => like.mutate(!liked)} aria-label={t(liked ? "sheet.like.undo" : "sheet.like.add")}
+        title={t(liked ? "sheet.like.undo" : "sheet.like.add")}>
+        <ThumbsUp size={20} fill={liked ? "currentColor" : "none"} aria-hidden />
+      </button>
+      <button type="button" className={`icon-button dislike-button ${disliked ? "is-on" : ""}`} aria-pressed={disliked} disabled={busy}
+        onClick={() => dislike.mutate(!disliked)} aria-label={t(disliked ? "sheet.dislike.undo" : "sheet.dislike.add")}
+        title={t(disliked ? "sheet.dislike.undo" : "sheet.dislike.hint")}>
+        <ThumbsDown size={20} fill={disliked ? "currentColor" : "none"} aria-hidden />
+      </button>
+    </span>
   );
 }
 
-/** Signale le jeu comme ne fonctionnant pas sur cette console (ou retire le signalement). */
+/** Pied de fiche : signale le jeu comme ne fonctionnant pas sur cette console (ou retire le signalement). */
 function BrokenButton({ id, on }: { id: number; on: boolean }) {
   const t = useT();
   const set = useSetBroken(id);
   return (
-    <button type="button" className={`button broken-button ${on ? "is-on" : ""}`} aria-pressed={on}
+    <button type="button" className={`link-button sheet__report ${on ? "is-on" : ""}`} aria-pressed={on}
       disabled={set.isPending} onClick={() => set.mutate(!on)} title={t(on ? "sheet.broken.undo" : "sheet.broken.hint")}>
-      <Ban size={16} aria-hidden /> {t(on ? "sheet.broken.on" : "sheet.broken.add")}
+      <TriangleAlert size={16} aria-hidden /> {t(on ? "sheet.broken.on" : "sheet.report")}
     </button>
-  );
-}
-
-/** Sauvegardes de ce jeu sur la console (lecture seule), avec un lien vers la page Sauvegardes. */
-function GameSaves({ id }: { id: number }) {
-  const t = useT();
-  const online = useDeviceStatus().data?.connected === true;
-  const saves = useGameSaves(online ? id : null);
-  if (!online) return null;
-  return (
-    <section className="sheet__section" aria-labelledby="saves-h">
-      <h2 id="saves-h">{t("saves.title")}</h2>
-      {saves.isPending ? <Spinner label={t("saves.scanning")} /> : saves.isError ? <ErrorNotice error={saves.error} /> :
-        saves.data.length === 0 ? <p className="muted">{t("saves.noneForGame")}</p> : (
-          <ul className="dup-list">
-            {saves.data.map((s) => (
-              <li key={s.path}>
-                <span>{saveLabel(t, s)}</span>
-                <span className="muted num">{dateTime(s.modified_at)}</span>
-                <PlaySaveButton save={s} />
-                <a className="icon-button" href={saveFileUrl(s.path)} download aria-label={t("saves.download")}><Download size={14} aria-hidden /></a>
-              </li>
-            ))}
-          </ul>
-        )}
-      <Link to={`/sauvegardes?game=${id}`} className="link">{t("saves.manage")}</Link>
-    </section>
   );
 }
 

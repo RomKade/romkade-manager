@@ -261,6 +261,7 @@ function mockFetch() {
       if (init?.method === "PUT") favoriteIds = favoriteIds.filter((f) => f !== id);
       return new Response(null, { status: 204 });
     }
+    if (/^\/api\/games\/\d+\/like/.test(url)) return new Response(null, { status: 204 });
     if (/^\/api\/games\/\d+\/screenshots\/[^/]+\/caption/.test(url)) {
       const n = bodies.filter((b) => String(b.url).endsWith("/caption")).length;
       return json({ text: `Brouillon ${n} de l'IA\n#retrogaming`, model: "Gemma", saw_image: true });
@@ -400,7 +401,7 @@ describe("Bibliothèque", () => {
       .toHaveAttribute("href", "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay");
   });
 
-  it("fiche : titre puis console, diaporama jaquette puis image de la carte, bande-annonce et source dessous", async () => {
+  it("fiche : images du jeu en tête (capture, écran titre, carte), puis jaquette et titre, bande-annonce plus bas", async () => {
     sheetImages = { boxart_url: "/api/games/1/boxart", image_url: "/api/games/1/image" };
     try {
       renderAt("/bibliotheque?all=1");
@@ -409,12 +410,14 @@ describe("Bibliothèque", () => {
       const title = await within(dialog).findByRole("heading", { name: "Super Mario World" });
       expect(within(dialog).getByText("1 à 2 joueurs")).toBeInTheDocument();  // sous le titre, à côté de la console
       const gallery = within(dialog).getByRole("region", { name: "Images du jeu" });
-      expect(title.compareDocumentPosition(gallery) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(within(gallery).getByRole("group", { name: "Jaquette, 1 sur 2" })).toBeInTheDocument();
-      expect(within(dialog).getByRole("link", { name: "libretro-thumbnails" })).toBeInTheDocument();
+      expect(gallery.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const first = within(gallery).getByRole("group", { name: "Capture du jeu, 1 sur 3" });
+      expect(first.querySelector(".sheet-hero__img")).toHaveAttribute("src", "/api/games/1/boxart?size=full&kind=snap");
+      expect(within(gallery).getByRole("link", { name: "libretro-thumbnails" })).toBeInTheDocument();
       await userEvent.click(within(gallery).getByRole("button", { name: "Image suivante" }));
-      expect(within(gallery).getByRole("group", { name: "Image de la carte, 2 sur 2" })).toBeInTheDocument();
-      expect(within(dialog).queryByRole("link", { name: "libretro-thumbnails" })).not.toBeInTheDocument();
+      expect(within(gallery).getByRole("group", { name: "Écran titre, 2 sur 3" })).toBeInTheDocument();
+      await userEvent.click(within(gallery).getByRole("button", { name: "Image de la carte" }));
+      expect(within(gallery).getByRole("group", { name: "Image de la carte, 3 sur 3" })).toBeInTheDocument();
       const trailer = within(dialog).getByRole("link", { name: /Bande-annonce/ });
       expect(trailer).not.toHaveClass("button");
       expect(gallery.compareDocumentPosition(trailer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -500,10 +503,13 @@ describe("Jouer avec une manette branchée", () => {
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
     const who = await within(dialog).findByRole("group", { name: "Qui joue ?" });
-    // Les 4 joueurs, comme sur la page Manettes, avec la config enregistrée : joueur 2 sur la 8BitDo, joueur 3 sur
-    // les boutons de la console. La 8BitDo est grisée pour le joueur 1 : le joueur 2 la libère, le joueur 1 la prend.
+    // Les joueurs qui ont une manette, avec la config enregistrée : joueur 2 sur la 8BitDo, joueur 3 sur les boutons
+    // de la console ; « Ajouter un joueur » montre le 4e. La 8BitDo est grisée pour le joueur 1 : le joueur 2 la
+    // libère, le joueur 1 la prend.
     expect(within(who).getByLabelText("Joueur 1")).toHaveDisplayValue("Aucune manette");
     expect(within(who).getByLabelText("Joueur 3")).toHaveDisplayValue("Boutons de la console");
+    expect(within(who).queryByLabelText("Joueur 4")).not.toBeInTheDocument();
+    await userEvent.click(within(who).getByRole("button", { name: /Ajouter un joueur/ }));
     expect(within(who).getByLabelText("Joueur 4")).toHaveDisplayValue("Aucune manette");
     expect(within(within(who).getByLabelText("Joueur 1")).getByRole("option", { name: "8BitDo Pro 2 · manette n°1 — joueur 2" })).toBeDisabled();
     await userEvent.selectOptions(within(who).getByLabelText("Joueur 2"), "Aucune manette");
@@ -874,8 +880,13 @@ describe("Je n'aime pas", () => {
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByRole("button", { name: /Dans mes favoris/ })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(within(dialog).getByRole("button", { name: /^Je n'aime pas$/ }));
-    expect(await within(dialog).findByRole("button", { name: /Je n'aime pas ce jeu/ })).toHaveAttribute("aria-pressed", "true");
+    // Pouce en haut, puis pouce en bas : l'un retire l'autre, et « Je n'aime pas » retire aussi le favori.
+    await userEvent.click(within(dialog).getByRole("button", { name: "J'aime ce jeu" }));
+    expect(await within(dialog).findByRole("button", { name: "Retirer « J'aime »" })).toHaveAttribute("aria-pressed", "true");
+    expect(calls).toContain("/api/games/1/like");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Je n'aime pas" }));
+    expect(await within(dialog).findByRole("button", { name: "Retirer « Je n'aime pas »" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(dialog).getByRole("button", { name: "J'aime ce jeu" })).toHaveAttribute("aria-pressed", "false");
     expect(within(dialog).getByRole("button", { name: /Ajouter aux favoris/ })).toHaveAttribute("aria-pressed", "false");
     expect(calls).toContain("/api/games/1/dislike");
   });
@@ -886,12 +897,12 @@ describe("Jeux qui ne fonctionnent pas", () => {
     renderAt("/bibliotheque?all=1");
     await userEvent.click(await screen.findByText("Super Mario World"));
     const dialog = await screen.findByRole("dialog");
-    await userEvent.click(await within(dialog).findByRole("button", { name: /Ne fonctionne pas/ }));
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Signaler : ne fonctionne pas/ }));
     expect(await within(dialog).findByRole("button", { name: /Signalé : ne fonctionne pas/ })).toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByText("Ne fonctionne pas sur cette console")).toBeInTheDocument();
     expect(calls).toContain("/api/games/1/broken");
     await userEvent.click(within(dialog).getByRole("button", { name: /Signalé : ne fonctionne pas/ }));
-    expect(await within(dialog).findByRole("button", { name: /^Ne fonctionne pas$/ })).toHaveAttribute("aria-pressed", "false");
+    expect(await within(dialog).findByRole("button", { name: /Signaler : ne fonctionne pas/ })).toHaveAttribute("aria-pressed", "false");
     expect(within(dialog).queryByText("Ne fonctionne pas sur cette console")).not.toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     await userEvent.click(screen.getByRole("button", { name: /Ne fonctionnent pas/ }));

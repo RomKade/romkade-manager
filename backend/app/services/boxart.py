@@ -1,4 +1,5 @@
-"""Jaquettes (boîtes des jeux) depuis libretro-thumbnails, la banque d'images de RetroArch.
+"""Jaquettes (boîtes des jeux) depuis libretro-thumbnails, la banque d'images de RetroArch, et dans la même banque
+la capture d'écran du jeu (Named_Snaps) et son écran titre (Named_Titles), en tête de la fiche.
 
 Les images du dossier Imgs de la carte sont souvent des montages (capture, petite boîte, logo) faits pour le
 menu de la console. Ici on récupère la vraie boîte : https://thumbnails.libretro.com/<Système>/Named_Boxarts/
@@ -39,6 +40,8 @@ EXTRA_SOURCES = {
     "NEOCD": ["SNK - Neo Geo CD"], "A800": ["Atari - 8-bit"], "C64": ["Commodore - 64"],
     "AMIGA": ["Commodore - Amiga"], "POKE": ["Nintendo - Pokemon Mini"], "GW": ["Handheld Electronic Game"],
 }
+# Sortes d'images de la banque : dossier libretro de chacune.
+KINDS = {"box": "Named_Boxarts", "snap": "Named_Snaps", "title": "Named_Titles"}
 # Caractères que libretro remplace par « _ » dans les noms de fichiers.
 _FORBIDDEN = str.maketrans({c: "_" for c in '&*/:`<>?\\|"'})
 
@@ -100,8 +103,8 @@ def best_in_listing(listing: list[str], title: str) -> str | None:
     return min(pool, key=rank)
 
 
-def url_for(system: str, name: str) -> str:
-    return f"{BASE}/{urllib.parse.quote(system)}/Named_Boxarts/{urllib.parse.quote(name.translate(_FORBIDDEN))}.png"
+def url_for(system: str, name: str, kind: str = "box") -> str:
+    return f"{BASE}/{urllib.parse.quote(system)}/{KINDS[kind]}/{urllib.parse.quote(name.translate(_FORBIDDEN))}.png"
 
 
 class BoxartStore:
@@ -112,12 +115,12 @@ class BoxartStore:
         self._sem = asyncio.Semaphore(PARALLEL)
         self.transport: httpx.AsyncBaseTransport | None = None  # les tests y branchent un faux serveur
 
-    def path_for(self, f: RemoteFile) -> Path:
+    def path_for(self, f: RemoteFile, kind: str = "box") -> Path:
         key = hashlib.sha1(f"{f.platform.directory}/{f.filename}|{f.full_title or ''}".encode()).hexdigest()
-        return self.root / f.platform.directory / f"{key}.png"
+        return self.root / f.platform.directory / f"{key}{'' if kind == 'box' else '-' + kind}.png"
 
-    async def get(self, f: RemoteFile, index: GenreIndex) -> Path | None:
-        target = self.path_for(f)
+    async def get(self, f: RemoteFile, index: GenreIndex, kind: str = "box") -> Path | None:
+        target = self.path_for(f, kind)
         missing = target.with_suffix(".missing")
         if target.exists():
             return target
@@ -128,7 +131,7 @@ class BoxartStore:
             if target.exists():
                 return target
             async with self._sem:
-                data = await self._download(candidates(f, index))
+                data = await self._download(candidates(f, index), kind)
             if data is None:
                 await asyncio.to_thread(_write_atomic, missing, b"")
                 return None
@@ -136,18 +139,18 @@ class BoxartStore:
             missing.unlink(missing_ok=True)
             return target
 
-    async def _download(self, tries: list[tuple[str, str]]) -> bytes | None:
+    async def _download(self, tries: list[tuple[str, str]], kind: str = "box") -> bytes | None:
         try:
             async with httpx.AsyncClient(timeout=15, transport=self.transport, follow_redirects=True) as http:
                 for system, name in tries:
-                    if data := await self._fetch_image(http, system, name):
+                    if data := await self._fetch_image(http, system, name, kind):
                         return data
                 # Nom exact inconnu de la banque : on cherche le titre le plus proche dans sa liste de fichiers.
                 for system in dict.fromkeys(s for s, _ in tries):
-                    listing = await self._listing(http, system)
+                    listing = await self._listing(http, system, kind)
                     for _, name in tries:
                         hit = best_in_listing(listing, name)
-                        if hit and (data := await self._fetch_image(http, system, hit)):
+                        if hit and (data := await self._fetch_image(http, system, hit, kind)):
                             return data
         except httpx.HTTPError as exc:
             # Réseau absent : on ne note pas la jaquette comme introuvable, on réessaiera.
@@ -156,22 +159,23 @@ class BoxartStore:
         return None
 
     @staticmethod
-    async def _fetch_image(http: httpx.AsyncClient, system: str, name: str) -> bytes | None:
-        r = await http.get(url_for(system, name))
+    async def _fetch_image(http: httpx.AsyncClient, system: str, name: str, kind: str = "box") -> bytes | None:
+        r = await http.get(url_for(system, name, kind))
         if r.status_code == 200 and r.headers.get("content-type", "").startswith("image/") and 0 < len(r.content) <= MAX_BYTES:
             return r.content
         return None
 
-    async def _listing(self, http: httpx.AsyncClient, system: str) -> list[str]:
-        """Noms des jaquettes d'un système (sans .png), lus dans l'index du serveur et gardés 30 jours."""
-        path = self.root / "_index" / f"{hashlib.sha1(system.encode()).hexdigest()}.json"
+    async def _listing(self, http: httpx.AsyncClient, system: str, kind: str = "box") -> list[str]:
+        """Noms des images d'un système (sans .png), lus dans l'index du serveur et gardés 30 jours."""
+        key = system if kind == "box" else f"{system}|{kind}"
+        path = self.root / "_index" / f"{hashlib.sha1(key.encode()).hexdigest()}.json"
         if path.exists() and time.time() - path.stat().st_mtime < LISTING_MAX_AGE:
             return json.loads(path.read_text())
         lock = self._locks.setdefault(path, asyncio.Lock())
         async with lock:
             if path.exists() and time.time() - path.stat().st_mtime < LISTING_MAX_AGE:
                 return json.loads(path.read_text())
-            r = await http.get(f"{BASE}/{urllib.parse.quote(system)}/Named_Boxarts/", timeout=60)
+            r = await http.get(f"{BASE}/{urllib.parse.quote(system)}/{KINDS[kind]}/", timeout=60)
             if r.status_code != 200:
                 return []
             names = sorted({urllib.parse.unquote(h)[:-4] for h in _HREF.findall(r.text)})
