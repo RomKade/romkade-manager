@@ -1,6 +1,7 @@
 #!/bin/sh
 # Lance Anbernic Game Manager sur http://127.0.0.1:8765 et ouvre le navigateur.
-# L'interface (frontend/dist, hors dépôt) est compilée au premier lancement : Node 20 ou plus (brew install node).
+# L'interface (frontend/dist, hors dépôt) est compilée au premier lancement, puis quand son code change : Node 20 ou
+# plus (brew install node).
 # Pour l'installation sans Node ni Python, sur macOS, Windows et Linux : Docker (voir README).
 #
 #   ./run.sh               sur ce Mac seulement
@@ -45,10 +46,23 @@ if [ ! -x .venv/bin/python ]; then
 fi
 .venv/bin/pip install -q --disable-pip-version-check -e ".[dev]"
 
-if [ ! -f ../frontend/dist/index.html ]; then
-  command -v npm >/dev/null || { echo "L'interface n'est pas encore compilée et Node est introuvable : brew install node, puis ./run.sh"; exit 1; }
-  echo "Compilation de l'interface (première fois)..."
-  ( cd ../frontend && npm ci --no-audit --no-fund --loglevel=error && npm run build >/dev/null )
+# Interface recompilée au premier lancement, puis dès que son code a changé depuis la dernière compilation (mise à
+# jour du dépôt) ; dépendances réinstallées quand package-lock.json a changé.
+FRONT=../frontend
+if [ ! -f $FRONT/dist/index.html ]; then
+  BUILD="première fois"
+elif [ -n "$(find $FRONT/src $FRONT/public $FRONT/index.html $FRONT/package.json $FRONT/package-lock.json \
+                 $FRONT/vite.config.ts $FRONT/.env* -newer $FRONT/dist/index.html -print -quit 2>/dev/null)" ]; then
+  BUILD="code modifié"
+fi
+if [ -n "${BUILD:-}" ]; then
+  command -v npm >/dev/null || { echo "L'interface n'est pas à jour et Node est introuvable : brew install node, puis ./run.sh"; exit 1; }
+  echo "Compilation de l'interface ($BUILD)..."
+  ( cd $FRONT
+    if [ ! -f node_modules/.package-lock.json ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
+      npm ci --no-audit --no-fund --loglevel=error
+    fi
+    npm run build >/dev/null )
 fi
 
 if [ $PHONE = 0 ]; then
