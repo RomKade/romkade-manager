@@ -248,7 +248,8 @@
 .account__badge { display: inline-block; padding: 1px 8px; margin-right: 4px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 800;
   color: var(--accent-ink); background: var(--live); vertical-align: 1px; }
 
-/* Paramètres > Pilotage à distance : sens ChatGPT / Claude -> ROMKADE Cloud -> console, puis trois étapes. */
+/* Paramètres > Pilotage à distance : sens ChatGPT / Claude -> ROMKADE Cloud -> console, puis trois étapes. Toute la largeur. */
+.account__tab.remote { max-width: none; }
 .remote__flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px 18px; border-radius: var(--r-card, 14px);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
 .remote__node { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: var(--r-pill); font-weight: 700;
