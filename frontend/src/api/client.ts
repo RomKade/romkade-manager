@@ -20,6 +20,7 @@ export type DescriptionDraft = {
 
 export type Game = S["GameOut"];
 export type GameDetail = S["GameDetailOut"];
+export type TopLiked = S["TopLikedOut"];
 export type GamesPage = S["GamesPageOut"];
 export type CatalogPlatform = S["CatalogPlatformOut"];
 export type CatalogStatus = S["CatalogStatusOut"];
@@ -132,6 +133,7 @@ export const api = {
   favorites: (limit?: number) => request<Game[]>("GET", `/favorites${qs({ limit })}`),
   setFavorite: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/favorite`),
   setBroken: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/broken`),
+  setDislike: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/dislike`),
   facets: (platform: string[]) => request<Facets>("GET", `/catalog/facets${qs({ platform })}`),
   startSync: () => request<ScanRun>("POST", "/catalog/sync"),
   sync: (id: number) => request<ScanRun>("GET", `/catalog/sync/${id}`),

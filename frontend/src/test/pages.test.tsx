@@ -35,6 +35,7 @@ let bodies: Record<string, unknown>[] = [];
 let deviceOnline = true;
 let playingId: number | null = null;
 let favoriteIds: number[] = [];
+let dislikedIds: number[] = [];
 let brokenIds: number[] = [];
 let hostKeyTrusted = true;
 let relayToken = "";
@@ -254,6 +255,12 @@ function mockFetch() {
       favoriteIds = init?.method === "PUT" ? [id, ...favoriteIds.filter((f) => f !== id)] : favoriteIds.filter((f) => f !== id);
       return new Response(null, { status: 204 });
     }
+    if (/^\/api\/games\/\d+\/dislike/.test(url)) {
+      const id = Number(url.split("/")[3]);
+      dislikedIds = init?.method === "PUT" ? [...dislikedIds, id] : dislikedIds.filter((f) => f !== id);
+      if (init?.method === "PUT") favoriteIds = favoriteIds.filter((f) => f !== id);
+      return new Response(null, { status: 204 });
+    }
     if (/^\/api\/games\/\d+\/screenshots\/[^/]+\/caption/.test(url)) {
       const n = bodies.filter((b) => String(b.url).endsWith("/caption")).length;
       return json({ text: `Brouillon ${n} de l'IA\n#retrogaming`, model: "Gemma", saw_image: true });
@@ -282,7 +289,7 @@ function mockFetch() {
       status: "no_key", query: "Super Mario World SNES gameplay", videos: [],
       search_url: "https://www.youtube.com/results?search_query=Super+Mario+World+SNES+gameplay",
     });
-    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), ...sheetImages, favorite: favoriteIds.includes(1), broken: brokenIds.includes(1), players: 2, players_link: false, release_year: 1990, release_date: "1990-11-21",
+    if (url.startsWith("/api/games/")) return json({ ...game(1, "Super Mario World"), ...sheetImages, favorite: favoriteIds.includes(1), disliked: dislikedIds.includes(1), broken: brokenIds.includes(1), players: 2, players_link: false, release_year: 1990, release_date: "1990-11-21",
       publisher: "Nintendo", developer: "Nintendo EAD", franchise: "Mario", description: "Mario's quest to save the princess.",
       descriptions: { fr: { text: "Mario part sauver la princesse.", origin: "translated" } },
       info_url: "http://www.gamefaqs.com/snes/519824-super-mario-world", remote_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc", image_relpath: null, possible_duplicates: [], history: [{ scan_run_id: 1, change: "added", old_size: null, new_size: 1, old_mtime: null, new_mtime: null, run_started_at: "2026-10-16T10:00:00Z" }] });
@@ -327,6 +334,7 @@ beforeEach(() => {
   playingId = null;
   shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
   favoriteIds = [];
+  dislikedIds = [];
   brokenIds = [];
   hostKeyTrusted = true;
   relayToken = "";
@@ -856,6 +864,20 @@ describe("Favoris", () => {
     await waitFor(() => expect(calls.some((c) => c.startsWith("/api/games?") && c.includes("favorite=true"))).toBe(true));
     expect(await screen.findByText("Super Mario World")).toBeInTheDocument();
     expect(screen.queryByText("Zelda")).not.toBeInTheDocument();
+  });
+});
+
+describe("Je n'aime pas", () => {
+  it("le contraire d'un favori : l'un retire l'autre, sur la fiche", async () => {
+    favoriteIds = [1];
+    renderAt("/bibliotheque?all=1");
+    await userEvent.click(await screen.findByText("Super Mario World"));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("button", { name: /Dans mes favoris/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(within(dialog).getByRole("button", { name: /^Je n'aime pas$/ }));
+    expect(await within(dialog).findByRole("button", { name: /Je n'aime pas ce jeu/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(dialog).getByRole("button", { name: /Ajouter aux favoris/ })).toHaveAttribute("aria-pressed", "false");
+    expect(calls).toContain("/api/games/1/dislike");
   });
 });
 

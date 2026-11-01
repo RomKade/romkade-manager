@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import type { TopLiked } from "../api/client";
 import { t } from "../i18n/core";
 import { supabase } from "./supabase";
 
@@ -68,3 +69,17 @@ export const localAgent = {
 /** Consoles du compte (ROMKADE Cloud), rafraîchies chaque minute : voyant de l'onglet Pilotage à distance. */
 export const useCloudConsoles = () =>
   useQuery({ queryKey: ["cloud-consoles"], queryFn: cloud.consoles, refetchInterval: 60_000, retry: false });
+
+/** Jeux aimés ou non (favoris, « Je n'aime pas ») : envoyés au compte par le moteur local, avec l'accord de
+ * l'utilisateur ; classement des plus aimés de tous les comptes, relié aux jeux de la bibliothèque. */
+export const likes = {
+  share: () => call<{ likes: number }>("/api/cloud/likes", { method: "PUT" }, "X-Romkade-Token"),
+  unshare: () => call<{ likes: number }>("/api/cloud/likes", { method: "DELETE" }, "X-Romkade-Token"),
+  top: (days: number) => call<TopLiked[]>(`/api/cloud/likes/top?days=${days}`, {}, "X-Romkade-Token"),
+};
+
+export const LIKE_PERIODS = [7, 30, 365] as const;
+export type LikePeriod = (typeof LIKE_PERIODS)[number];
+
+export const useTopLiked = (days: LikePeriod, enabled: boolean) =>
+  useQuery({ queryKey: ["top-liked", days], queryFn: () => likes.top(days), enabled, staleTime: 5 * 60_000, retry: false });

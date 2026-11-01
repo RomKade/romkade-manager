@@ -16,6 +16,9 @@
                              (ROMKADE_OPENAI_CHALLENGE ; 404 sans lui)
     /api/me/…                API du compte pour ROMKADE Manager (jeton de session Supabase) : consoles reliées,
                              liaison d'une console sans code, suppression du compte
+    /api/me/likes            jeux aimés ou non du compte (favoris et « Je n'aime pas » du Manager, avec leur date),
+                             envoyés seulement avec l'accord de l'utilisateur ; DELETE les retire
+    /api/likes/top           jeux les plus aimés de tous les comptes sur 7, 30 ou 365 jours (même jeton)
     /api/guide               soluce d'un jeu (titre, console, recherche) pour l'assistant de ROMKADE Manager (même
                              jeton) : les mêmes passages que l'outil MCP game_guide (guide.py)
     /oauth/consent           ancienne adresse de la page de connexion -> https://romkade.com/authentification/
@@ -65,6 +68,9 @@ LOGIN_PAGE = "https://romkade.com/authentification/"  # page de connexion ROMKAD
 PUBLIC_FILES = {"icon.png", "icon-192.webp", "romkade-logo.webp", "romkade-logo.png"}  # .png : e-mails
 MAX_BODY = 8 * 1024 * 1024
 MAX_FAVORITES = 500
+MAX_LIKES = 2000
+LIKE_PERIODS = (7, 30, 365)  # jours
+TOP_LIKED_CACHE = 300  # secondes
 GUIDE_FETCHES_PER_HOUR = 30  # soluces pas encore gardées, récupérées pour un compte : les wikis ne sont pas un proxy
 # Jeton du compte à la racine (/<jeton>) ; /mcp/<jeton>, forme des premiers connecteurs, reste acceptée ; /<jeton>/beta.
 TOKEN_PATH = re.compile(r"^/(?:mcp/)?([A-Za-z0-9_-]{32,})(/beta)?/?$")
@@ -429,6 +435,70 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
             return JSONResponse({"error": "unavailable"}, 503)
         return JSONResponse(found)
 
+    min_likers = int(os.environ.get("ROMKADE_LIKES_MIN_ACCOUNTS") or 3)
+    top_cache: dict[tuple[int, int], tuple[float, list]] = {}
+
+    def like_row(item, now: float) -> dict | None:
+        """Réaction envoyée par le Manager, vérifiée ; la clé du jeu est refaite ici (code de console canonique)."""
+        if not isinstance(item, dict) or item.get("value") not in (1, -1):
+            return None
+        directory, filename = str(item.get("platform") or ""), str(item.get("filename") or "")
+        normalized, title = str(item.get("normalized") or "").strip(), str(item.get("title") or "").strip()
+        code = canonical(directory) if directory else ""
+        if code not in PLATFORMS or not filename or not normalized or not title or "/" in filename \
+                or max(len(filename), len(normalized), len(title)) > 300:
+            return None
+        try:
+            at = min(float(item.get("at")), now)
+        except (TypeError, ValueError):
+            return None
+        full = str(item["full_title"])[:300] if item.get("full_title") else None
+        return {"key": f"{code}/{normalized}", "value": item["value"], "at": at, "platform_dir": directory,
+                "filename": filename, "title": title, "full_title": full,
+                "art_key": catalog.art_key(directory, filename, full)}
+
+    async def my_likes(request: Request) -> Response:
+        who = await me(request)
+        if who is None:
+            return JSONResponse({"error": "unauthorized"}, 401)
+        account, _ = who
+        if request.method == "DELETE":
+            store.replace_likes(account, [])
+            return JSONResponse({"likes": 0})
+        try:
+            body = await body_json(request)
+        except ValueError:
+            return JSONResponse({"error": "bad_request"}, 400)
+        now = time.time()
+        rows = [r for r in (like_row(x, now) for x in (body.get("likes") or [])[:MAX_LIKES]) if r]
+        latest = {}
+        for r in sorted(rows, key=lambda r: r["at"]):  # même jeu aimé sur deux éditions : la dernière réaction
+            latest[r["key"]] = r
+        return JSONResponse({"likes": store.replace_likes(account, list(latest.values()))})
+
+    async def top_liked(request: Request) -> Response:
+        if await me(request) is None:
+            return JSONResponse({"error": "unauthorized"}, 401)
+        try:
+            days, limit = int(request.query_params.get("days") or 30), int(request.query_params.get("limit") or 12)
+        except ValueError:
+            return JSONResponse({"error": "bad_request"}, 400)
+        if days not in LIKE_PERIODS:
+            return JSONResponse({"error": "bad_request", "periods": list(LIKE_PERIODS)}, 400)
+        limit = max(1, min(limit, 50))
+        now = time.time()
+        cached = top_cache.get((days, limit))
+        if cached is None or now - cached[0] > TOP_LIKED_CACHE:
+            cached = top_cache[(days, limit)] = (now, store.top_liked(now - days * 86400, limit, min_likers))
+        games = []
+        for g in cached[1]:
+            code = g["key"].split("/", 1)[0]
+            games.append({"key": g["key"], "title": g["title"], "platform_code": code,
+                          "platform_label": PLATFORMS[code].label or g["platform_dir"],
+                          "platform_dir": g["platform_dir"], "likes": g["likes"], "dislikes": g["dislikes"],
+                          "cover": f"{public_url}/art/{g['art_key']}.webp"})
+        return JSONResponse({"days": days, "games": games}, headers={"Cache-Control": "private, max-age=300"})
+
     async def home(_: Request) -> Response:
         return Response(status_code=302, headers={"Location": "https://romkade.com"})
 
@@ -454,6 +524,8 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/api/me/consoles", my_consoles, methods=["GET", "POST"]),
         Route("/api/me/consoles/{console_id}", my_console, methods=["PATCH", "DELETE"]),
         Route("/api/me", delete_me, methods=["DELETE"]),
+        Route("/api/me/likes", my_likes, methods=["PUT", "DELETE"]),
+        Route("/api/likes/top", top_liked, methods=["GET"]),
         Route("/api/guide", guide, methods=["GET"]),
         Route("/", home),
         Mount("/fonts", StaticFiles(directory=STATIC / "fonts")),

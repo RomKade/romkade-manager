@@ -20,6 +20,12 @@ ordres. Rien à ouvrir sur la box, pas d'IP, pas de SSH.
 - Favoris : ceux de la console dans le Manager (étoile d'un jeu). Le Manager les pose à côté de l'agent
   (`romkade/favorites.json`) à chaque favori ajouté ou retiré, à chaque synchronisation et à la liaison ; l'agent
   les envoie (`/agent/favorites`). Le cloud les garde par chemin : ils survivent au recalcul du catalogue.
+- Jeux aimés ou non (`likes`) : favoris et « Je n'aime pas » du Manager, par compte, avec leur date, envoyés par le
+  Manager lui-même (`PUT /api/me/likes`, jeton de session) seulement si l'utilisateur accepte les statistiques
+  anonymes ; `DELETE` les retire. Un jeu = code de console / titre normalisé, toutes éditions confondues.
+  `/api/likes/top?days=7|30|365` classe les jeux de tous les comptes (aimés moins pas aimés sur la période), à
+  partir de `ROMKADE_LIKES_MIN_ACCOUNTS` comptes (3 par défaut) : on ne remonte jamais à un utilisateur. Supprimer
+  le compte les efface.
 - `romkade_cloud/ui/app.html` : interface ROMKADE dans ChatGPT, Claude… (extension **MCP Apps**, ressource
   `ui://romkade/app.html`). Même charte que le Manager : grille de jaquettes, fiche du jeu, carte « En cours sur la
   console » (volume, sauvegarder, quitter), bibliothèque par console, cheats, consoles. Boutons reliés aux outils

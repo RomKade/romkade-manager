@@ -496,6 +496,18 @@ Los favoritos pertenecen a una consola: cada uno guarda la huella SHA-256 de la 
 (estable, a diferencia de su dirección IP). Al conectar otra consola (la de un amigo, otro firmware) solo se muestran
 sus propios favoritos, limitados a los juegos presentes en su tarjeta; los demás se quedan en la base y vuelven con su consola.
 
+«No me gusta», junto a la estrella, es lo contrario de un favorito: uno quita el otro (tabla `disliked_game`, por
+consola como los favoritos).
+
+**Los más queridos del momento**: si el usuario acepta las estadísticas anónimas (Ajustes → Acerca de), los favoritos
+y los «No me gusta» de todas las consolas se envían con su fecha a su cuenta ROMKADE (`PUT /api/cloud/likes` →
+ROMKADE Cloud `/api/me/likes`): tras cada cambio, al arrancar, y se borran del cloud en cuanto se retira el
+consentimiento (`DELETE`). Un juego se reconoce de un usuario a otro por el código de su consola y su título
+normalizado (`SFC/super mario world`): todas sus ediciones cuentan juntas. El bloque del panel clasifica los juegos de
+todas las cuentas en 7 días, 30 días o 1 año (gustan menos no gustan, reacciones dadas en el periodo), y solo muestra
+un juego a partir de 3 cuentas que han opinado. Un juego de la biblioteca abre su ficha y se puede relanzar; los demás
+solo se muestran.
+
 ## Tiempo de juego
 
 Página «Tiempo de juego»: tiempo del día, de los últimos 7 días y total, histograma de 14 días, tiempo por juego,
@@ -522,7 +534,7 @@ partida en curso, si está afectada, vuelve a empezar de cero.
 
 Por orden: el juego en curso, los juegos jugados recientemente (botón ▶ para relanzarlos en la consola;
 historial de RetroArch de la consola completado con las partidas seguidas por Game Manager, `GET /api/play/recent`),
-las últimas incorporaciones con un enlace «Añadir juegos», la tarjeta microSD y, por último, las consolas con más juegos y
+los favoritos, [los más queridos del momento](#favoritos), las últimas incorporaciones con un enlace «Añadir juegos», la tarjeta microSD y, por último, las consolas con más juegos y
 la actividad (última partida, tiempo de juego del día, sincronización, juegos que se están añadiendo).
 
 ## Búsqueda (Typesense)

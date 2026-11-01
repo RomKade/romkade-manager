@@ -86,6 +86,7 @@ class GameDetailOut(GameOut):
     descriptions: dict[str, dict] = {}  # {fr|en|es: {text, origin}} : par Claude (services/descriptions.py)
     favorite: bool = False
     broken: bool = False  # signalé comme ne fonctionnant pas sur cette console
+    disliked: bool = False  # « Je n'aime pas » sur cette console (le contraire d'un favori)
     info_url: str | None = None  # fiche de référence (GameFAQs)
     remote_path: str
     image_relpath: str | None

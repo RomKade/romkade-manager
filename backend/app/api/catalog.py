@@ -175,6 +175,18 @@ async def remove_favorite(game_id: int, request: Request) -> None:
     cloud_agent.push_favorites_later(request.app.state, console_id(request))
 
 
+@router.put("/games/{game_id}/dislike", status_code=204, tags=["catalog"])
+async def add_dislike(game_id: int, request: Request) -> None:
+    """« Je n'aime pas » : retire aussi le jeu des favoris."""
+    await asyncio.to_thread(_with_write, request, cq.set_disliked, console_id(request), game_id, True)
+    cloud_agent.push_favorites_later(request.app.state, console_id(request))
+
+
+@router.delete("/games/{game_id}/dislike", status_code=204, tags=["catalog"])
+async def remove_dislike(game_id: int, request: Request) -> None:
+    await asyncio.to_thread(_with_write, request, cq.set_disliked, console_id(request), game_id, False)
+
+
 @router.put("/games/{game_id}/broken", status_code=204, tags=["catalog"])
 async def mark_broken(game_id: int, request: Request) -> None:
     """Signale le jeu comme ne fonctionnant pas sur la console branchée."""

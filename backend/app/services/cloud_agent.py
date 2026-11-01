@@ -303,3 +303,32 @@ async def guide(token: str, title: str, directory: str, query: str,
         log.info("soluce du cloud refusée : %s", r.status_code)
         return None
     return r.json()
+
+
+async def _cloud(method: str, path: str, token: str, transport: httpx.AsyncBaseTransport | None = None, **kw) -> dict:
+    """Appel à l'API du compte de ROMKADE Cloud avec le jeton de session ; erreur lisible si le cloud refuse."""
+    try:
+        async with httpx.AsyncClient(timeout=20, transport=transport) as http:
+            r = await http.request(method, f"{CLOUD_URL}{path}", headers={"Authorization": f"Bearer {token}"}, **kw)
+    except httpx.HTTPError as exc:
+        raise errors.AppError("cloud_unreachable", "ROMKADE Cloud est injoignable : vérifie la connexion Internet.", 502) from exc
+    if r.status_code == 401:
+        raise errors.AppError("cloud_unauthorized", "Session ROMKADE expirée : reconnecte-toi.", 401)
+    if r.status_code >= 400:
+        raise errors.AppError("cloud_error", f"ROMKADE Cloud a refusé la demande ({r.status_code}).", 502)
+    return r.json()
+
+
+async def put_likes(token: str, likes: list[dict], transport: httpx.AsyncBaseTransport | None = None) -> int:
+    """Jeux aimés ou non du compte (favoris et « Je n'aime pas », avec leur date) : classement des plus aimés."""
+    return (await _cloud("PUT", "/api/me/likes", token, transport, json={"likes": likes}))["likes"]
+
+
+async def delete_likes(token: str, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    """Accord retiré : le cloud oublie les jeux aimés ou non de ce compte."""
+    await _cloud("DELETE", "/api/me/likes", token, transport)
+
+
+async def top_liked(token: str, days: int, limit: int, transport: httpx.AsyncBaseTransport | None = None) -> list[dict]:
+    """Jeux les plus aimés de tous les comptes ROMKADE sur la période."""
+    return (await _cloud("GET", "/api/likes/top", token, transport, params={"days": days, "limit": limit}))["games"]

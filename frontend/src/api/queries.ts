@@ -1,6 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
+import { shareLikesSoon } from "../lib/likes";
 import { api, ApiError, type Capabilities, type GameControls, type GameDetail, type KnowledgeStatus, type GameControlsIn, type Query, type Transfer } from "./client";
 
 export const PAGE_SIZE = 120;
@@ -45,9 +46,23 @@ export function useSetFavorite(id: number) {
   return useMutation({
     mutationFn: (on: boolean) => api.setFavorite(id, on),
     onSuccess: (_, on) => {
-      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, favorite: on } : g));
+      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, favorite: on, disliked: on ? false : g.disliked } : g));
       qc.invalidateQueries({ queryKey: ["favorites"] });
       qc.invalidateQueries({ queryKey: ["games"] });
+      shareLikesSoon();
+    },
+  });
+}
+
+/** « Je n'aime pas » (le contraire d'un favori : l'un retire l'autre). */
+export function useSetDislike(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => api.setDislike(id, on),
+    onSuccess: (_, on) => {
+      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, disliked: on, favorite: on ? false : g.favorite } : g));
+      if (on) qc.invalidateQueries({ queryKey: ["favorites"] });
+      shareLikesSoon();
     },
   });
 }

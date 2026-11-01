@@ -1,4 +1,5 @@
-import { ArrowRight, Box, CheckCircle2, Gamepad2, HardDriveUpload, Play, RefreshCw, Star } from "lucide-react";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
+import { ArrowRight, Box, CheckCircle2, Gamepad2, HardDriveUpload, Heart, Play, RefreshCw, Star } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
@@ -9,6 +10,8 @@ import {
 } from "../api/queries";
 import type { Settings } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { LIKE_PERIODS, useTopLiked, type LikePeriod } from "../auth/cloud";
+import { useAnalyticsConsent } from "../components/AnalyticsNotice";
 import { ConsoleBadge } from "../components/ConsoleBadge";
 import { Cover } from "../components/Cover";
 import { GameSheet } from "../components/GameSheet";
@@ -231,6 +234,8 @@ export function DashboardPage() {
         )}
       </section>
 
+      <TopLiked nowId={nowId} onOpen={setOpenId} />
+
       <section className="block" aria-labelledby="recent-h">
         <div className="block__head">
           <h2 id="recent-h"><Box size={22} aria-hidden />{t("dashboard.recent")}</h2>
@@ -328,6 +333,64 @@ export function DashboardPage() {
 }
 
 /** Relance un jeu joué récemment sur la console. */
+/** Jeux les plus aimés de tous les comptes ROMKADE (favoris moins « Je n'aime pas ») sur 7 jours, 30 jours ou un an.
+ * Un jeu de la bibliothèque s'ouvre et se relance ; les autres sont seulement montrés. */
+export function TopLiked({ nowId, onOpen }: { nowId: number | undefined; onOpen: (id: number) => void }) {
+  const t = useT();
+  const signedIn = !!useAuth().session;
+  const consent = useAnalyticsConsent();
+  const [days, setDays] = useState<LikePeriod>(30);
+  const top = useTopLiked(days, signedIn);
+  if (!signedIn) return null;
+  return (
+    <section className="block" aria-labelledby="liked-h">
+      <div className="block__head">
+        <h2 id="liked-h"><Heart size={22} aria-hidden />{t("dashboard.liked")}</h2>
+        <ToggleGroup.Root type="single" className="segmented segmented--text" value={String(days)}
+          onValueChange={(v) => v && setDays(Number(v) as LikePeriod)} aria-label={t("dashboard.likedPeriod")}>
+          {LIKE_PERIODS.map((d) => (
+            <ToggleGroup.Item key={d} value={String(d)} className="segmented__item">{t(`dashboard.likedDays.${d}`)}</ToggleGroup.Item>
+          ))}
+        </ToggleGroup.Root>
+      </div>
+      {consent !== "on" && <p className="muted block__lead">{t("dashboard.likedShare")}</p>}
+      {top.isPending ? <Spinner label={t("common.loading")} /> : top.isError ? <p className="muted">{t("dashboard.likedOffline")}</p> : top.data.length === 0 ? (
+        <p className="muted">{t("dashboard.likedEmpty")}</p>
+      ) : (
+        <Shelf label={t("dashboard.liked")}>
+          {top.data.map((g) => {
+            const meta = (
+              <span className="tile__meta">
+                <ConsoleBadge code={g.platform_code} label={g.platform_label} />
+                <span className="tile__likes" title={t("dashboard.likedCount", { likes: g.likes, dislikes: g.dislikes })}>
+                  <Heart size={12} fill="currentColor" aria-hidden /> {count(g.likes)}
+                </span>
+              </span>
+            );
+            return g.game ? (
+              <div key={g.key} className={`shelf__item shelf__item--played ${g.game.id === nowId ? "is-current" : ""}`}>
+                <button type="button" className="shelf__open" onClick={() => onOpen(g.game!.id)}>
+                  <Cover game={g.game} />
+                  <span className="tile__title">{g.game.title}</span>
+                  {meta}
+                </button>
+                {g.game.present && <ReplayButton id={g.game.id} title={g.game.title} />}
+              </div>
+            ) : (
+              <div key={g.key} className="shelf__item shelf__item--played" title={t("dashboard.likedNotMine")}>
+                <Cover game={{ title: g.title, image_url: null, boxart_url: g.cover,
+                  platform: { id: 0, directory: g.platform_dir, code: g.platform_code, label: g.platform_label } }} />
+                <span className="tile__title">{g.title}</span>
+                {meta}
+              </div>
+            );
+          })}
+        </Shelf>
+      )}
+    </section>
+  );
+}
+
 function ReplayButton({ id, title }: { id: number; title: string }) {
   const t = useT();
   const launch = useLaunchGame();

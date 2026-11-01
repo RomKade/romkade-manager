@@ -499,6 +499,18 @@ Les favoris appartiennent à une console : chacun garde l'empreinte SHA-256 de l
 (stable, contrairement à son adresse IP). Brancher une autre console (celle d'un ami, un autre firmware) n'affiche que
 ses propres favoris, limités aux jeux présents sur sa carte ; les autres restent en base et reviennent avec leur console.
 
+« Je n'aime pas », à côté de l'étoile, est le contraire d'un favori : l'un retire l'autre (table `disliked_game`, par
+console comme les favoris).
+
+**Les plus aimés du moment** : si l'utilisateur accepte les statistiques anonymes (Paramètres → À propos), favoris et
+« Je n'aime pas » de toutes les consoles partent avec leur date sur son compte ROMKADE (`PUT /api/cloud/likes` →
+ROMKADE Cloud `/api/me/likes`) : après chaque changement, au démarrage, et retirés du cloud dès que l'accord est
+retiré (`DELETE`). Un jeu est reconnu d'un utilisateur à l'autre par le code de sa console et son titre normalisé
+(`SFC/super mario world`) : toutes ses éditions comptent ensemble. Le bloc du tableau de bord classe les jeux de tous
+les comptes sur 7 jours, 30 jours ou 1 an (aimés moins pas aimés, réactions données sur la période), et ne montre un
+jeu qu'à partir de 3 comptes qui ont donné leur avis. Un jeu de la bibliothèque ouvre sa fiche et se relance ; les
+autres sont seulement montrés.
+
 ## Temps de jeu
 
 Page « Temps de jeu » : temps du jour, des 7 derniers jours et total, histogramme sur 14 jours, temps par jeu,
@@ -525,7 +537,7 @@ partie en cours, si elle est concernée, repart de zéro.
 
 Dans l'ordre : le jeu en cours, les jeux joués récemment (bouton ▶ pour les relancer sur la console ;
 historique RetroArch de la console complété par les parties suivies par Game Manager, `GET /api/play/recent`),
-les derniers ajouts avec un lien « Ajouter des jeux », la carte microSD, puis les consoles les plus fournies et
+les favoris, [les plus aimés du moment](#favoris), les derniers ajouts avec un lien « Ajouter des jeux », la carte microSD, puis les consoles les plus fournies et
 l'activité (dernière partie, temps de jeu du jour, synchronisation, jeux en cours d'ajout).
 
 ## Recherche (Typesense)

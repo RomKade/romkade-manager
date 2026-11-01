@@ -475,6 +475,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/dislike": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add Dislike
+         * @description « Je n'aime pas » : retire aussi le jeu des favoris.
+         */
+        put: operations["add_dislike_api_games__game_id__dislike_put"];
+        post?: never;
+        /** Remove Dislike */
+        delete: operations["remove_dislike_api_games__game_id__dislike_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/games/{game_id}/broken": {
         parameters: {
             query?: never;
@@ -1475,7 +1496,8 @@ export interface paths {
         put?: never;
         /**
          * Install Cheats
-         * @description Copie le fichier de codes choisi dans le dossier des codes de RetroArch, sous le nom du jeu.
+         * @description Copie le fichier de codes choisi dans le dossier des codes de RetroArch, sous le nom du jeu ; avec `only`,
+         *     seulement ces codes (déjà activés).
          */
         post: operations["install_cheats_api_games__game_id__cheats_install_post"];
         delete?: never;
@@ -1724,6 +1746,28 @@ export interface paths {
          *     et rôle des touches si c'est un écran de commandes. Rien n'est enregistré.
          */
         post: operations["analyze_screenshot_api_games__game_id__screenshots__name__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/stuck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stuck
+         * @description « Je suis bloqué » : capture de l'écran du jeu en cours, lue par le modèle réglé (qui doit lire les images)
+         *     pour savoir où en est le joueur, puis indice tiré de la soluce du jeu : connaissances du Manager, sinon celle
+         *     gardée par ROMKADE Cloud (jeton de session ROMKADE dans X-Romkade-Token, transmis sans être gardé).
+         */
+        post: operations["stuck_api_assistant_stuck_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2032,6 +2076,52 @@ export interface paths {
          * @description Relie la console au compte ROMKADE connecté : enregistrement dans le cloud, puis installation de l'agent.
          */
         post: operations["link_api_cloud_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cloud/likes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Share Likes
+         * @description Envoie au compte ROMKADE les jeux aimés (favoris) ou non (« Je n'aime pas ») de toutes les consoles, avec
+         *     leur date, pour le classement des plus aimés. L'interface ne l'appelle qu'avec l'accord de l'utilisateur
+         *     (statistiques anonymes).
+         */
+        put: operations["share_likes_api_cloud_likes_put"];
+        post?: never;
+        /**
+         * Unshare Likes
+         * @description Accord retiré : le cloud oublie les jeux aimés ou non de ce compte.
+         */
+        delete: operations["unshare_likes_api_cloud_likes_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cloud/likes/top": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Top Liked
+         * @description Jeux les plus aimés de tous les comptes ROMKADE sur la période, reliés aux jeux de la bibliothèque.
+         */
+        get: operations["top_liked_api_cloud_likes_top_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2952,6 +3042,11 @@ export interface components {
              * @default false
              */
             broken: boolean;
+            /**
+             * Disliked
+             * @default false
+             */
+            disliked: boolean;
             /** Info Url */
             info_url?: string | null;
             /** Remote Path */
@@ -3129,6 +3224,8 @@ export interface components {
         InstallIn: {
             /** Name */
             name: string;
+            /** Only */
+            only?: number[] | null;
         };
         /** InstallOut */
         InstallOut: {
@@ -3967,6 +4064,56 @@ export interface components {
              */
             method: "sftp_statvfs" | "df";
         };
+        /** StuckIn */
+        StuckIn: {
+            /** Game Id */
+            game_id: number;
+            /**
+             * Lang
+             * @default fr
+             * @enum {string}
+             */
+            lang: "fr" | "en" | "es";
+            /**
+             * Name
+             * @default Duke
+             */
+            name: string;
+            /**
+             * Question
+             * @default
+             */
+            question: string;
+            /**
+             * Solution
+             * @default false
+             */
+            solution: boolean;
+        };
+        /** StuckOut */
+        StuckOut: {
+            /** Text */
+            text: string;
+            /** Game Id */
+            game_id: number;
+            /** Shot */
+            shot: {
+                [key: string]: unknown;
+            };
+            /** Where */
+            where: string;
+            /**
+             * Guide
+             * @enum {string}
+             */
+            guide: "local" | "cloud" | "none";
+            /** Sources */
+            sources: {
+                [key: string]: unknown;
+            }[];
+            /** Model */
+            model: string;
+        };
         /** SystemProfileOut */
         SystemProfileOut: {
             /** Id */
@@ -4000,6 +4147,26 @@ export interface components {
             /** Title */
             title: string;
             shot: components["schemas"]["ShotOut"];
+        };
+        /** TopLikedOut */
+        TopLikedOut: {
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+            /** Platform Code */
+            platform_code: string;
+            /** Platform Label */
+            platform_label: string;
+            /** Platform Dir */
+            platform_dir: string;
+            /** Likes */
+            likes: number;
+            /** Dislikes */
+            dislikes: number;
+            /** Cover */
+            cover: string;
+            game?: components["schemas"]["GameOut"] | null;
         };
         /** TransferOut */
         TransferOut: {
@@ -4962,6 +5129,64 @@ export interface operations {
         };
     };
     remove_favorite_api_games__game_id__favorite_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_dislike_api_games__game_id__dislike_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_dislike_api_games__game_id__dislike_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -7240,6 +7465,39 @@ export interface operations {
             };
         };
     };
+    stuck_api_assistant_stuck_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StuckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StuckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     caption_screenshot_api_games__game_id__screenshots__name__caption_post: {
         parameters: {
             query?: never;
@@ -7685,6 +7943,83 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_likes_api_cloud_likes_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    unshare_likes_api_cloud_likes_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    top_liked_api_cloud_likes_top_get: {
+        parameters: {
+            query?: {
+                /** @description 7, 30 ou 365 */
+                days?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopLikedOut"][];
                 };
             };
             /** @description Validation Error */

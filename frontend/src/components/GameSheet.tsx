@@ -1,11 +1,11 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { Ban, Copy, Download, Gamepad2, Loader2, Save, Square, Star, Users, X } from "lucide-react";
+import { Ban, Copy, Download, Gamepad2, Loader2, Save, Square, Star, ThumbsDown, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { saveFileUrl, type GameDetail } from "../api/client";
-import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetBroken, useSetFavorite, useSetPlayers } from "../api/queries";
+import { useCaps, useDeviceStatus, useGame, useGameSaves, useLaunchGame, useNowPlaying, usePlayers, useQuitGame, useSaveStateNow, useSetBroken, useSetDislike, useSetFavorite, useSetPlayers } from "../api/queries";
 import { useT } from "../i18n";
 import { bytes, date, dateTime } from "../lib/format";
 import { controllerLabel, dropUnusedRelays, linkComputerPad, padName, useComputerPads, useRelays } from "../lib/computerPads";
@@ -108,6 +108,7 @@ function SheetBody({ game, onOpen, onVideo }: { game: GameDetail; onOpen: (id: n
         <div className="sheet__actions">
           {game.present && <LaunchButton id={game.id} />}
           <FavoriteButton id={game.id} on={game.favorite ?? false} />
+          <DislikeButton id={game.id} on={game.disliked ?? false} />
           <BrokenButton id={game.id} on={game.broken ?? false} />
         </div>
       )}
@@ -320,6 +321,18 @@ export function FavoriteButton({ id, on, small = false }: { id: number; on: bool
     <button type="button" className={`button ${small ? "button--small " : ""}favorite-button ${on ? "is-on" : ""}`} aria-pressed={on}
       disabled={set.isPending} onClick={() => set.mutate(!on)}>
       <Star size={16} fill={on ? "currentColor" : "none"} aria-hidden /> {t(on ? "sheet.favorite.on" : "sheet.favorite.add")}
+    </button>
+  );
+}
+
+/** « Je n'aime pas » : le contraire d'un favori (l'un retire l'autre) ; compte dans le classement des plus aimés. */
+function DislikeButton({ id, on }: { id: number; on: boolean }) {
+  const t = useT();
+  const set = useSetDislike(id);
+  return (
+    <button type="button" className={`button dislike-button ${on ? "is-on" : ""}`} aria-pressed={on}
+      disabled={set.isPending} onClick={() => set.mutate(!on)} title={t(on ? "sheet.dislike.undo" : "sheet.dislike.hint")}>
+      <ThumbsDown size={16} fill={on ? "currentColor" : "none"} aria-hidden /> {t(on ? "sheet.dislike.on" : "sheet.dislike.add")}
     </button>
   );
 }

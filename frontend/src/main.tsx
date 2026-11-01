@@ -9,6 +9,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import { initAnalytics } from "./lib/analytics";
+import { initLikes } from "./lib/likes";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -16,8 +17,9 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>,
 );
 
-// Statistiques anonymes : seulement si l'utilisateur les a acceptées (lib/analytics.ts).
+// Statistiques anonymes et jeux aimés partagés : seulement si l'utilisateur les a acceptés (lib/analytics.ts, lib/likes.ts).
 initAnalytics();
+initLikes();
 
 // Application installable : service worker (public/sw.js), seulement dans la version compilée.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

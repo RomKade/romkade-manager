@@ -492,6 +492,17 @@ Favorites belong to a console: each one records the SHA-256 fingerprint of the c
 (stable, unlike its IP address). Plugging in another console (a friend's, another firmware) only shows its own
 favorites, limited to games present on its card; the others stay in the database and come back with their console.
 
+"Not for me" next to the star is the opposite of a favorite: one removes the other (`disliked_game` table, per console
+like favorites).
+
+**Most loved right now**: if the user accepts anonymous statistics (Settings → About), favorites and "Not for me"
+from every console are sent with their date to their ROMKADE account (`PUT /api/cloud/likes` → ROMKADE Cloud
+`/api/me/likes`): after each change, at startup, and removed from the cloud as soon as consent is withdrawn
+(`DELETE`). A game is identified across users by its console code and normalized title (`SFC/super mario world`):
+all editions count together. The dashboard block ranks the games of every account over 7 days, 30 days or 1 year
+(loved minus not loved, reactions given during the period), and only shows a game once at least 3 accounts have
+given their opinion. A game in the library opens its page and can be relaunched; the others are only shown.
+
 ## Play time
 
 "Play time" page: today's time, the last 7 days and the total, 14-day histogram, time per game,
@@ -518,7 +529,7 @@ current session, if affected, starts again from zero.
 
 In order: the running game, recently played games (▶ button to relaunch them on the console;
 the console's RetroArch history supplemented by sessions tracked by Game Manager, `GET /api/play/recent`),
-the latest additions with an "Add games" link, the microSD card, then the consoles with the most games and
+favorites, the [most loved right now](#favorites), the latest additions with an "Add games" link, the microSD card, then the consoles with the most games and
 activity (last session, today's play time, sync, games being added).
 
 ## Search (Typesense)

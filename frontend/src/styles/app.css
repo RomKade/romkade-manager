@@ -697,6 +697,7 @@ button, input, select { font: inherit; color: inherit; }
 .sheet__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
 .sheet__launch-error { flex-basis: 100%; }
 .favorite-button.is-on { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.dislike-button.is-on { color: var(--ink); border-color: var(--ink-3); background: var(--panel-2); }
 /* Jeu signalé comme ne fonctionnant pas : rouge (--err), sur la fiche et dans le filtre de la bibliothèque */
 .broken-button.is-on, .chip--broken.is-on { color: var(--err); border-color: color-mix(in srgb, var(--err) 55%, var(--line)); background: color-mix(in srgb, var(--err) 12%, var(--panel-2)); }
 .tag--broken { display: inline-flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--err) 16%, transparent); color: var(--err); font-weight: 600; }
@@ -1040,6 +1041,8 @@ kbd {
 
 /* Tableau de bord : jeux joués récemment */
 .shelf__item--played { position: relative; cursor: default; }
+/* Plus aimés du moment : nombre de joueurs qui aiment, en rouge cœur */
+.tile__meta .tile__likes { display: inline-flex; align-items: center; gap: 3px; color: var(--err); font-weight: 600; }
 .shelf__open { display: flex; flex-direction: column; gap: 6px; text-align: left; background: none; border: none; padding: 0; color: inherit; cursor: pointer; min-width: 0; }
 .shelf__open:disabled { cursor: default; }
 .shelf__open:hover .cover, .shelf__open:focus-visible .cover { box-shadow: 0 0 0 2px var(--accent); }

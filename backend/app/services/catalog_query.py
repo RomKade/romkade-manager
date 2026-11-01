@@ -12,7 +12,7 @@ from app.catalog_schemas import (
     FacetsOut, FacetValue,
     GameDetailOut, GameOut, GamesPageOut, PlatformRef, ScanRunOut, UnmatchedImagesOut,
 )
-from app.db.models import BrokenGame, Device, Favorite, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
+from app.db.models import BrokenGame, Device, DislikedGame, Favorite, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
 from app.device.paths import safe_join
 from app.schemas import Page
 from app.platforms import canonical
@@ -175,9 +175,68 @@ def set_favorite(s: Session, console: str | None, file_id: int, on: bool) -> Non
     rows = s.scalars(select(Favorite).where(Favorite.file_id == file_id, _console_scope(console))).all()
     if on and not rows:
         s.add(Favorite(file_id=file_id, console=console))
+        _unset(s, DislikedGame, console, file_id)
     elif not on:
         for row in rows:
             s.delete(row)
+
+
+def _unset(s: Session, model, console: str | None, file_id: int) -> None:
+    row = s.scalar(select(model).where(model.file_id == file_id, model.console == console))
+    if row is not None:
+        s.delete(row)
+
+
+def is_disliked(s: Session, console: str | None, file_id: int) -> bool:
+    return s.scalar(select(DislikedGame.id).where(DislikedGame.file_id == file_id, DislikedGame.console == console)
+                    .limit(1)) is not None
+
+
+def set_disliked(s: Session, console: str | None, file_id: int, on: bool) -> None:
+    """« Je n'aime pas » sur cette console (ou retrait) ; le jeu quitte alors les favoris."""
+    get_file(s, file_id)
+    if on and not is_disliked(s, console, file_id):
+        s.add(DislikedGame(file_id=file_id, console=console))
+        for row in s.scalars(select(Favorite).where(Favorite.file_id == file_id, _console_scope(console))):
+            s.delete(row)
+    elif not on:
+        _unset(s, DislikedGame, console, file_id)
+
+
+def game_key(f: RemoteFile) -> str:
+    """Jeu commun à tous les utilisateurs (ROMKADE Cloud) : code de la console / titre normalisé, quelle que soit
+    l'édition (région, nom du fichier). Le cloud refait la même clé."""
+    return f"{canonical(f.platform.directory)}/{f.normalized_title}"
+
+
+def reactions(s: Session) -> list[dict]:
+    """Favoris (1) et « Je n'aime pas » (-1) de toutes les consoles, avec leur date, pour ROMKADE Cloud. Jeux
+    seulement (pas les fichiers annexes) ; le cloud garde une réaction par jeu, la plus récente."""
+    out = []
+    for model, value in ((Favorite, 1), (DislikedGame, -1)):
+        q = (select(RemoteFile, model.created_at).join(model, model.file_id == RemoteFile.id)
+             .options(joinedload(RemoteFile.platform)).where(RemoteFile.role == "candidate"))
+        for f, at in s.execute(q):
+            out.append({"platform": f.platform.directory, "filename": f.filename, "normalized": f.normalized_title,
+                        "title": display_title(f.full_title) if f.full_title else f.title, "full_title": f.full_title,
+                        "value": value, "at": at.timestamp()})
+    return out
+
+
+def games_for_keys(s: Session, keys: list[str]) -> dict[str, GameOut]:
+    """Jeux de la bibliothèque pour des clés de ROMKADE Cloud (classement des plus aimés) : une édition par clé."""
+    wanted = {k.split("/", 1)[1]: k for k in keys if "/" in k}
+    if not wanted:
+        return {}
+    rows = s.scalars(select(RemoteFile).join(Platform).options(joinedload(RemoteFile.platform)).where(
+        RemoteFile.normalized_title.in_(wanted), RemoteFile.role == "candidate", RemoteFile.deleted_at.is_(None),
+        Platform.present.is_(True)).order_by(RemoteFile.id))
+    found: dict[str, GameOut] = {}
+    for f in rows:
+        k = game_key(f)
+        if k in keys and k not in found:
+            found[k] = to_game(f)
+    return found
 
 
 def is_broken(s: Session, console: str | None, file_id: int) -> bool:
@@ -216,6 +275,7 @@ def game_detail(s: Session, file_id: int, roms_root: str, console: str | None = 
             GameText.platform_id == f.platform_id, GameText.normalized_title == f.normalized_title))},
         favorite=is_favorite(s, console, f.id),
         broken=is_broken(s, console, f.id),
+        disliked=is_disliked(s, console, f.id),
         remote_path=safe_join(roms_root, f.platform.directory, f.relative_path),
         image_relpath=f.image_relpath,
         possible_duplicates=[to_game(d) for d in dups] if f.role == "candidate" else [],

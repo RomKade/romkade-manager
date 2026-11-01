@@ -1,5 +1,5 @@
-"""Données du cloud ROMKADE : comptes, consoles appairées, catalogue et favoris de chaque console, soluces des jeux
-(SQLite).
+"""Données du cloud ROMKADE : comptes, consoles appairées, catalogue et favoris de chaque console, jeux aimés ou non
+de chaque compte (classement des plus aimés), soluces des jeux (SQLite).
 
 Les secrets (jeton du compte, secret de la console) ne sont gardés que sous forme d'empreinte SHA-256 : la base
 seule ne permet ni de parler au MCP au nom d'un compte, ni de se faire passer pour une console.
@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS favorites (
 CREATE TABLE IF NOT EXISTS recent (
     console_id TEXT NOT NULL REFERENCES consoles(id) ON DELETE CASCADE, platform_dir TEXT NOT NULL,
     relative_path TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (console_id, platform_dir, relative_path));
+CREATE TABLE IF NOT EXISTS likes (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, game_key TEXT NOT NULL,
+    value INTEGER NOT NULL, at REAL NOT NULL, platform_dir TEXT NOT NULL, filename TEXT NOT NULL, title TEXT NOT NULL,
+    full_title TEXT, art_key TEXT NOT NULL, PRIMARY KEY (account_id, game_key));
+CREATE INDEX IF NOT EXISTS likes_at ON likes(at);
+CREATE INDEX IF NOT EXISTS likes_art ON likes(art_key);
 CREATE TABLE IF NOT EXISTS google_links (
     account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, linked_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS google_oauth (
@@ -282,8 +288,11 @@ class Store:
                                 (console_id, platform_dir, relative_path)).fetchone()
 
     def game_for_art(self, key: str) -> sqlite3.Row | None:
-        return self._db.execute("SELECT platform_dir, relative_path, full_title FROM games WHERE art_key = ? LIMIT 1",
-                                (key,)).fetchone()
+        """Jeu d'une jaquette : dans un catalogue, à défaut parmi les jeux aimés (classement des plus aimés)."""
+        return (self._db.execute("SELECT platform_dir, relative_path, full_title FROM games WHERE art_key = ? LIMIT 1",
+                                 (key,)).fetchone()
+                or self._db.execute("SELECT platform_dir, filename AS relative_path, full_title FROM likes "
+                                    "WHERE art_key = ? LIMIT 1", (key,)).fetchone())
 
     # ---------- favoris (posés par le Manager sur la carte, envoyés par l'agent) ----------
     def _replace_list(self, table: str, console_id: str, items: list[list[str]]) -> int:
@@ -315,6 +324,31 @@ class Store:
 
     def recent(self, console_id: str, limit: int) -> tuple[list[sqlite3.Row], int]:
         return self._list("recent", console_id, limit)
+
+    # ---------- jeux aimés ou non (envoyés par le Manager, avec l'accord de l'utilisateur) ----------
+    def replace_likes(self, account_id: str, likes: list[dict]) -> int:
+        """Réactions du compte (value 1 : favori, -1 : « Je n'aime pas »), une par jeu (game_key : code de la
+        console / titre normalisé, commun à toutes les éditions), avec leur date. Liste vide : tout est retiré."""
+        with self._lock, self._db:
+            self._db.execute("DELETE FROM likes WHERE account_id = ?", (account_id,))
+            self._db.executemany("INSERT OR REPLACE INTO likes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                 [(account_id, x["key"], x["value"], x["at"], x["platform_dir"], x["filename"],
+                                   x["title"], x["full_title"], x["art_key"]) for x in likes])
+        return len(likes)
+
+    def top_liked(self, since: float, limit: int, min_accounts: int) -> list[dict]:
+        """Jeux les plus aimés depuis `since` : réactions données sur la période, aimés moins pas aimés. Un jeu
+        n'apparaît qu'avec au moins `min_accounts` comptes : on ne remonte jamais à un utilisateur."""
+        rows = self._db.execute(
+            "SELECT game_key, sum(value > 0) AS likes, sum(value < 0) AS dislikes FROM likes WHERE at >= ? "
+            "GROUP BY game_key HAVING count(*) >= ? AND sum(value) > 0 "
+            "ORDER BY sum(value) DESC, likes DESC, max(at) DESC LIMIT ?", (since, min_accounts, limit)).fetchall()
+        out = []
+        for r in rows:
+            g = self._db.execute("SELECT platform_dir, title, art_key FROM likes WHERE game_key = ? AND value > 0 "
+                                 "ORDER BY at DESC LIMIT 1", (r["game_key"],)).fetchone()
+            out.append({"key": r["game_key"], "likes": r["likes"], "dislikes": r["dislikes"], **dict(g)})
+        return out
 
     # ---------- Google Home ----------
     def set_google_link(self, account_id: str, linked: bool) -> None:

@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from app.config import DeviceSettings
+from app.platforms import canonical
 
 
 async def sync(c: httpx.AsyncClient, expect: str = "completed") -> dict:
@@ -255,6 +256,55 @@ async def test_broken_games(app_factory):
         assert (await c.get(f"/api/games/{a}")).json()["broken"] is False
         assert (await c.get("/api/games", params={"broken": True})).json()["page"]["total"] == 0
         assert (await c.put("/api/games/999999/broken")).status_code == 404
+
+
+async def test_dislike_and_likes_shared_with_cloud(app_factory, monkeypatch):
+    """« Je n'aime pas » (contraire d'un favori) ; favoris et « Je n'aime pas » envoyés à ROMKADE Cloud avec le jeton
+    de session, et classement des plus aimés relié aux jeux de la bibliothèque."""
+    from app.services import cloud_agent
+
+    app = app_factory()
+    sent = {}
+
+    async def put_likes(token, likes):
+        sent.update(token=token, likes=likes)
+        return len(likes)
+
+    async def top_liked(token, days, limit):
+        sent.update(days=days, limit=limit)
+        return [{"key": keys[a], "title": "A", "platform_code": keys[a].split("/")[0], "platform_label": "x",
+                 "platform_dir": "x", "likes": 3, "dislikes": 0, "cover": "https://cloud/art/1.webp"},
+                {"key": "GBA/pas dans ma bibliotheque", "title": "B", "platform_code": "GBA", "platform_label": "GBA",
+                 "platform_dir": "GBA", "likes": 3, "dislikes": 1, "cover": "https://cloud/art/2.webp"}]
+
+    monkeypatch.setattr(cloud_agent, "put_likes", put_likes)
+    monkeypatch.setattr(cloud_agent, "top_liked", top_liked)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        items = (await c.get("/api/games", params={"limit": 2})).json()["items"]
+        a, b = items[0]["id"], items[1]["id"]
+        await c.put(f"/api/games/{a}/favorite")
+        assert (await c.put(f"/api/games/{a}/dislike")).status_code == 204
+        sheet = (await c.get(f"/api/games/{a}")).json()
+        assert sheet["disliked"] is True and sheet["favorite"] is False  # l'un retire l'autre
+        await c.put(f"/api/games/{a}/favorite")
+        sheet = (await c.get(f"/api/games/{a}")).json()
+        assert sheet["disliked"] is False and sheet["favorite"] is True
+        await c.put(f"/api/games/{b}/dislike")
+
+        assert (await c.put("/api/cloud/likes")).status_code == 401  # sans session ROMKADE
+        r = await c.put("/api/cloud/likes", headers={"X-Romkade-Token": "jeton"})
+        assert r.json() == {"likes": 2} and sent["token"] == "jeton"
+        by_value = {x["value"]: x for x in sent["likes"]}
+        ga = (await c.get(f"/api/games/{a}")).json()
+        assert by_value[1]["filename"] == ga["filename"] and by_value[1]["normalized"] == ga["normalized_title"]
+        assert by_value[-1]["at"] > 1_700_000_000
+        keys = {a: f"{canonical(ga['platform']['directory'])}/{ga['normalized_title']}"}
+
+        assert (await c.get("/api/cloud/likes/top", params={"days": 12}, headers={"X-Romkade-Token": "j"})).status_code == 422
+        top = (await c.get("/api/cloud/likes/top", params={"days": 7}, headers={"X-Romkade-Token": "j"})).json()
+        assert sent["days"] == 7 and top[0]["game"]["normalized_title"] == ga["normalized_title"]
+        assert top[1]["game"] is None and top[1]["dislikes"] == 1
 
 
 async def test_favorites_per_console(app_factory, monkeypatch):

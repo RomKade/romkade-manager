@@ -268,6 +268,19 @@ class Favorite(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class DislikedGame(Base):
+    """Jeu marqué « Je n'aime pas » depuis sa fiche (l'édition choisie), pour une console ; le contraire d'un favori
+    (l'un retire l'autre). `console` comme pour Favorite. Avec l'accord de l'utilisateur, favoris et « Je n'aime
+    pas » partent dans ROMKADE Cloud pour le classement des plus aimés (services/cloud_agent.py)."""
+
+    __tablename__ = "disliked_game"
+    __table_args__ = (UniqueConstraint("console", "file_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("remote_file.id", ondelete="CASCADE"), index=True)
+    console: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class BrokenGame(Base):
     """Jeu signalé depuis sa fiche comme ne fonctionnant pas (l'édition choisie), sur une console : un jeu peut
     marcher sur un firmware et pas sur un autre. `console` comme pour Favorite (empreinte de la clé SSH)."""
