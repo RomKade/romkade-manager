@@ -492,10 +492,10 @@ Favorites belong to a console: each one records the SHA-256 fingerprint of the c
 (stable, unlike its IP address). Plugging in another console (a friend's, another firmware) only shows its own
 favorites, limited to games present on its card; the others stay in the database and come back with their console.
 
-"Not for me" next to the star is the opposite of a favorite: one removes the other (`disliked_game` table, per console
-like favorites).
+Thumbs up ("I like it", `liked_game` table) and thumbs down ("Not for me", `disliked_game` table), at the bottom of
+the sheet, per console like favorites: one removes the other, and "Not for me" also removes the favorite.
 
-**Most loved right now**: if the user accepts anonymous statistics (Settings → About), favorites and "Not for me"
+**Most loved right now**: if the user accepts anonymous statistics (Settings → About), favorites, thumbs up and "Not for me"
 from every console are sent with their date to their ROMKADE account (`PUT /api/cloud/likes` → ROMKADE Cloud
 `/api/me/likes`): after each change, at startup, and removed from the cloud as soon as consent is withdrawn
 (`DELETE`). A game is identified across users by its console code and normalized title (`SFC/super mario world`):

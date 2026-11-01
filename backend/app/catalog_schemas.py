@@ -87,6 +87,7 @@ class GameDetailOut(GameOut):
     favorite: bool = False
     broken: bool = False  # signalé comme ne fonctionnant pas sur cette console
     disliked: bool = False  # « Je n'aime pas » sur cette console (le contraire d'un favori)
+    liked: bool = False  # « J'aime » (pouce en haut) sur cette console, le contraire de « Je n'aime pas »
     info_url: str | None = None  # fiche de référence (GameFAQs)
     remote_path: str
     image_relpath: str | None

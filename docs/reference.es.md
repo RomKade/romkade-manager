@@ -496,11 +496,11 @@ Los favoritos pertenecen a una consola: cada uno guarda la huella SHA-256 de la 
 (estable, a diferencia de su dirección IP). Al conectar otra consola (la de un amigo, otro firmware) solo se muestran
 sus propios favoritos, limitados a los juegos presentes en su tarjeta; los demás se quedan en la base y vuelven con su consola.
 
-«No me gusta», junto a la estrella, es lo contrario de un favorito: uno quita el otro (tabla `disliked_game`, por
-consola como los favoritos).
+Pulgar arriba («Me gusta», tabla `liked_game`) y pulgar abajo («No me gusta», tabla `disliked_game`), al pie de la
+ficha, por consola como los favoritos: uno quita el otro, y «No me gusta» quita también el favorito.
 
-**Los más queridos del momento**: si el usuario acepta las estadísticas anónimas (Ajustes → Acerca de), los favoritos
-y los «No me gusta» de todas las consolas se envían con su fecha a su cuenta ROMKADE (`PUT /api/cloud/likes` →
+**Los más queridos del momento**: si el usuario acepta las estadísticas anónimas (Ajustes → Acerca de), los favoritos,
+los «Me gusta» y los «No me gusta» de todas las consolas se envían con su fecha a su cuenta ROMKADE (`PUT /api/cloud/likes` →
 ROMKADE Cloud `/api/me/likes`): tras cada cambio, al arrancar, y se borran del cloud en cuanto se retira el
 consentimiento (`DELETE`). Un juego se reconoce de un usuario a otro por el código de su consola y su título
 normalizado (`SFC/super mario world`): todas sus ediciones cuentan juntas. El bloque del panel clasifica los juegos de

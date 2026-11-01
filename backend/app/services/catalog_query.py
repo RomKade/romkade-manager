@@ -12,7 +12,7 @@ from app.catalog_schemas import (
     FacetsOut, FacetValue,
     GameDetailOut, GameOut, GamesPageOut, PlatformRef, ScanRunOut, UnmatchedImagesOut,
 )
-from app.db.models import BrokenGame, Device, DislikedGame, Favorite, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
+from app.db.models import BrokenGame, Device, DislikedGame, Favorite, LikedGame, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
 from app.device.paths import safe_join
 from app.schemas import Page
 from app.platforms import canonical
@@ -192,11 +192,27 @@ def is_disliked(s: Session, console: str | None, file_id: int) -> bool:
                     .limit(1)) is not None
 
 
+def is_liked(s: Session, console: str | None, file_id: int) -> bool:
+    return s.scalar(select(LikedGame.id).where(LikedGame.file_id == file_id, LikedGame.console == console)
+                    .limit(1)) is not None
+
+
+def set_liked(s: Session, console: str | None, file_id: int, on: bool) -> None:
+    """« J'aime » (pouce en haut) sur cette console (ou retrait) ; retire « Je n'aime pas »."""
+    get_file(s, file_id)
+    if on and not is_liked(s, console, file_id):
+        s.add(LikedGame(file_id=file_id, console=console))
+        _unset(s, DislikedGame, console, file_id)
+    elif not on:
+        _unset(s, LikedGame, console, file_id)
+
+
 def set_disliked(s: Session, console: str | None, file_id: int, on: bool) -> None:
-    """« Je n'aime pas » sur cette console (ou retrait) ; le jeu quitte alors les favoris."""
+    """« Je n'aime pas » sur cette console (ou retrait) ; le jeu quitte alors les favoris et « J'aime »."""
     get_file(s, file_id)
     if on and not is_disliked(s, console, file_id):
         s.add(DislikedGame(file_id=file_id, console=console))
+        _unset(s, LikedGame, console, file_id)
         for row in s.scalars(select(Favorite).where(Favorite.file_id == file_id, _console_scope(console))):
             s.delete(row)
     elif not on:
@@ -210,10 +226,10 @@ def game_key(f: RemoteFile) -> str:
 
 
 def reactions(s: Session) -> list[dict]:
-    """Favoris (1) et « Je n'aime pas » (-1) de toutes les consoles, avec leur date, pour ROMKADE Cloud. Jeux
-    seulement (pas les fichiers annexes) ; le cloud garde une réaction par jeu, la plus récente."""
+    """Favoris et « J'aime » (1), « Je n'aime pas » (-1) de toutes les consoles, avec leur date, pour ROMKADE Cloud.
+    Jeux seulement (pas les fichiers annexes) ; le cloud garde une réaction par jeu, la plus récente."""
     out = []
-    for model, value in ((Favorite, 1), (DislikedGame, -1)):
+    for model, value in ((Favorite, 1), (LikedGame, 1), (DislikedGame, -1)):
         q = (select(RemoteFile, model.created_at).join(model, model.file_id == RemoteFile.id)
              .options(joinedload(RemoteFile.platform)).where(RemoteFile.role == "candidate"))
         for f, at in s.execute(q):
@@ -276,6 +292,7 @@ def game_detail(s: Session, file_id: int, roms_root: str, console: str | None = 
         favorite=is_favorite(s, console, f.id),
         broken=is_broken(s, console, f.id),
         disliked=is_disliked(s, console, f.id),
+        liked=is_liked(s, console, f.id),
         remote_path=safe_join(roms_root, f.platform.directory, f.relative_path),
         image_relpath=f.image_relpath,
         possible_duplicates=[to_game(d) for d in dups] if f.role == "candidate" else [],

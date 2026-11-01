@@ -496,6 +496,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/games/{game_id}/like": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add Like
+         * @description « J'aime » (pouce en haut) : retire « Je n'aime pas ».
+         */
+        put: operations["add_like_api_games__game_id__like_put"];
+        post?: never;
+        /** Remove Like */
+        delete: operations["remove_like_api_games__game_id__like_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/games/{game_id}/broken": {
         parameters: {
             query?: never;
@@ -3047,6 +3068,11 @@ export interface components {
              * @default false
              */
             disliked: boolean;
+            /**
+             * Liked
+             * @default false
+             */
+            liked: boolean;
             /** Info Url */
             info_url?: string | null;
             /** Remote Path */
@@ -5187,6 +5213,64 @@ export interface operations {
         };
     };
     remove_dislike_api_games__game_id__dislike_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_like_api_games__game_id__like_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_like_api_games__game_id__like_delete: {
         parameters: {
             query?: never;
             header?: never;

@@ -290,7 +290,12 @@ async def test_dislike_and_likes_shared_with_cloud(app_factory, monkeypatch):
         await c.put(f"/api/games/{a}/favorite")
         sheet = (await c.get(f"/api/games/{a}")).json()
         assert sheet["disliked"] is False and sheet["favorite"] is True
+        await c.put(f"/api/games/{b}/like")
+        assert (await c.get(f"/api/games/{b}")).json()["liked"] is True
         await c.put(f"/api/games/{b}/dislike")
+        sheet = (await c.get(f"/api/games/{b}")).json()
+        assert sheet["disliked"] is True and sheet["liked"] is False  # pouce en bas retire le pouce en haut
+        assert (await c.put("/api/games/999999/like")).status_code == 404
 
         assert (await c.put("/api/cloud/likes")).status_code == 401  # sans session ROMKADE
         r = await c.put("/api/cloud/likes", headers={"X-Romkade-Token": "jeton"})

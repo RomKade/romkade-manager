@@ -20,7 +20,7 @@ ordres. Rien à ouvrir sur la box, pas d'IP, pas de SSH.
 - Favoris : ceux de la console dans le Manager (étoile d'un jeu). Le Manager les pose à côté de l'agent
   (`romkade/favorites.json`) à chaque favori ajouté ou retiré, à chaque synchronisation et à la liaison ; l'agent
   les envoie (`/agent/favorites`). Le cloud les garde par chemin : ils survivent au recalcul du catalogue.
-- Jeux aimés ou non (`likes`) : favoris et « Je n'aime pas » du Manager, par compte, avec leur date, envoyés par le
+- Jeux aimés ou non (`likes`) : favoris, « J'aime » et « Je n'aime pas » du Manager, par compte, avec leur date, envoyés par le
   Manager lui-même (`PUT /api/me/likes`, jeton de session) seulement si l'utilisateur accepte les statistiques
   anonymes ; `DELETE` les retire. Un jeu = code de console / titre normalisé, toutes éditions confondues.
   `/api/likes/top?days=7|30|365` classe les jeux de tous les comptes (aimés moins pas aimés sur la période), à

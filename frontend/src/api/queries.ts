@@ -54,14 +54,27 @@ export function useSetFavorite(id: number) {
   });
 }
 
-/** « Je n'aime pas » (le contraire d'un favori : l'un retire l'autre). */
+/** « Je n'aime pas » (le contraire d'un favori et de « J'aime » : l'un retire l'autre). */
 export function useSetDislike(id: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (on: boolean) => api.setDislike(id, on),
     onSuccess: (_, on) => {
-      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, disliked: on, favorite: on ? false : g.favorite } : g));
+      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, disliked: on, favorite: on ? false : g.favorite,
+        liked: on ? false : g.liked } : g));
       if (on) qc.invalidateQueries({ queryKey: ["favorites"] });
+      shareLikesSoon();
+    },
+  });
+}
+
+/** « J'aime » (pouce en haut), le contraire de « Je n'aime pas » ; compte dans le classement des plus aimés. */
+export function useSetLike(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => api.setLike(id, on),
+    onSuccess: (_, on) => {
+      qc.setQueryData<GameDetail>(["game", id], (g) => (g ? { ...g, liked: on, disliked: on ? false : g.disliked } : g));
       shareLikesSoon();
     },
   });

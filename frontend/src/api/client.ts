@@ -134,6 +134,7 @@ export const api = {
   setFavorite: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/favorite`),
   setBroken: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/broken`),
   setDislike: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/dislike`),
+  setLike: (id: number, on: boolean) => request<void>(on ? "PUT" : "DELETE", `/games/${id}/like`),
   facets: (platform: string[]) => request<Facets>("GET", `/catalog/facets${qs({ platform })}`),
   startSync: () => request<ScanRun>("POST", "/catalog/sync"),
   sync: (id: number) => request<ScanRun>("GET", `/catalog/sync/${id}`),
