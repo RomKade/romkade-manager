@@ -9,6 +9,7 @@ import { AnalyticsNotice } from "./components/AnalyticsNotice";
 import { AssistantBubble } from "./components/AssistantBubble";
 import { GameSheet } from "./components/GameSheet";
 import { Sidebar } from "./components/Sidebar";
+import { OpinionPrompt } from "./components/OpinionPrompt";
 import { PlayAlerts } from "./components/PlayAlerts";
 import { TermsNotice } from "./components/TermsNotice";
 import { TopBar } from "./components/TopBar";
@@ -77,6 +78,7 @@ function Layout() {
         {IS_DEMO && <DemoBanner />}
         <TopBar />
         <PlayAlerts />
+        <OpinionPrompt />
         <TermsNotice />
         <AnalyticsNotice />
         <div className="main__content">

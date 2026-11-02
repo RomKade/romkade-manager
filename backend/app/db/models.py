@@ -293,6 +293,18 @@ class LikedGame(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class OpinionAsked(Base):
+    """Jeu pour lequel la pop-in « Tu as aimé ? », posée après une partie, a été fermée sans avis, sur une console :
+    elle ne revient plus pour ce jeu. Un avis donné (« J'aime », « Je n'aime pas », favori) l'arrête aussi."""
+
+    __tablename__ = "opinion_asked"
+    __table_args__ = (UniqueConstraint("console", "file_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    file_id: Mapped[int] = mapped_column(ForeignKey("remote_file.id", ondelete="CASCADE"), index=True)
+    console: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
 class BrokenGame(Base):
     """Jeu signalé depuis sa fiche comme ne fonctionnant pas (l'édition choisie), sur une console : un jeu peut
     marcher sur un firmware et pas sur un autre. `console` comme pour Favorite (empreinte de la clé SSH)."""

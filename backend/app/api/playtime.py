@@ -11,6 +11,7 @@ from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import joinedload
 
 from app import errors
+from app.api.catalog import console_key
 from app.catalog_schemas import GameOut
 from app.db.models import Platform, PlayReset, PlaySession, RemoteFile, utcnow
 from app.device.ssh_client import DeviceClient
@@ -39,6 +40,7 @@ class PlayStateOut(BaseModel):
     today_seconds: int
     settings: pt.PlaySettings
     alerts: list[AlertOut]
+    opinion: GameOut | None = None  # jeu de la dernière partie, sans avis : pop-in « Tu as aimé ? »
 
 
 class DayOut(BaseModel):
@@ -116,7 +118,37 @@ async def play_state(request: Request) -> PlayStateOut:
         session_started_at=cur["started_at"] if cur else None,
         session_seconds=int((cur["last_seen"] - cur["started_at"]).total_seconds()) if cur else 0,
         today_seconds=int(today * 60), settings=request.app.state.play_settings.load(),
-        alerts=[AlertOut(**a) for a in tr.pending_alerts()])
+        alerts=[AlertOut(**a) for a in tr.pending_alerts()],
+        opinion=None if cur else await asyncio.to_thread(_opinion, request, now))
+
+
+OPINION_MIN_SECONDS = 5 * 60  # partie assez longue pour avoir un avis (pas un simple essai)
+OPINION_DAYS = 3              # au-delà, la partie est trop ancienne pour la demander
+
+
+def _opinion(request: Request, now: datetime) -> GameOut | None:
+    """Jeu de la dernière vraie partie terminée (5 min au moins, ces 3 derniers jours) sur lequel aucun avis n'a
+    été donné pour cette console, ni la question refusée : le Manager demande alors « Tu as aimé ? »."""
+    console = console_key(request.app.state)
+    with request.app.state.sessions() as s:
+        rows = s.scalars(select(PlaySession).where(PlaySession.game_id.is_not(None),
+                                                   PlaySession.ended_at >= now - timedelta(days=OPINION_DAYS))
+                         .order_by(PlaySession.ended_at.desc()).limit(20)).all()
+        for row in rows:
+            if (row.ended_at - row.started_at).total_seconds() < OPINION_MIN_SECONDS:
+                continue
+            if cq.has_opinion(s, console, row.game_id):
+                return None  # dernière partie déjà notée : les plus anciennes ne sont pas redemandées
+            f = s.get(RemoteFile, row.game_id, options=[joinedload(RemoteFile.platform)])
+            return cq.to_game(f) if f else None
+    return None
+
+
+@router.post("/opinion/{game_id}/skip", status_code=204)
+def skip_opinion(game_id: int, request: Request) -> None:
+    """Pop-in « Tu as aimé ? » fermée sans répondre : elle n'est plus posée pour ce jeu."""
+    with request.app.state.sessions.begin() as s:
+        cq.skip_opinion(s, console_key(request.app.state), game_id)
 
 
 @router.post("/alerts/{alert_id}/ack", status_code=204)

@@ -501,6 +501,10 @@ ses propres favoris, limités aux jeux présents sur sa carte ; les autres reste
 
 Pouce en haut (« J'aime », table `liked_game`) et pouce en bas (« Je n'aime pas », table `disliked_game`), en bas de
 la fiche, par console comme les favoris : l'un retire l'autre, et « Je n'aime pas » retire aussi le favori.
+Après une partie d'au moins 5 minutes ces 3 derniers jours, une fois qu'aucun jeu ne tourne plus, une pop-in demande
+« Tu as aimé {jeu} ? » (`opinion` dans `GET /api/play/state`) : « J'aime », « Je n'aime pas » ou « Sans avis »
+(`POST /api/play/opinion/{id}/skip`, table `opinion_asked`). Elle ne revient plus une fois un avis donné sur le jeu
+(pouce ou favori) ou la question refusée.
 
 **Les plus aimés du moment** : si l'utilisateur accepte les statistiques anonymes (Paramètres → À propos), favoris,
 « J'aime » et « Je n'aime pas » de toutes les consoles partent avec leur date sur son compte ROMKADE (`PUT /api/cloud/likes` →

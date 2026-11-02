@@ -72,6 +72,7 @@ let sound: { output: string; address?: string | null } = { output: "tv" };
 // Captures d'écran gardées sur le Mac (deux pour Super Mario World), supprimées par DELETE.
 const shot = (name: string) => ({ name, taken_at: "2026-10-19T20:30:00Z", size: 1000, url: `/api/screenshots/1/${name}` });
 let shots = [shot("20261019-203001.png"), shot("20261019-203000.png")];
+let opinion: ReturnType<typeof game> | null = null;
 let playAlerts: { id: number; created_at: string; minutes: number; scope: string; game_title: string }[] = [];
 
 function mockFetch() {
@@ -118,6 +119,7 @@ function mockFetch() {
     if (url.startsWith("/api/transfers")) return url.includes("plan") ? json({}) : (init?.method === "POST" ? json([], 202) : json([]));
     const playSettings = { alert_enabled: true, alert_minutes: 240, alert_scope: "day", repeat_minutes: 30, console_message: true };
     if (url.startsWith("/api/play/alerts/")) { playAlerts = []; return new Response(null, { status: 204 }); }
+    if (url.startsWith("/api/play/opinion/")) { opinion = null; return new Response(null, { status: 204 }); }
     if (url.startsWith("/api/search")) return json({ items: [game(1, "Super Mario World")], total: 1, engine: "typesense" });
     if (url.startsWith("/api/play/recent")) return json([
       { title: "Super Mario World", platform: "SFC", rom_path: "/mnt/mmc/Roms/SFC/Super Mario World (USA).smc",
@@ -125,7 +127,7 @@ function mockFetch() {
     ]);
     if (/^\/api\/games\/\d+\/launch/.test(url)) return json({ status: "launching", rom_path: "x", slot: null }, 202);
     if (url.startsWith("/api/play/state")) return json({ playing: false, game: null, title: null, session_started_at: null,
-      session_seconds: 0, today_seconds: 3 * 3600, settings: playSettings, alerts: playAlerts });
+      session_seconds: 0, today_seconds: 3 * 3600, settings: playSettings, alerts: playAlerts, opinion });
     if (url.startsWith("/api/play/settings")) return json(playSettings);
     if (url.startsWith("/api/play/reset")) return new Response(null, { status: 204 });
     if (url.startsWith("/api/play/stats")) return json({
@@ -261,7 +263,7 @@ function mockFetch() {
       if (init?.method === "PUT") favoriteIds = favoriteIds.filter((f) => f !== id);
       return new Response(null, { status: 204 });
     }
-    if (/^\/api\/games\/\d+\/like/.test(url)) return new Response(null, { status: 204 });
+    if (/^\/api\/games\/\d+\/like/.test(url)) { if (init?.method === "PUT") opinion = null; return new Response(null, { status: 204 }); }
     if (/^\/api\/games\/\d+\/screenshots\/[^/]+\/caption/.test(url)) {
       const n = bodies.filter((b) => String(b.url).endsWith("/caption")).length;
       return json({ text: `Brouillon ${n} de l'IA\n#retrogaming`, model: "Gemma", saw_image: true });
@@ -348,6 +350,7 @@ beforeEach(() => {
   volume = { percent: 60, muted: false };
   sound = { output: "tv" };
   playAlerts = [];
+  opinion = null;
   vi.stubGlobal("fetch", mockFetch());
   // Comme Chrome : scrollIntoView renvoie une promesse (un effet qui la renvoyait faisait planter toute la page).
   Element.prototype.scrollIntoView = function () { return Promise.resolve() as unknown as void; };
@@ -1006,6 +1009,24 @@ describe("Temps de jeu", () => {
     expect(within(alert).getByText("Ça fait 4 h 00 que tu joues")).toBeInTheDocument();
     await userEvent.click(within(alert).getByRole("button", { name: "OK, compris" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
+  it("demande après une partie si le jeu a plu, sans le redemander une fois l'avis donné", async () => {
+    opinion = game(1, "Super Mario World");
+    renderAt("/");
+    const ask = await screen.findByRole("dialog", { name: "Tu as aimé Super Mario World ?" });
+    await userEvent.click(within(ask).getByRole("button", { name: "J'aime" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /Tu as aimé/ })).not.toBeInTheDocument());
+    expect(calls).toContain("/api/games/1/like");
+  });
+
+  it("« Sans avis » ferme la question pour de bon", async () => {
+    opinion = game(1, "Super Mario World");
+    renderAt("/");
+    const ask = await screen.findByRole("dialog", { name: "Tu as aimé Super Mario World ?" });
+    await userEvent.click(within(ask).getByRole("button", { name: "Sans avis" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /Tu as aimé/ })).not.toBeInTheDocument());
+    expect(calls).toContain("/api/play/opinion/1/skip");
   });
 });
 

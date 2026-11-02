@@ -206,6 +206,7 @@ export const api = {
   playSettings: () => request<PlaySettings>("GET", "/play/settings"),
   savePlaySettings: (s: PlaySettings) => request<PlaySettings>("PUT", "/play/settings", s),
   ackAlert: (id: number) => request<void>("POST", `/play/alerts/${id}/ack`),
+  skipOpinion: (id: number) => request<void>("POST", `/play/opinion/${id}/skip`),
   bluetooth: () => request<BtStatus>("GET", "/bluetooth"),
   btScan: () => request<BtStatus>("POST", "/bluetooth/scan"),
   btConnect: (address: string) => request<BtStatus>("POST", "/bluetooth/connect", { address }),

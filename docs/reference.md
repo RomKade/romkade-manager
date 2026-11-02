@@ -494,6 +494,10 @@ favorites, limited to games present on its card; the others stay in the database
 
 Thumbs up ("I like it", `liked_game` table) and thumbs down ("Not for me", `disliked_game` table), at the bottom of
 the sheet, per console like favorites: one removes the other, and "Not for me" also removes the favorite.
+After a game session of at least 5 minutes in the last 3 days, once nothing is playing anymore, a pop-in asks
+"Did you like {game}?" (`opinion` in `GET /api/play/state`): "I like it", "I don't like it", or "No opinion"
+(`POST /api/play/opinion/{id}/skip`, `opinion_asked` table). It is not asked again once an opinion was given on the
+game (thumb or favorite) or declined.
 
 **Most loved right now**: if the user accepts anonymous statistics (Settings → About), favorites, thumbs up and "Not for me"
 from every console are sent with their date to their ROMKADE account (`PUT /api/cloud/likes` → ROMKADE Cloud

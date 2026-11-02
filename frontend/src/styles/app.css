@@ -1032,6 +1032,9 @@ kbd {
 .play-alert__title { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-lg); }
 .play-alert__actions { display: flex; gap: 14px; align-items: center; margin-top: 4px; }
 .play-alert__close { margin: -6px -6px 0 0; }
+.play-alert--opinion { border-color: var(--accent); }
+.play-alert__cover { width: 56px; flex: none; aspect-ratio: 3 / 4; border-radius: var(--r-control); overflow: hidden; }
+.play-alert__actions--opinion { flex-wrap: wrap; gap: 8px 10px; }
 /* Réglages */
 .playtime-form { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 .playtime-form:disabled { opacity: 0.5; }

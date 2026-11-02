@@ -584,7 +584,8 @@ export interface paths {
         };
         /**
          * Game Boxart
-         * @description Jaquette du jeu (libretro-thumbnails), téléchargée au premier appel puis servie depuis le cache du Mac.
+         * @description Jaquette du jeu (libretro-thumbnails), ou sa capture d'écran, ou son écran titre : téléchargée au premier appel
+         *     puis servie depuis le cache du Mac.
          */
         get: operations["game_boxart_api_games__game_id__boxart_get"];
         put?: never;
@@ -1849,6 +1850,26 @@ export interface paths {
         get: operations["play_state_api_play_state_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/play/opinion/{game_id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Skip Opinion
+         * @description Pop-in « Tu as aimé ? » fermée sans répondre : elle n'est plus posée pour ce jeu.
+         */
+        post: operations["skip_opinion_api_play_opinion__game_id__skip_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3683,6 +3704,7 @@ export interface components {
             settings: components["schemas"]["PlaySettings"];
             /** Alerts */
             alerts: components["schemas"]["AlertOut"][];
+            opinion?: components["schemas"]["GameOut"] | null;
         };
         /** PlayStatsOut */
         PlayStatsOut: {
@@ -5430,6 +5452,8 @@ export interface operations {
             query?: {
                 /** @description thumb : miniature WebP pour la grille */
                 size?: "thumb" | "full";
+                /** @description box : jaquette ; snap : capture du jeu ; title : écran titre */
+                kind?: "box" | "snap" | "title";
             };
             header?: never;
             path: {
@@ -7687,6 +7711,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlayStateOut"];
+                };
+            };
+        };
+    };
+    skip_opinion_api_play_opinion__game_id__skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -229,3 +229,36 @@ async def test_reset_one_game_and_everything(app_factory):
         assert (await c.post("/api/play/reset-all", json={"games": everything})).status_code == 204
         stats = (await c.get("/api/play/stats")).json()
         assert stats["games"] == [] and stats["sessions"] == [] and stats["total_seconds"] == 0
+
+
+async def test_opinion_after_play(app_factory):
+    app = app_factory()
+    app.state.device_runner = FakeConsole()
+    tr = app.state.tracker
+    now = datetime.now(UTC)
+
+    async def play(rom, start, minutes):
+        for i in range(minutes * 2 + 1):
+            await tr.observe(playing(rom), start + timedelta(seconds=30 * i))
+        await tr.observe(IDLE, start + timedelta(minutes=minutes, seconds=30))
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
+        await sync(c)
+        await play(SONIC, now - timedelta(hours=2), 2)       # simple essai : pas de question
+        assert (await c.get("/api/play/state")).json()["opinion"] is None
+        await play(MARIO, now - timedelta(hours=1), 10)
+        await tr.observe(playing(SONIC), now - timedelta(minutes=1))  # en jeu : la question attend la fin
+        assert (await c.get("/api/play/state")).json()["opinion"] is None
+        await tr.observe(IDLE, now)
+        opinion = (await c.get("/api/play/state")).json()["opinion"]
+        assert opinion["title"] == "Super Mario World"
+        assert (await c.put(f"/api/games/{opinion['id']}/like")).status_code == 204  # avis donné : plus redemandé
+        assert (await c.get("/api/play/state")).json()["opinion"] is None
+
+        await play(SONIC, now - timedelta(minutes=30), 8)
+        sonic = (await c.get("/api/play/state")).json()["opinion"]
+        assert sonic["title"] == "Sonic The Hedgehog"
+        assert (await c.post(f"/api/play/opinion/{sonic['id']}/skip")).status_code == 204  # « Plus tard » : fini
+        assert (await c.get("/api/play/state")).json()["opinion"] is None
+        await play(SONIC, now - timedelta(minutes=15), 8)
+        assert (await c.get("/api/play/state")).json()["opinion"] is None

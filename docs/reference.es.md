@@ -498,6 +498,10 @@ sus propios favoritos, limitados a los juegos presentes en su tarjeta; los demá
 
 Pulgar arriba («Me gusta», tabla `liked_game`) y pulgar abajo («No me gusta», tabla `disliked_game`), al pie de la
 ficha, por consola como los favoritos: uno quita el otro, y «No me gusta» quita también el favorito.
+Tras una partida de al menos 5 minutos en los últimos 3 días, cuando ya no hay ningún juego en marcha, una ventana
+pregunta «¿Te ha gustado {juego}?» (`opinion` en `GET /api/play/state`): «Me gusta», «No me gusta» o «Sin opinión»
+(`POST /api/play/opinion/{id}/skip`, tabla `opinion_asked`). No vuelve una vez dada una opinión sobre el juego
+(pulgar o favorito) o rechazada la pregunta.
 
 **Los más queridos del momento**: si el usuario acepta las estadísticas anónimas (Ajustes → Acerca de), los favoritos,
 los «Me gusta» y los «No me gusta» de todas las consolas se envían con su fecha a su cuenta ROMKADE (`PUT /api/cloud/likes` →

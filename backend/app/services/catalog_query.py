@@ -12,7 +12,7 @@ from app.catalog_schemas import (
     FacetsOut, FacetValue,
     GameDetailOut, GameOut, GamesPageOut, PlatformRef, ScanRunOut, UnmatchedImagesOut,
 )
-from app.db.models import BrokenGame, Device, DislikedGame, Favorite, LikedGame, GameText, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
+from app.db.models import BrokenGame, Device, DislikedGame, Favorite, LikedGame, GameText, OpinionAsked, Platform, PlatformImage, RemoteFile, ScanChange, ScanRun
 from app.device.paths import safe_join
 from app.schemas import Page
 from app.platforms import canonical
@@ -217,6 +217,21 @@ def set_disliked(s: Session, console: str | None, file_id: int, on: bool) -> Non
             s.delete(row)
     elif not on:
         _unset(s, DislikedGame, console, file_id)
+
+
+def has_opinion(s: Session, console: str | None, file_id: int) -> bool:
+    """Avis déjà donné sur ce jeu pour cette console (« J'aime », « Je n'aime pas », favori), ou question déjà
+    refusée : la pop-in d'après partie ne le redemande pas."""
+    return (is_liked(s, console, file_id) or is_disliked(s, console, file_id) or is_favorite(s, console, file_id)
+            or s.scalar(select(OpinionAsked.id).where(OpinionAsked.file_id == file_id, OpinionAsked.console == console)
+                        .limit(1)) is not None)
+
+
+def skip_opinion(s: Session, console: str | None, file_id: int) -> None:
+    """Pop-in « Tu as aimé ? » fermée sans avis : plus posée pour ce jeu sur cette console."""
+    get_file(s, file_id)
+    if s.scalar(select(OpinionAsked.id).where(OpinionAsked.file_id == file_id, OpinionAsked.console == console)) is None:
+        s.add(OpinionAsked(file_id=file_id, console=console))
 
 
 def game_key(f: RemoteFile) -> str:

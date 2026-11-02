@@ -254,6 +254,12 @@ export function useAckAlert() {
   return useMutation({ mutationFn: api.ackAlert, onSuccess: () => qc.invalidateQueries({ queryKey: ["play-state"] }) });
 }
 
+/** Pop-in « Tu as aimé ? » fermée sans avis : plus posée pour ce jeu. */
+export function useSkipOpinion() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.skipOpinion, onSuccess: () => qc.invalidateQueries({ queryKey: ["play-state"] }) });
+}
+
 /** Bluetooth de la console. Chaque opération renvoie l'état à jour. */
 export const useBluetooth = (enabled: boolean) =>
   useQuery({ queryKey: ["bluetooth"], queryFn: api.bluetooth, enabled, retry: false, refetchInterval: 20_000 });

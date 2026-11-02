@@ -66,6 +66,12 @@ const messages: Messages = {
     "alert.resume": "Reprendre la partie",
     "alert.close": "Fermer l'alerte",
     "alert.settings": "Régler la limite",
+    "opinion.title": "Tu as aimé {game} ?",
+    "opinion.body": "Tu viens d'y jouer : dis-nous ce que tu en penses. Tu pourras changer d'avis sur sa fiche.",
+    "opinion.like": "J'aime",
+    "opinion.dislike": "Je n'aime pas",
+    "opinion.skip": "Sans avis",
+    "opinion.close": "Ne pas donner d'avis",
   },
   en: {
     "period.title": "Period",
@@ -131,6 +137,12 @@ const messages: Messages = {
     "alert.resume": "Resume playing",
     "alert.close": "Close the alert",
     "alert.settings": "Set the limit",
+    "opinion.title": "Did you like {game}?",
+    "opinion.body": "You just played it: tell us what you think. You can change your mind on its page.",
+    "opinion.like": "I like it",
+    "opinion.dislike": "I don't like it",
+    "opinion.skip": "No opinion",
+    "opinion.close": "Don't give an opinion",
   },
   es: {
     "period.title": "Periodo",
@@ -196,6 +208,12 @@ const messages: Messages = {
     "alert.resume": "Seguir jugando",
     "alert.close": "Cerrar la alerta",
     "alert.settings": "Fijar el límite",
+    "opinion.title": "¿Te ha gustado {game}?",
+    "opinion.body": "Acabas de jugarlo: dinos qué te parece. Podrás cambiar de opinión en su ficha.",
+    "opinion.like": "Me gusta",
+    "opinion.dislike": "No me gusta",
+    "opinion.skip": "Sin opinión",
+    "opinion.close": "No dar mi opinión",
   },
 };
 
