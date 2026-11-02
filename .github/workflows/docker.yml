@@ -116,3 +116,11 @@ jobs:
     uses: ./.github/workflows/install-test.yml
     with:
       tag: ${{ github.ref_name }}
+
+  # Annonce de la version dans #changelog sur Discord (secret DISCORD_CHANGELOG_WEBHOOK, facultatif).
+  discord:
+    needs: release
+    uses: ./.github/workflows/discord.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

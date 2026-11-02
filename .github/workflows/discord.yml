@@ -1,0 +1,69 @@
+# Annonce d'une version dans le salon #changelog du Discord de la communauté ROMKADE (en anglais : les notes de
+# version sont en français, le message renvoie vers l'historique complet sur romkade.com et vers la release GitHub).
+#
+# Appelé par docker.yml après la release (input « tag »). À la main (Actions → Discord → Run workflow) : une version
+# (« v0.5.0 ») ou « all » pour poster tout l'historique, de la plus ancienne à la plus récente.
+# Secret facultatif DISCORD_CHANGELOG_WEBHOOK : URL d'un webhook du salon (Modifier le salon → Intégrations → Webhooks).
+name: Discord
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version à annoncer (v0.5.0) ou « all » pour tout l'historique"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Annonce dans #changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          WEBHOOK: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then echo "DISCORD_CHANGELOG_WEBHOOK absent : rien n'est posté sur Discord."; exit 0; fi
+          announce() {
+            gh release view "$1" --json tagName,url,publishedAt,body > release.json
+            # Nombre de lignes de la section « ## Nouveautés » (écrite par docker.yml).
+            COUNT=$(jq -r .body release.json | awk '/^## /{s=($0=="## Nouveautés")} s&&/^- /{n++} END{print n+0}')
+            jq -n --slurpfile r release.json --argjson count "$COUNT" '$r[0] as $r | ($r.tagName | ltrimstr("v")) as $v | {
+              username: "ROMKADE",
+              embeds: [{
+                title: "ROMKADE Manager \($v) is out 🚀",
+                url: $r.url,
+                color: 1236471,
+                timestamp: $r.publishedAt,
+                description: ([
+                  "\($count) changes in this version.",
+                  "",
+                  "**Update**",
+                  "Docker: `docker compose pull && docker compose up -d`",
+                  "Docker Desktop: update the ROMKADE extension",
+                  "New here? [Installation guide](https://romkade.com/en/installation/)",
+                  "",
+                  "📜 [Full release history](https://romkade.com/en/release-notes/) · [GitHub release](\($r.url))"
+                ] | join("\n"))
+              }]
+            }' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
+            echo "$1 annoncée sur Discord."
+          }
+          if [ "$TAG" = "all" ]; then
+            for t in $(gh release list --exclude-drafts --exclude-pre-releases --limit 100 --json tagName,publishedAt \
+                         --jq 'sort_by(.publishedAt) | .[].tagName'); do
+              announce "$t"
+              sleep 2  # limite de débit des webhooks Discord
+            done
+          else
+            announce "$TAG"
+          fi
