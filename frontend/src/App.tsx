@@ -12,6 +12,8 @@ import { Sidebar } from "./components/Sidebar";
 import { PlayAlerts } from "./components/PlayAlerts";
 import { TermsNotice } from "./components/TermsNotice";
 import { TopBar } from "./components/TopBar";
+import { DemoBanner } from "./demo/DemoBanner";
+import { IS_DEMO } from "./demo/mode";
 import { t, useLang } from "./i18n";
 import { Empty } from "./components/ui";
 import { AccountPage } from "./pages/Account";
@@ -72,6 +74,7 @@ function Layout() {
       <a href="#main" className="skip-link">{t("common.nav.skip")}</a>
       <Sidebar />
       <main id="main" className="main" tabIndex={-1}>
+        {IS_DEMO && <DemoBanner />}
         <TopBar />
         <PlayAlerts />
         <TermsNotice />
@@ -125,7 +128,7 @@ export function App() {
     <QueryClientProvider client={client}>
       {/* Compte ROMKADE obligatoire : sans connexion, l'écran de connexion remplace tout le Manager. */}
       <AuthGate>
-        <BrowserRouter key={lang}>
+        <BrowserRouter key={lang} basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AppRoutes />
         </BrowserRouter>
       </AuthGate>

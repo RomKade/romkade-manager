@@ -9,6 +9,7 @@ known_hosts
 *.sqlite3
 node_modules/
 dist/
+dist-demo/
 .DS_Store
 .claude/settings.local.json
 *.tsbuildinfo

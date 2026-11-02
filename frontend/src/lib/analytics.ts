@@ -8,6 +8,7 @@
  * de session. Version sans dépendance externe : aucun script téléchargé depuis PostHog.
  */
 import type { CaptureResult, PostHog } from "posthog-js/dist/module.no-external";
+import { IS_DEMO } from "../demo/mode";
 
 import { APP_VERSION } from "../version";
 import { getLang } from "../i18n";
@@ -19,7 +20,8 @@ const STORAGE_KEY = "romkade-analytics";
 export type Consent = "on" | "off" | null;
 
 /** La clé PostHog a été fournie au build : la question et le réglage s'affichent. */
-export const analyticsAvailable = Boolean(KEY);
+// Jamais dans la démo publique (romkade.com/demo).
+export const analyticsAvailable = Boolean(KEY) && !IS_DEMO;
 
 export function getConsent(): Consent {
   try {

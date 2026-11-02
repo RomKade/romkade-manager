@@ -13,7 +13,7 @@ export function ConsoleBadge({ code, label, className = "" }: { code: string; la
   return (
     <span className={`console-badge ${className}`} title={label ?? short}>
       {failed ? <Gamepad2 size={14} aria-hidden className="console-badge__icon" /> : (
-        <img className="console-badge__icon" src={`/consoles/${code.toUpperCase()}.webp`} alt="" aria-hidden
+        <img className="console-badge__icon" src={`${import.meta.env.BASE_URL}consoles/${code.toUpperCase()}.webp`} alt="" aria-hidden
           loading="lazy" decoding="async" onError={() => setFailed(true)} />
       )}
       <span className="console-badge__name">{short}</span>

@@ -11,7 +11,7 @@ export function ConsoleIcon({ code, className = "" }: { code: string; className?
     return <span className={`console-icon console-icon--generic ${className}`} aria-hidden><Gamepad2 size={28} strokeWidth={1.5} /></span>;
   }
   return (
-    <img className={`console-icon ${className}`} src={`/consoles/${code.toUpperCase()}.webp`} alt="" aria-hidden
+    <img className={`console-icon ${className}`} src={`${import.meta.env.BASE_URL}consoles/${code.toUpperCase()}.webp`} alt="" aria-hidden
       loading="lazy" decoding="async" onError={() => setFailed(true)} />
   );
 }

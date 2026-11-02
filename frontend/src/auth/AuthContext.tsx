@@ -2,6 +2,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { useT } from "../i18n";
+import { IS_DEMO } from "../demo/mode";
 import { onPhone } from "../lib/phone";
 import { AuthScreen } from "./AuthScreen";
 import { supabase } from "./supabase";
@@ -52,7 +53,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   // Téléphone associé par QR code depuis l'ordinateur connecté : pas d'écran de connexion (sa vérification
   // anti-robot n'est autorisée que sur localhost et romkade.com) ; le compte se gère sur l'ordinateur.
-  if (onPhone()) return <>{children}</>;
+  // Démo publique : pas de compte (useAuth().session reste null).
+  if (onPhone() || IS_DEMO) return <>{children}</>;
   if (status === "loading") {
     return <div className="auth-loading" role="status"><span className="auth-spin" aria-hidden />{t("auth.loading")}</div>;
   }

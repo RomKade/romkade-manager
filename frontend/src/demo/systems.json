@@ -1,0 +1,534 @@
+[
+ {
+  "id": "anbernic-stock-mod",
+  "label": "Anbernic (firmware d'origine + Stock OS Mod)",
+  "status": "tested",
+  "roms_roots": [
+   "/mnt/mmc/Roms",
+   "/mnt/sdcard/Roms"
+  ],
+  "launcher": "stock-mod",
+  "quit": "ra-udp",
+  "save_sources": [
+   "saves_RA/Roms",
+   "states_RA/Roms",
+   "save/Roms",
+   "save_nds",
+   ".config/ppsspp/PSP/SAVEDATA"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/.config/retroarch/retroarch.cfg",
+  "ra_history": "/.config/retroarch/content_history.lpl",
+  "ra_logs": "/mnt/vendor/deep/retro/playlists/logs",
+  "bluetooth": "stock",
+  "notes": "RG35XX Pro/Plus/H/SP/2024, RG28XX, RG34XX, RG40XX, RG CubeXX (puce H700).",
+  "makers": [
+   "Anbernic"
+  ],
+  "ra_network": true,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": true,
+   "resume_slot": true,
+   "quit": true,
+   "save_state": true,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": true,
+   "bluetooth": true,
+   "bluetooth_audio": true,
+   "players": true,
+   "volume": true,
+   "on_screen_message": true,
+   "break_screen": true,
+   "clock": true,
+   "screenshot": true
+  }
+ },
+ {
+  "id": "anbernic-stock",
+  "label": "Anbernic (firmware d'origine)",
+  "status": "experimental",
+  "roms_roots": [
+   "/mnt/mmc/Roms",
+   "/mnt/sdcard/Roms"
+  ],
+  "launcher": null,
+  "quit": "ra-udp",
+  "save_sources": [
+   "saves_RA/Roms",
+   "states_RA/Roms",
+   "save/Roms",
+   "save_nds",
+   ".config/ppsspp/PSP/SAVEDATA"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/.config/retroarch/retroarch.cfg",
+  "ra_history": "/.config/retroarch/content_history.lpl",
+  "ra_logs": "/mnt/vendor/deep/retro/playlists/logs",
+  "bluetooth": "stock",
+  "notes": "Sans « Stock OS Mod », les jeux ne se lancent pas à distance : installer le mod de cbepx-me.",
+  "makers": [
+   "Anbernic"
+  ],
+  "ra_network": true,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": false,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": true,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": true,
+   "bluetooth": true,
+   "bluetooth_audio": true,
+   "players": true,
+   "volume": true,
+   "on_screen_message": true,
+   "break_screen": true,
+   "clock": true,
+   "screenshot": true
+  }
+ },
+ {
+  "id": "knulli",
+  "label": "Knulli",
+  "status": "experimental",
+  "roms_roots": [
+   "/userdata/roms"
+  ],
+  "launcher": "es-http",
+  "quit": "es-http",
+  "save_sources": [
+   "saves"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/userdata/system/configs/retroarch/retroarchcustom.cfg",
+  "ra_history": null,
+  "ra_logs": null,
+  "bluetooth": "bluez",
+  "notes": "Basé sur Batocera. Consoles H700 (Anbernic), RK3566, Miyoo Flip, TrimUI.",
+  "makers": [
+   "Anbernic",
+   "Miyoo",
+   "TrimUI",
+   "Powkiddy"
+  ],
+  "ra_network": true,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": true,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": true,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": true,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": true,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "batocera",
+  "label": "Batocera",
+  "status": "experimental",
+  "roms_roots": [
+   "/userdata/roms"
+  ],
+  "launcher": "es-http",
+  "quit": "es-http",
+  "save_sources": [
+   "saves"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/userdata/system/configs/retroarch/retroarchcustom.cfg",
+  "ra_history": null,
+  "ra_logs": null,
+  "bluetooth": "bluez",
+  "notes": "",
+  "makers": [
+   "PC",
+   "Raspberry Pi",
+   "Retroid"
+  ],
+  "ra_network": true,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": true,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": true,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": true,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": true,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "rocknix",
+  "label": "ROCKNIX / JELOS",
+  "status": "experimental",
+  "roms_roots": [
+   "/storage/roms"
+  ],
+  "launcher": "es-http",
+  "quit": "es-http",
+  "save_sources": [
+   "roms/savestates"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/storage/.config/retroarch/retroarch.cfg",
+  "ra_history": "/storage/playlists/builtin/content_history.lpl",
+  "ra_logs": "/storage/playlists/logs",
+  "bluetooth": "bluez",
+  "notes": "Sauvegardes en jeu à côté des jeux, instantanées dans roms/savestates. Sauvegarder depuis le Mac : impossible (commandes réseau de RetroArch coupées) ; RetroArch sauvegarde tout seul en quittant.",
+  "makers": [
+   "Anbernic",
+   "Powkiddy",
+   "Retroid",
+   "AYN"
+  ],
+  "ra_network": false,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": true,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": false,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": true,
+   "bluetooth": true,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "muos",
+  "label": "muOS",
+  "status": "experimental",
+  "roms_roots": [
+   "/mnt/mmc/ROMS",
+   "/mnt/sdcard/ROMS",
+   "/mnt/union/ROMS"
+  ],
+  "launcher": null,
+  "quit": "generic",
+  "save_sources": [
+   "MUOS/save/file",
+   "MUOS/save/state"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/mnt/mmc/MUOS/retroarch/retroarch.cfg",
+  "ra_history": null,
+  "ra_logs": null,
+  "bluetooth": null,
+  "notes": "Dossiers de ROMs aux noms libres : la console de chaque dossier est devinée d'après son nom.",
+  "makers": [
+   "Anbernic",
+   "TrimUI"
+  ],
+  "ra_network": false,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": false,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": false,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": false,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "arkos",
+  "label": "ArkOS / dArkOS",
+  "status": "experimental",
+  "roms_roots": [
+   "/roms",
+   "/roms2"
+  ],
+  "launcher": null,
+  "quit": "generic",
+  "save_sources": [],
+  "states_in_rom_folder": true,
+  "ra_config": "/home/ark/.config/retroarch/retroarch.cfg",
+  "ra_history": "/home/ark/.config/retroarch/content_history.lpl",
+  "ra_logs": null,
+  "bluetooth": null,
+  "notes": "R36S et clones, RG351, RG353 (sous ArkOS).",
+  "makers": [
+   "Anbernic",
+   "R36S",
+   "Powkiddy"
+  ],
+  "ra_network": false,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": false,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": false,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": false,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "onion",
+  "label": "Onion OS",
+  "status": "tested",
+  "roms_roots": [
+   "/mnt/SDCARD/Roms"
+  ],
+  "launcher": "onion",
+  "quit": "generic",
+  "save_sources": [
+   "Saves/CurrentProfile/saves",
+   "Saves/CurrentProfile/states"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/mnt/SDCARD/RetroArch/.retroarch/retroarch.cfg",
+  "ra_history": "/mnt/SDCARD/Saves/CurrentProfile/lists/content_history.lpl",
+  "ra_logs": null,
+  "bluetooth": null,
+  "notes": "Miyoo Mini / Mini Plus. Activer SSH dans les réglages d'Onion. Au premier jeu lancé depuis le Mac, Game Manager active « Keep services alive » (Tweaks > Network) : sans lui, Onion coupe SSH pendant les jeux.",
+  "makers": [
+   "Miyoo"
+  ],
+  "ra_network": false,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": true,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": false,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": false,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "spruce",
+  "label": "spruce",
+  "status": "experimental",
+  "roms_roots": [
+   "/mnt/SDCARD/Roms"
+  ],
+  "launcher": null,
+  "quit": "generic",
+  "save_sources": [
+   "Saves/saves",
+   "Saves/states"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": "/mnt/SDCARD/RetroArch/retroarch.cfg",
+  "ra_history": null,
+  "ra_logs": null,
+  "bluetooth": null,
+  "notes": "Miyoo A30, Miyoo Flip, TrimUI.",
+  "makers": [
+   "Miyoo",
+   "TrimUI"
+  ],
+  "ra_network": false,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": false,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": false,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": false,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "minui",
+  "label": "MinUI / NextUI",
+  "status": "experimental",
+  "roms_roots": [
+   "/mnt/SDCARD/Roms"
+  ],
+  "launcher": null,
+  "quit": "none",
+  "save_sources": [
+   "Saves"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": null,
+  "ra_history": null,
+  "ra_logs": null,
+  "bluetooth": null,
+  "notes": "Dossiers « Game Boy (GB) » : la console est lue entre parenthèses. Pas de RetroArch.",
+  "makers": [
+   "Miyoo",
+   "TrimUI",
+   "Anbernic"
+  ],
+  "ra_network": false,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": false,
+   "resume_slot": false,
+   "quit": false,
+   "save_state": false,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": false,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "android",
+  "label": "Android + RetroArch",
+  "status": "experimental",
+  "roms_roots": [
+   "/storage/emulated/0/ROMs",
+   "/storage/emulated/0/Roms",
+   "/storage/emulated/0/roms"
+  ],
+  "launcher": "android",
+  "quit": "none",
+  "save_sources": [
+   "RetroArch/saves",
+   "RetroArch/states"
+  ],
+  "states_in_rom_folder": false,
+  "ra_config": null,
+  "ra_history": null,
+  "ra_logs": null,
+  "bluetooth": null,
+  "notes": "Retroid Pocket, AYN Odin/Thor, Anbernic et Ayaneo sous Android. Sur la console : Termux (serveur SSH, port 8022, « Afficher par-dessus les autres applis » autorisé) et RetroArch. Les jeux se lancent dans RetroArch, avec le cœur installé pour chaque console ; on les quitte depuis la console.",
+  "makers": [
+   "Retroid",
+   "AYN",
+   "Anbernic",
+   "Ayaneo"
+  ],
+  "ra_network": false,
+  "clock": false,
+  "now_playing": false,
+  "capabilities": {
+   "launch": true,
+   "resume_slot": false,
+   "quit": false,
+   "save_state": false,
+   "now_playing": false,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": false,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": false,
+   "screenshot": false
+  }
+ },
+ {
+  "id": "generic",
+  "label": "Autre système (Linux + SSH)",
+  "status": "experimental",
+  "roms_roots": [],
+  "launcher": null,
+  "quit": "generic",
+  "save_sources": [],
+  "states_in_rom_folder": false,
+  "ra_config": null,
+  "ra_history": null,
+  "ra_logs": null,
+  "bluetooth": null,
+  "notes": "Catalogue, jaquettes, ajout de jeux et sauvegardes rangées à côté des jeux.",
+  "makers": [],
+  "ra_network": false,
+  "clock": true,
+  "now_playing": true,
+  "capabilities": {
+   "launch": false,
+   "resume_slot": false,
+   "quit": true,
+   "save_state": false,
+   "now_playing": true,
+   "saves": true,
+   "retroarch_logs": false,
+   "bluetooth": false,
+   "bluetooth_audio": false,
+   "players": false,
+   "volume": false,
+   "on_screen_message": false,
+   "break_screen": false,
+   "clock": true,
+   "screenshot": false
+  }
+ }
+]

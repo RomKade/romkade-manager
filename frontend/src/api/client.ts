@@ -1,3 +1,4 @@
+import { IS_DEMO } from "../demo/mode";
 import type { components } from "./schema";
 
 type S = components["schemas"];
@@ -260,6 +261,10 @@ export const api = {
  * c'est la seule API du navigateur qui donne la progression d'un envoi.
  */
 export function uploadFile(file: File, onProgress: (loaded: number, total: number) => void, signal?: AbortSignal): Promise<Upload> {
+  if (IS_DEMO) {
+    onProgress(file.size, file.size);
+    return request<Upload>("PUT", `/uploads${qs({ filename: file.name, size: file.size })}`);
+  }
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", `/api/uploads${qs({ filename: file.name })}`);

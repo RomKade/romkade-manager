@@ -1,0 +1,156 @@
+/**
+ * Bibliothèque de la démo : jeux inventés pour ROMKADE (titres, studios et textes), répartis sur six consoles.
+ * Aucun vrai jeu, aucune marque d'éditeur : la démo est publique sur romkade.com.
+ */
+import type { Scene } from "./art";
+
+export type DemoPlatform = { id: number; directory: string; code: string; label: string; ext: string; kind: string };
+
+export const PLATFORMS: DemoPlatform[] = [
+  { id: 1, directory: "FC", code: "FC", label: "NES / Famicom", ext: "nes", kind: "emulated" },
+  { id: 2, directory: "SFC", code: "SFC", label: "Super Nintendo", ext: "sfc", kind: "emulated" },
+  { id: 3, directory: "GB", code: "GB", label: "Game Boy", ext: "gb", kind: "emulated" },
+  { id: 4, directory: "GBA", code: "GBA", label: "Game Boy Advance", ext: "gba", kind: "emulated" },
+  { id: 5, directory: "MD", code: "MD", label: "Mega Drive / Genesis", ext: "md", kind: "emulated" },
+  { id: 6, directory: "PS", code: "PS", label: "PlayStation", ext: "chd", kind: "emulated" },
+];
+
+type Text3 = { fr: string; en: string; es: string };
+
+export type DemoGame = {
+  title: string; dir: string; genre: string; year: number; dev: string; players: number; scene: Scene;
+  region: "World" | "Europe" | "USA" | "Japan"; size: number; text: Text3;
+};
+
+const MB = 1024 * 1024;
+
+export const GAMES: DemoGame[] = [
+  { title: "Skygrove Isles", dir: "SFC", genre: "plateforme", year: 1994, dev: "Pixel Harbor", players: 1, scene: "isles", region: "Europe", size: 2 * MB,
+    text: { fr: "Sautez d'île en île au-dessus des nuages pour rallumer les phares du ciel, avec un planeur qui s'améliore au fil des mondes.",
+      en: "Hop from island to island above the clouds to relight the sky lighthouses, with a glider that improves world after world.",
+      es: "Salta de isla en isla sobre las nubes para volver a encender los faros del cielo, con un planeador que mejora en cada mundo." } },
+  { title: "Voltway 88", dir: "MD", genre: "course", year: 1991, dev: "Neon Garage", players: 2, scene: "city", region: "Europe", size: 1 * MB,
+    text: { fr: "Course de nuit dans une ville néon : boost électrique, raccourcis par les toits et duel en écran partagé.",
+      en: "Night racing through a neon city: electric boost, rooftop shortcuts and split-screen duels.",
+      es: "Carreras nocturnas por una ciudad de neón: turbo eléctrico, atajos por los tejados y duelos a pantalla partida." } },
+  { title: "Frostpeak Trail", dir: "GBA", genre: "aventure", year: 2003, dev: "Northlight", players: 1, scene: "peaks", region: "Europe", size: 8 * MB,
+    text: { fr: "Une expédition en montagne où chaque col cache une énigme de glace, et où le froid compte autant que les monstres.",
+      en: "A mountain expedition where every pass hides an ice puzzle, and the cold matters as much as the monsters.",
+      es: "Una expedición de montaña donde cada puerto esconde un acertijo de hielo, y el frío importa tanto como los monstruos." } },
+  { title: "Mistvale Chronicles", dir: "SFC", genre: "rpg", year: 1995, dev: "Lantern Works", players: 1, scene: "forest", region: "Europe", size: 4 * MB,
+    text: { fr: "Un jeu de rôle au tour par tour dans une vallée noyée de brume : quatre héros, une carte à dévoiler et des combats à la jauge de temps.",
+      en: "A turn-based role-playing game in a mist-drowned valley: four heroes, a map to uncover and time-gauge battles.",
+      es: "Un juego de rol por turnos en un valle cubierto de niebla: cuatro héroes, un mapa por descubrir y combates con barra de tiempo." } },
+  { title: "Sunken Glyphs", dir: "GB", genre: "reflexion", year: 1992, dev: "Tidal Bits", players: 2, scene: "ruins", region: "World", size: 256 * 1024,
+    text: { fr: "Faites glisser les dalles d'un temple englouti pour reformer les glyphes, seul ou à deux avec le câble link.",
+      en: "Slide the tiles of a sunken temple to rebuild the glyphs, alone or with a friend over the link cable.",
+      es: "Desliza las losas de un templo sumergido para recomponer los glifos, solo o con un amigo por cable link." } },
+  { title: "Glimmer Hollow", dir: "GBA", genre: "action", year: 2004, dev: "Firefly Forge", players: 2, scene: "cave", region: "Europe", size: 16 * MB,
+    text: { fr: "Explorez des grottes de cristal avec une lanterne qui sert aussi d'arme : la lumière repousse les ombres et révèle les passages.",
+      en: "Explore crystal caves with a lantern that doubles as a weapon: light pushes back the shadows and reveals passages.",
+      es: "Explora cuevas de cristal con un farol que también es un arma: la luz aparta las sombras y revela pasadizos." } },
+  { title: "Comet Courier", dir: "FC", genre: "shmup", year: 1989, dev: "Orbit Eight", players: 2, scene: "space", region: "USA", size: 256 * 1024,
+    text: { fr: "Livrez le courrier interplanétaire sous une pluie d'astéroïdes : shoot'em up à défilement vertical, à deux en même temps.",
+      en: "Deliver interplanetary mail through an asteroid storm: a vertical shoot'em up for two players at once.",
+      es: "Entrega el correo interplanetario bajo una lluvia de asteroides: un matamarcianos vertical para dos jugadores a la vez." } },
+  { title: "Pocket Rally", dir: "GB", genre: "course", year: 1993, dev: "Tidal Bits", players: 2, scene: "track", region: "Europe", size: 512 * 1024,
+    text: { fr: "Rallye vu de dessus sur des pistes de terre et de neige, avec un éditeur de circuits et le duel par câble link.",
+      en: "Top-down rally on dirt and snow tracks, with a track editor and link-cable duels.",
+      es: "Rally visto desde arriba en pistas de tierra y nieve, con editor de circuitos y duelos por cable link." } },
+  { title: "Harbor Knights", dir: "MD", genre: "beat", year: 1992, dev: "Iron Pier", players: 2, scene: "sea", region: "Europe", size: 2 * MB,
+    text: { fr: "Beat'em up sur les quais d'un port en pleine tempête : trois chevaliers, des combos et des caisses à lancer.",
+      en: "A beat'em up on the docks of a storm-hit harbor: three knights, combos and crates to throw.",
+      es: "Un beat'em up en los muelles de un puerto en plena tormenta: tres caballeros, combos y cajas para lanzar." } },
+  { title: "Dune Drifter", dir: "MD", genre: "action", year: 1993, dev: "Neon Garage", players: 1, scene: "desert", region: "USA", size: 2 * MB,
+    text: { fr: "Glissez sur les dunes en planche à voile des sables, attrapez les reliques et échappez aux vers géants.",
+      en: "Sand-surf across the dunes, grab relics and escape the giant worms.",
+      es: "Desliza por las dunas en tabla de arena, recoge reliquias y escapa de los gusanos gigantes." } },
+  { title: "Tower of Echoes", dir: "SFC", genre: "aventure", year: 1996, dev: "Lantern Works", players: 1, scene: "ruins", region: "Japan", size: 3 * MB,
+    text: { fr: "Gravissez une tour où chaque étage rejoue vos pas d'avant : un écho de vous-même ouvre les portes.",
+      en: "Climb a tower where every floor replays your earlier steps: an echo of yourself opens the doors.",
+      es: "Sube una torre donde cada piso repite tus pasos anteriores: un eco de ti mismo abre las puertas." } },
+  { title: "Byte Bandits", dir: "FC", genre: "plateforme", year: 1990, dev: "Orbit Eight", players: 2, scene: "city", region: "Europe", size: 384 * 1024,
+    text: { fr: "Deux voleurs de pixels traversent une ville rétro, en alternance ou ensemble, pour récupérer les octets dérobés.",
+      en: "Two pixel thieves cross a retro city, taking turns or together, to win back the stolen bytes.",
+      es: "Dos ladrones de píxeles cruzan una ciudad retro, por turnos o juntos, para recuperar los bytes robados." } },
+  { title: "Lumen Drift", dir: "PS", genre: "simulation", year: 1998, dev: "Halo Bay", players: 1, scene: "sea", region: "Europe", size: 410 * MB,
+    text: { fr: "Pilotez un petit sous-marin lumineux dans les abysses, cartographiez les fonds et ramenez des espèces inconnues.",
+      en: "Pilot a small glowing submarine in the abyss, map the seabed and bring back unknown species.",
+      es: "Pilota un pequeño submarino luminoso en el abismo, cartografía el fondo y trae especies desconocidas." } },
+  { title: "Starlance Zero", dir: "PS", genre: "shmup", year: 1997, dev: "Orbit Eight", players: 2, scene: "space", region: "Europe", size: 520 * MB,
+    text: { fr: "Shoot'em up en 3D à défilement horizontal : une lance d'énergie qui se charge en frôlant les tirs ennemis.",
+      en: "A side-scrolling 3D shoot'em up: an energy lance that charges as you graze enemy fire.",
+      es: "Un matamarcianos 3D de scroll horizontal: una lanza de energía que se carga rozando los disparos enemigos." } },
+  { title: "Moss & Mortar", dir: "GBA", genre: "strategie", year: 2005, dev: "Northlight", players: 2, scene: "forest", region: "Europe", size: 8 * MB,
+    text: { fr: "Stratégie au tour par tour entre deux villages de la forêt : bâtir, récolter, et défendre ses murs de mousse.",
+      en: "Turn-based strategy between two forest villages: build, harvest and defend your moss walls.",
+      es: "Estrategia por turnos entre dos aldeas del bosque: construye, cosecha y defiende tus muros de musgo." } },
+  { title: "Pixel Pinball Deluxe", dir: "GB", genre: "flipper", year: 1994, dev: "Tidal Bits", players: 1, scene: "space", region: "World", size: 512 * 1024,
+    text: { fr: "Trois tables de flipper sur le thème de l'espace, avec missions, multibille et tableau des scores.",
+      en: "Three space-themed pinball tables, with missions, multiball and high-score table.",
+      es: "Tres mesas de pinball de temática espacial, con misiones, multibola y tabla de récords." } },
+  { title: "Cinder Fist", dir: "SFC", genre: "combat", year: 1995, dev: "Iron Pier", players: 2, scene: "cave", region: "USA", size: 4 * MB,
+    text: { fr: "Jeu de combat à deux : huit lutteurs, des coups spéciaux de feu et de glace, et un mode tournoi.",
+      en: "A two-player fighting game: eight fighters, fire and ice special moves and a tournament mode.",
+      es: "Juego de lucha para dos: ocho luchadores, golpes especiales de fuego y hielo y un modo torneo." } },
+  { title: "Quill & Quest", dir: "GB", genre: "rpg", year: 1997, dev: "Lantern Works", players: 1, scene: "forest", region: "Europe", size: 1 * MB,
+    text: { fr: "Un scribe part en voyage pour réécrire un royaume effacé : les mots trouvés deviennent des sorts.",
+      en: "A scribe sets out to rewrite an erased kingdom: the words you find become spells.",
+      es: "Un escriba emprende un viaje para reescribir un reino borrado: las palabras que encuentras se vuelven hechizos." } },
+  { title: "Turbo Tides", dir: "GBA", genre: "course", year: 2002, dev: "Halo Bay", players: 2, scene: "sea", region: "Europe", size: 8 * MB,
+    text: { fr: "Courses de jet-ski sur des vagues qui changent à chaque tour, avec figures et raccourcis sous les cascades.",
+      en: "Jet-ski races on waves that change every lap, with tricks and shortcuts under waterfalls.",
+      es: "Carreras de moto acuática sobre olas que cambian en cada vuelta, con piruetas y atajos bajo las cascadas." } },
+  { title: "Rune Runner", dir: "FC", genre: "action", year: 1991, dev: "Firefly Forge", players: 1, scene: "ruins", region: "Europe", size: 256 * 1024,
+    text: { fr: "Course effrénée dans des ruines qui s'effondrent : chaque rune ramassée change votre pouvoir.",
+      en: "A frantic run through crumbling ruins: every rune you grab changes your power.",
+      es: "Una carrera frenética por ruinas que se derrumban: cada runa que recoges cambia tu poder." } },
+  { title: "Nebula Garden", dir: "PS", genre: "reflexion", year: 1999, dev: "Halo Bay", players: 1, scene: "space", region: "Europe", size: 180 * MB,
+    text: { fr: "Faites pousser des fleurs d'étoiles en orientant la lumière de planètes : un jeu de réflexion calme en 60 tableaux.",
+      en: "Grow star flowers by steering planetary light: a calm puzzle game in 60 levels.",
+      es: "Haz crecer flores de estrellas orientando la luz de los planetas: un juego de puzles tranquilo en 60 niveles." } },
+  { title: "Iron Orchard", dir: "MD", genre: "tir", year: 1994, dev: "Iron Pier", players: 2, scene: "forest", region: "Europe", size: 2 * MB,
+    text: { fr: "Run and gun dans un verger envahi par des robots jardiniers, avec armes à combiner et boss géants.",
+      en: "A run and gun in an orchard overrun by gardening robots, with combinable weapons and giant bosses.",
+      es: "Un run and gun en un huerto invadido por robots jardineros, con armas combinables y jefes gigantes." } },
+  { title: "Snowdrop Valley", dir: "SFC", genre: "simulation", year: 1997, dev: "Pixel Harbor", players: 1, scene: "peaks", region: "Europe", size: 2 * MB,
+    text: { fr: "Tenez une petite ferme de montagne au fil des saisons : cultures, animaux et fêtes du village.",
+      en: "Run a small mountain farm through the seasons: crops, animals and village festivals.",
+      es: "Lleva una pequeña granja de montaña a lo largo de las estaciones: cultivos, animales y fiestas del pueblo." } },
+  { title: "Bounce Brigade", dir: "GBA", genre: "plateforme", year: 2004, dev: "Pixel Harbor", players: 1, scene: "isles", region: "USA", size: 4 * MB,
+    text: { fr: "Une équipe de balles rebondissantes à guider à travers des îles tropicales, chacune avec son saut.",
+      en: "A team of bouncing balls to guide through tropical islands, each with its own jump.",
+      es: "Un equipo de pelotas saltarinas que guiar por islas tropicales, cada una con su salto." } },
+  { title: "Desert Signal", dir: "PS", genre: "aventure", year: 2000, dev: "Northlight", players: 1, scene: "desert", region: "Europe", size: 630 * MB,
+    text: { fr: "Une radio capte un signal au milieu du désert : aventure à énigmes, à remonter jusqu'à son émetteur.",
+      en: "A radio picks up a signal in the middle of the desert: a puzzle adventure to trace it back to its source.",
+      es: "Una radio capta una señal en medio del desierto: una aventura de puzles hasta dar con su emisor." } },
+  { title: "Gridlock Gems", dir: "FC", genre: "reflexion", year: 1990, dev: "Tidal Bits", players: 2, scene: "cave", region: "Japan", size: 128 * 1024,
+    text: { fr: "Alignez les gemmes qui tombent avant que la mine ne déborde ; en duel, vos combos envoient des blocs chez l'adversaire.",
+      en: "Line up falling gems before the mine overflows; in versus mode, your combos send blocks to your opponent.",
+      es: "Alinea las gemas que caen antes de que la mina rebose; en duelo, tus combos envían bloques al rival." } },
+  { title: "Ember Saga", dir: "PS", genre: "rpg", year: 1999, dev: "Lantern Works", players: 1, scene: "desert", region: "Europe", size: 700 * MB,
+    text: { fr: "Un grand jeu de rôle sur trois disques : une caravane, un volcan endormi et des combats aux braises à combiner.",
+      en: "A large role-playing game on three discs: a caravan, a dormant volcano and battles with combinable embers.",
+      es: "Un gran juego de rol en tres discos: una caravana, un volcán dormido y combates con brasas combinables." } },
+  { title: "Kite Kingdom", dir: "GB", genre: "plateforme", year: 1996, dev: "Pixel Harbor", players: 1, scene: "peaks", region: "Europe", size: 512 * 1024,
+    text: { fr: "Planez de sommet en sommet suspendu à un cerf-volant, en jouant avec le vent pour atteindre le château.",
+      en: "Glide from peak to peak hanging from a kite, playing with the wind to reach the castle.",
+      es: "Planea de cima en cima colgado de una cometa, jugando con el viento para llegar al castillo." } },
+  { title: "Neon Nightfall", dir: "SFC", genre: "beat", year: 1993, dev: "Neon Garage", players: 2, scene: "city", region: "Europe", size: 2 * MB,
+    text: { fr: "Nettoyez les rues d'une ville néon à deux, avec motos, ascenseurs et un patron final sur un dirigeable.",
+      en: "Clean up the streets of a neon city with a friend: motorbikes, elevators and a final boss on an airship.",
+      es: "Limpia las calles de una ciudad de neón con un amigo: motos, ascensores y un jefe final en un dirigible." } },
+  { title: "Coral Quest", dir: "GBA", genre: "aventure", year: 2003, dev: "Halo Bay", players: 1, scene: "sea", region: "Europe", size: 16 * MB,
+    text: { fr: "Une plongeuse explore un récif, parle aux poissons et répare le corail : aventure paisible avec quelques secrets.",
+      en: "A diver explores a reef, talks to fish and repairs the coral: a peaceful adventure with a few secrets.",
+      es: "Una buceadora explora un arrecife, habla con los peces y repara el coral: una aventura tranquila con algunos secretos." } },
+];
+
+/** Jeux marqués d'avance comme favoris et joués récemment (index dans GAMES). */
+export const FAVORITES = [0, 3, 6, 14];
+export const RECENT = [0, 3, 1, 5, 9, 17];
+/** Jeux qui ont des sauvegardes sur la console de démo. */
+export const WITH_SAVES = [0, 3, 2, 5, 17, 26];
+
+export const CONSOLE = { host: "192.168.1.42", name: "RG35XX Plus", model: "Anbernic RG35XX Plus", firmware: "stock 1.1.6" };
