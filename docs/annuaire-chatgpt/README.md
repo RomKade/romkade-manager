@@ -16,6 +16,8 @@ démo. OpenAI demande un paquet ZIP : manifeste, configuration MCP, icônes, cap
 | Vidéo de démonstration (`https://romkade.com/video/romkade-in-chatgpt.mp4`) | Claude | ✅ |
 | Vérification d'identité OpenAI (Individual) | vous | ✅ |
 | Envoi du ZIP, domaine vérifié, serveur connecté (13 outils, aucun relevé), identifiants, soumission | vous | ✅ soumis le 2026-10-27, version 1.0.0 en revue |
+| Refus de la 1.0.0 : nom du développeur différent de l'identité vérifiée → `developerName` et `author.name` = « Arnaud Breton », version 1.0.1, ZIP refait | Claude | ✅ 2026-11-06 |
+| Nouvelle soumission de la 1.0.1 (envoi du nouveau ZIP) | vous | ⬜ |
 | Publication après acceptation (bouton **Publish plugin**) | vous | ⬜ |
 
 ## Contenu
@@ -49,6 +51,9 @@ démo. OpenAI demande un paquet ZIP : manifeste, configuration MCP, icônes, cap
 > console.
 
 ## Points d'attention
+
+- Le nom du développeur (`developerName`, `author.name`) doit être celui de l'identité vérifiée chez OpenAI
+  (Individual : « Arnaud Breton »), pas la marque.
 
 - « Importer une archive de plugin » installe le paquet dans **Codex**, pas dans ChatGPT, et sans connexion OAuth :
   ça valide le paquet (accepté le 2026-10-27), pas le serveur. Le test se fait avec un serveur personnalisé sur chatgpt.com.
