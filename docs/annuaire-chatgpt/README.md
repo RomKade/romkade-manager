@@ -54,6 +54,7 @@ démo. OpenAI demande un paquet ZIP : manifeste, configuration MCP, icônes, cap
 
 - Le nom du développeur (`developerName`, `author.name`) doit être celui de l'identité vérifiée chez OpenAI
   (Individual : « Arnaud Breton »), pas la marque.
+- Le portail refuse `interface.screenshots` dans le manifeste : les captures ne sont pas dans le ZIP.
 
 - « Importer une archive de plugin » installe le paquet dans **Codex**, pas dans ChatGPT, et sans connexion OAuth :
   ça valide le paquet (accepté le 2026-10-27), pas le serveur. Le test se fait avec un serveur personnalisé sur chatgpt.com.

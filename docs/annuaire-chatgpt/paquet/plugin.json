@@ -36,14 +36,7 @@
           "Launch my last game and set the volume to 60 %"
         ],
         "composerIcon": "./assets/icon.png",
-        "logo": "./assets/logo.png",
-        "screenshots": [
-          "./assets/screenshot-1-library.png",
-          "./assets/screenshot-2-games.png",
-          "./assets/screenshot-3-game-details.png",
-          "./assets/screenshot-4-now-playing.png",
-          "./assets/screenshot-5-favorites.png"
-        ]
+        "logo": "./assets/logo.png"
       },
       "review": {
         "test_cases": {
