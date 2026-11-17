@@ -86,6 +86,9 @@ fichiers) depuis l'agent. Les autres firmwares suivent les profils du Manager, s
 - `deploy/supabase_setup.py` : configuration rejouable de Supabase Auth par l'API de gestion (OAuth, Mailjet,
   codes à 6 chiffres, règles de mot de passe, e-mails ROMKADE en français, anglais et espagnol). Secrets dans
   `deploy/.env` (jamais commité).
+- `deploy/supabase_signups.py` : annonce de chaque nouvel utilisateur (compte confirmé) sur Discord, par un
+  déclencheur sur `auth.users` et pg_net ; webhook `DISCORD_SIGNUPS_WEBHOOK` rangé dans le coffre de Supabase.
+  `--test` poste un essai, `--remove` retire tout.
 - Connecteur : `https://mcp.romkade.com`, authentification **OAuth**. Les adresses à jeton (`/<jeton>`) sont
   coupées ; `python -m romkade_cloud move-consoles <ancien> sb:<id>` transfère les consoles d'un ancien compte.
 
