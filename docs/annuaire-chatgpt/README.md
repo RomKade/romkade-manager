@@ -17,8 +17,8 @@ démo. OpenAI demande un paquet ZIP : manifeste, configuration MCP, icônes, cap
 | Vérification d'identité OpenAI (Individual) | vous | ✅ |
 | Envoi du ZIP, domaine vérifié, serveur connecté (13 outils, aucun relevé), identifiants, soumission | vous | ✅ soumis le 2026-10-27, version 1.0.0 en revue |
 | Refus de la 1.0.0 : nom du développeur différent de l'identité vérifiée → `developerName` et `author.name` = « Arnaud Breton », version 1.0.1, ZIP refait | Claude | ✅ 2026-11-06 |
-| Nouvelle soumission de la 1.0.1 (envoi du nouveau ZIP) | vous | ⬜ |
-| Publication après acceptation (bouton **Publish plugin**) | vous | ⬜ |
+| Nouvelle soumission de la 1.0.1 (envoi du nouveau ZIP) | vous | ✅ acceptée |
+| Publication après acceptation (bouton **Publish plugin**) | vous | ✅ 2026-11-23, ROMKADE publié dans ChatGPT |
 
 ## Contenu
 
