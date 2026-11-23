@@ -14,6 +14,8 @@
     /.well-known/oauth-protected-resource   serveur d'autorisation de ce serveur MCP (Supabase Auth)
     /.well-known/openai-apps-challenge      jeton de vérification du domaine pour l'annuaire de ChatGPT
                              (ROMKADE_OPENAI_CHALLENGE ; 404 sans lui)
+    /.well-known/glama.json  revendication du connecteur sur glama.ai (jeton public, lié au compte Glama : à laisser
+                             en ligne pour rester vérifié ; romkade.com publie le même fichier)
     /api/me/…                API du compte pour ROMKADE Manager (jeton de session Supabase) : consoles reliées,
                              liaison d'une console sans code, suppression du compte
     /api/me/likes            jeux aimés ou non du compte (favoris et « Je n'aime pas » du Manager, avec leur date),
@@ -60,6 +62,10 @@ from .homegraph import HomeGraph
 from .relay import Relay
 from .store import MAX_CONSOLES, Store
 from .tools import build
+
+# Revendication du connecteur sur glama.ai (même jeton pour mcp.romkade.com et romkade.com, sans donnée personnelle)
+GLAMA_CLAIM = {"$schema": "https://glama.ai/mcp/schemas/connector.json",
+               "claim": "glama_claim_EdPRHoESAIZ1FL4whiu2dp_sBmd3-qS_"}
 
 log = logging.getLogger("romkade.cloud")
 STATIC = Path(__file__).parent / "static"
@@ -294,6 +300,9 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         token = os.environ.get("ROMKADE_OPENAI_CHALLENGE", "").strip()
         return PlainTextResponse(token) if token else PlainTextResponse("Not found", status_code=404)
 
+    async def glama_claim(_: Request) -> Response:
+        return JSONResponse(GLAMA_CLAIM, headers={"Cache-Control": "public, max-age=3600"})
+
     # ---------- comptes ROMKADE (OAuth) ----------
     async def protected_resource(request: Request) -> Response:
         """RFC 9728 : quel serveur d'autorisation délivre les jetons de ce serveur MCP (ou de celui de /beta)."""
@@ -516,6 +525,7 @@ def create_app(store: Store | None = None, relay: Relay | None = None, public_ur
         Route("/google/token", google.token, methods=["POST"]),
         Route("/google/fulfillment", google.fulfillment, methods=["POST"]),
         Route("/.well-known/openai-apps-challenge", openai_challenge),
+        Route("/.well-known/glama.json", glama_claim),
         Route("/.well-known/oauth-protected-resource", protected_resource),
         Route("/.well-known/oauth-protected-resource/mcp", protected_resource),
         Route("/.well-known/oauth-protected-resource/beta", protected_resource),

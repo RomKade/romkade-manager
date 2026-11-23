@@ -303,6 +303,24 @@ class FakeAuth:
         return {"sub": "u-123", "email": "joueur@example.com", "role": "authenticated"} if token == "bon-jeton" else None
 
 
+def test_glama_claim(env):
+    store, _ = env
+
+    async def scenario():
+        base, server, task = await serving(store, Relay())
+        try:
+            async with httpx.AsyncClient() as h:
+                r = await h.get(f"{base}/.well-known/glama.json")
+                assert r.status_code == 200 and r.headers["content-type"].startswith("application/json")
+                assert r.json() == {"$schema": "https://glama.ai/mcp/schemas/connector.json",
+                                    "claim": "glama_claim_EdPRHoESAIZ1FL4whiu2dp_sBmd3-qS_"}
+        finally:
+            server.should_exit = True
+            await task
+
+    asyncio.run(scenario())
+
+
 def test_openai_domain_challenge(env, monkeypatch):
     store, _ = env
 
